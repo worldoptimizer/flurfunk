@@ -22,6 +22,7 @@ function all(): array {
 		'Log in' => __( 'Log in', 'flurfunk' ),
 		'just now' => __( 'just now', 'flurfunk' ),
 		'Remove card' => __( 'Remove card', 'flurfunk' ),
+		'no longer available' => __( 'no longer available', 'flurfunk' ),
 		'Conversations about this post' => __( 'Conversations about this post', 'flurfunk' ),
 		'done' => __( 'done', 'flurfunk' ),
 		'open' => __( 'open', 'flurfunk' ),

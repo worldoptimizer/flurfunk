@@ -205,6 +205,28 @@ list( $s, $r ) = $req( 'GET', 'targets', null, array( 'q' => '' ) );
 $check( 'guest finds only own posts, no plugin targets', $r && ! array_filter( $r, fn ( $i ) => 'post' !== $i['type'] || ! in_array( $i['id'], Flurfunk\Access\owned_post_ids( $guest ), true ) ), $r );
 $as( $team );
 
+WP_CLI::log( 'Cache and files' );
+$as( $team2 );
+$c1 = Store\counts( $team2 )['total'];
+$as( $team );
+Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'neu für den Zähler' ) );
+$c2 = Store\counts( $team2 )['total'];
+$check( 'cached unread numbers update right after a new thread', $c2 === $c1 + 1, "$c1 → $c2" );
+$png = wp_tempnam( 'ff-test.png' );
+file_put_contents( $png, base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' ) );
+require_once ABSPATH . 'wp-admin/includes/media.php';
+require_once ABSPATH . 'wp-admin/includes/file.php';
+require_once ABSPATH . 'wp-admin/includes/image.php';
+$att = media_handle_sideload( array( 'name' => 'ff-test-punkt.png', 'tmp_name' => $png ), 0, 'Testbild Punkt' );
+list( $s, $x ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'mit Bild', 'files' => array( $att ) ) );
+$f = end( $x['messages'] )['files'][0] ?? array();
+$check( 'image files come with address, preview and title', ! empty( $f['url'] ) && ! empty( $f['preview'] ) && 'Testbild Punkt' === ( $f['title'] ?? '' ), $f );
+wp_delete_attachment( $att, true );
+list( $s, $x ) = $req( 'GET', 'threads/' . $t2['id'] );
+$f = end( $x['messages'] )['files'][0] ?? array();
+$check( 'a file deleted from the media library is marked missing', ! empty( $f['missing'] ) && empty( $f['url'] ), $f );
+$check( 'files from another site keep their link', 'https://elsewhere.example/a.pdf' === ( Store\file_view( array( 'id' => 0, 'name' => 'a.pdf', 'url' => 'https://elsewhere.example/a.pdf' ) )['url'] ?? '' ) );
+
 WP_CLI::log( 'Mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );

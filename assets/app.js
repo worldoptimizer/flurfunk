@@ -117,15 +117,52 @@
 		return '<span class="ff-ava' + ( 'guest' === p.kind ? ' is-guest' : '' ) + ( boot && id === boot.me.id ? ' is-me' : '' ) + ( cls ? ' ' + cls : '' ) + '" aria-hidden="true">' + esc( initials( p.name ) ) + photo( p ) + '</span>';
 	};
 
-	const linkify = ( html ) => html.replace( /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>' );
-	const rich = ( text ) => String( text || '' ).split( /(<@\d+>)/ ).map( ( part ) => {
-		const m = part.match( /^<@(\d+)>$/ );
-		if ( m ) {
-			const p = person( +m[ 1 ] );
-			return '<span class="ff-mention' + ( boot && +m[ 1 ] === boot.me.id ? ' is-me' : '' ) + '">@' + esc( p.name ) + '</span>';
-		}
-		return linkify( esc( part ) ).replace( /\n/g, '<br>' );
-	} ).join( '' );
+	/*
+	 * Text → HTML: escaped first, then a small, Slack-like formatting on top. Mentions, links
+	 * and code are set aside as placeholders so formatting never reaches into them.
+	 *   *bold*  _italic_  ~strike~  `code`  ```block```  "- item" / "1. item"  "> quote"
+	 */
+	const rich = ( text ) => {
+		const keep = [];
+		const hold = ( html ) => '\u0000' + ( keep.push( html ) - 1 ) + '\u0000';
+		let s = String( text || '' );
+		s = s.replace( /```([\s\S]*?)```/g, ( all, code ) => hold( '<pre class="ff-code">' + esc( code.replace( /^\n|\n$/g, '' ) ) + '</pre>' ) );
+		s = s.replace( /`([^`\n]+)`/g, ( all, code ) => hold( '<code>' + esc( code ) + '</code>' ) );
+		s = s.replace( /<@(\d+)>/g, ( all, id ) => hold( '<span class="ff-mention' + ( boot && +id === boot.me.id ? ' is-me' : '' ) + '">@' + esc( person( +id ).name ) + '</span>' ) );
+		s = s.replace( /https?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]]/g, ( url ) => hold( '<a href="' + esc( url ) + '" target="_blank" rel="noopener noreferrer">' + esc( url ) + '</a>' ) );
+		s = esc( s );
+		const edge = '(^|[\\s(„"\'\\[])';
+		const end = '(?=$|[\\s).,!?:;“"\'\\]])';
+		s = s.replace( new RegExp( edge + '\\*([^*\\n]+?)\\*' + end, 'g' ), '$1<strong>$2</strong>' );
+		s = s.replace( new RegExp( edge + '_([^_\\n]+?)_' + end, 'g' ), '$1<em>$2</em>' );
+		s = s.replace( new RegExp( edge + '~([^~\\n]+?)~' + end, 'g' ), '$1<s>$2</s>' );
+		// Lines: lists and quotes become blocks, everything else keeps its line breaks.
+		const out = [];
+		let block = null;
+		const flush = () => {
+			if ( block ) {
+				out.push( '<' + block.tag + '>' + block.items.map( ( x ) => ( 'blockquote' === block.tag ? x : '<li>' + x + '</li>' ) ).join( 'blockquote' === block.tag ? '<br>' : '' ) + '</' + block.tag + '>' );
+				block = null;
+			}
+		};
+		s.split( '\n' ).forEach( ( line ) => {
+			const m = line.match( /^\s*(?:([-•*])|(\d+)[.)]|(&gt;))\s+(.*)$/ );
+			const tag = m ? ( m[ 1 ] ? 'ul' : m[ 2 ] ? 'ol' : 'blockquote' ) : null;
+			if ( tag ) {
+				if ( ! block || block.tag !== tag ) {
+					flush();
+					block = { tag, items: [] };
+				}
+				block.items.push( m[ 4 ] );
+				return;
+			}
+			flush();
+			out.push( line + '\n' );
+		} );
+		flush();
+		s = out.join( '' ).replace( /\n$/, '' ).replace( /\n/g, '<br>' ).replace( /(<\/(?:ul|ol|blockquote)>)<br>/g, '$1' );
+		return s.replace( /\u0000(\d+)\u0000/g, ( all, i ) => keep[ +i ] );
+	};
 
 	// "@Full Name" (or a unique first name) → <@ID>.
 	const encode = ( text ) => {
@@ -174,7 +211,30 @@
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};
 	const cards = ( list ) => ( list && list.length ? '<div class="ff-cards">' + list.map( ( a ) => card( a ) ).join( '' ) + '</div>' : '' );
-	const files = ( list ) => ( list || [] ).map( ( f ) => '<a class="ff-file" href="' + esc( cfg.mediaUrl + f.id ) + '" target="_top">' + icon.file + esc( f.name ) + ' <small>· ' + size( f.size ) + '</small></a>' ).join( '' );
+	// Images as previews, audio and video as players, everything else as a link.
+	const files = ( list ) => {
+		const items = ( list || [] ).map( ( f ) => {
+			const type = String( f.type || '' );
+			// The media library title if someone set one, otherwise the file name.
+			const name = f.title && f.title !== String( f.name ).replace( /\.[^.]+$/, '' ) ? f.title : f.name;
+			const label = esc( name ) + ' <small>· ' + size( f.size ) + '</small>';
+			if ( f.missing || ! f.url ) {
+				return '<span class="ff-file is-missing">' + icon.file + esc( f.name ) + ' <small>· ' + esc( t( 'no longer available' ) ) + '</small></span>';
+			}
+			if ( type.startsWith( 'image/' ) ) {
+				const ratio = f.width && f.height ? ' style="aspect-ratio:' + f.width + '/' + f.height + '"' : '';
+				return '<a class="ff-media ff-image" href="' + esc( f.url ) + '" target="_blank" rel="noopener"' + ratio + '><img src="' + esc( f.preview || f.url ) + '" alt="' + esc( f.name ) + '" loading="lazy"></a>';
+			}
+			if ( type.startsWith( 'audio/' ) ) {
+				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio></figure>';
+			}
+			if ( type.startsWith( 'video/' ) ) {
+				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption></figure>';
+			}
+			return '<a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>';
+		} );
+		return items.length ? '<div class="ff-files">' + items.join( '' ) + '</div>' : '';
+	};
 
 	/* ------------------------------------------------------------------ pieces */
 
@@ -1229,6 +1289,7 @@
 		},
 		api,
 		t,
+		format: rich,
 	};
 
 	document.addEventListener( 'DOMContentLoaded', () => {

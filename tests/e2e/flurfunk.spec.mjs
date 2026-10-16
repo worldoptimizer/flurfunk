@@ -167,6 +167,32 @@ test.describe( 'team', () => {
 		expect( full.body ).toContain( 'e2e mit Datei' );
 	} );
 
+	test( 'formatting and image previews show in the thread', async ( { page } ) => {
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		await ta.fill( 'e2e *fett* und _kursiv_\n- eins\n- zwei\n`code`' );
+		const png = Buffer.from( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64' );
+		await page.locator( '.ff-new-thread input[type=file]' ).setInputFiles( { name: 'e2e-vorschau.png', mimeType: 'image/png', buffer: png } );
+		await expect( page.locator( '.ff-new-thread .ff-pending small' ) ).toHaveCount( 0, { timeout: 60_000 } );
+		await ta.press( 'Control+Enter' );
+		const root = page.locator( '.ff-pane .ff-root-msg' );
+		await expect( root.locator( 'strong' ) ).toHaveText( 'fett' );
+		await expect( root.locator( 'em' ) ).toHaveText( 'kursiv' );
+		await expect( root.locator( 'li' ) ).toHaveCount( 2 );
+		await expect( root.locator( 'code' ) ).toHaveText( 'code' );
+	} );
+
+	test( 'a reply with an image shows a preview', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Bild ' + Date.now() } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		const png = Buffer.from( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64' );
+		await page.locator( '.ff-pane input[type=file]' ).setInputFiles( { name: 'e2e-antwort.png', mimeType: 'image/png', buffer: png } );
+		await expect( page.locator( '.ff-pane .ff-pending small' ) ).toHaveCount( 0, { timeout: 60_000 } );
+		await page.locator( '.ff-pane .ff-send' ).click();
+		await expect( page.locator( '.ff-pane .ff-msg .ff-image img' ) ).toBeVisible();
+	} );
+
 	test( 'on a phone the back button returns to the list', async ( { page } ) => {
 		await page.setViewportSize( { width: 400, height: 800 } );
 		await openApp( page );

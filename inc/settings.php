@@ -97,6 +97,7 @@ function save( array $in ): void {
 	);
 	update_option( OPTION, $out, true );
 	get( true );
+	\Flurfunk\Store\bump();
 }
 
 /**

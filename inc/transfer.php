@@ -126,7 +126,17 @@ function import( array $data ): array {
 					'type'        => $m['type'] ?? 'message',
 					'status'      => $m['status'] ?? '',
 					'body'        => $text( (string) ( $m['text'] ?? '' ) ),
-					'files'       => (array) ( $m['files'] ?? array() ),
+					// Media IDs belong to the source site: keep name, type and a link to the original.
+					'files'       => array_map(
+						static fn ( $f ) => array(
+							'id'   => 0,
+							'name' => (string) ( $f['name'] ?? '' ),
+							'size' => (int) ( $f['size'] ?? 0 ),
+							'type' => (string) ( $f['type'] ?? '' ),
+							'url'  => esc_url_raw( (string) ( $f['url'] ?? '' ) ),
+						),
+						(array) ( $m['files'] ?? array() )
+					),
 					'attachments' => (array) ( $m['attachments'] ?? array() ),
 					'mentions'    => array_filter( array_map( $user, (array) ( $m['mentions'] ?? array() ) ) ),
 					'author'      => $user( $m['author'] ?? 0 ),

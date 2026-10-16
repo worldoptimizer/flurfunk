@@ -149,6 +149,7 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
 		if ( $update && $data ) {
 			$wpdb->update( table( 'channels' ), $data, array( 'id' => $row->id ) ); // phpcs:ignore WordPress.DB
 			channels( true );
+			bump();
 		}
 		return (int) $row->id;
 	}
@@ -161,8 +162,10 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
 			'created' => now(),
 		)
 	);
+	$id = (int) $wpdb->insert_id;
 	channels( true );
-	return (int) $wpdb->insert_id;
+	bump();
+	return $id;
 }
 
 /**
@@ -307,13 +310,24 @@ function create_thread( array $args, bool $check = true ) {
 	if ( '' === $body && '' === $title && empty( $args['attachments'] ) ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The conversation is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
+	// Two people ticking the same embedded checklist item at once must not create two threads.
+	$ref = sanitize_text_field( (string) ( $args['ref_key'] ?? '' ) );
+	if ( '' !== $ref ) {
+		$lock = 'flurfunk_ref_' . md5( $ref );
+		$wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $lock ) ); // phpcs:ignore WordPress.DB
+		$existing = thread_by_ref( $ref );
+		if ( $existing ) {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) ); // phpcs:ignore WordPress.DB
+			return (int) $existing->id;
+		}
+	}
 	$created = mysql( $args['created'] ?? null ) ?? now();
 	$status  = $args['status'] ?? ( empty( $args['task'] ) ? '' : 'open' );
 	$wpdb->insert( // phpcs:ignore WordPress.DB
 		table( 'threads' ),
 		array(
 			'channel_id'    => (int) $channel->id,
-			'ref_key'       => sanitize_text_field( (string) ( $args['ref_key'] ?? '' ) ),
+			'ref_key'       => $ref,
 			'target_type'   => $type,
 			'target_id'     => $tid,
 			'title'         => $title,
@@ -327,9 +341,13 @@ function create_thread( array $args, bool $check = true ) {
 		)
 	);
 	$id = (int) $wpdb->insert_id;
+	if ( '' !== $ref ) {
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'flurfunk_ref_' . md5( $ref ) ) ); // phpcs:ignore WordPress.DB
+	}
 	if ( ! $id ) {
 		return new \WP_Error( 'flurfunk_db', __( 'Could not save the conversation.', 'flurfunk' ), array( 'status' => 500 ) );
 	}
+	bump();
 	$row = thread_row( $id );
 	save_mentions( $row, 0, $check ? mentions_in( $body, $row ) : array_map( 'intval', (array) ( $args['mentions'] ?? array() ) ) );
 	save_attachments( $row, 0, (array) ( $args['attachments'] ?? array() ), $author, $check );
@@ -380,6 +398,7 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 		return new \WP_Error( 'flurfunk_db', __( 'Could not save the message.', 'flurfunk' ), array( 'status' => 500 ) );
 	}
 	$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'threads' ) . ' SET last_activity = GREATEST(last_activity, %s) WHERE id = %d', $created, $thread_id ) ); // phpcs:ignore WordPress.DB
+	bump();
 	save_mentions( $thread, $id, $check ? mentions_in( $body, $thread ) : array_map( 'intval', (array) ( $args['mentions'] ?? array() ) ) );
 	save_attachments( $thread, $id, (array) ( $args['attachments'] ?? array() ), $author, $check );
 	if ( $check ) {
@@ -458,6 +477,7 @@ function edit_message( int $message_id, string $body ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The message is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	$wpdb->update( table( 'messages' ), array( 'body' => $body, 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	bump();
 	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
 	save_mentions( $t, $message_id, mentions_in( $body, $t ) );
 	do_action( 'flurfunk_message_edited', $t, $message_id );
@@ -479,6 +499,7 @@ function delete_message( int $message_id ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
 	$wpdb->update( table( 'messages' ), array( 'type' => 'deleted', 'body' => '', 'files' => '[]', 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	bump();
 	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
 	$wpdb->delete( table( 'attachments' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
 	do_action( 'flurfunk_message_deleted', $t, $message_id );
@@ -505,9 +526,27 @@ function edit_thread( int $thread_id, array $args ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The conversation is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	$wpdb->update( table( 'threads' ), array( 'title' => $title, 'body' => $body ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+	bump();
 	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => $thread_id, 'message_id' => 0 ) ); // phpcs:ignore WordPress.DB
 	save_mentions( $t, 0, mentions_in( $body, $t ) );
 	return true;
+}
+
+/**
+ * Revision counter: changes whenever something changes, so cached numbers expire at once.
+ * Reading only affects the reader, so it bumps that person's own counter.
+ *
+ * @param int $user_id User.
+ */
+function revision( int $user_id ): string {
+	return (int) get_option( 'flurfunk_rev', 0 ) . '-' . (int) get_user_meta( $user_id, 'flurfunk_rev', true );
+}
+
+/**
+ * Something changed for everyone.
+ */
+function bump(): void {
+	update_option( 'flurfunk_rev', (int) get_option( 'flurfunk_rev', 0 ) + 1, true );
 }
 
 /**
@@ -532,6 +571,7 @@ function mark_read( int $thread_id, int $user_id, ?int $message_id = null ): voi
 			now()
 		)
 	);
+	update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
 }
 
 /**
@@ -621,6 +661,35 @@ function files( array $ids, int $user_id, bool $check ): array {
 		);
 	}
 	return $out;
+}
+
+/**
+ * File for display: adds the current address and, for images, a preview. Stored data stays
+ * the plain description (id, name, size, type), so exports remain portable; a file deleted
+ * from the media library is marked "missing".
+ *
+ * @param array $f Stored description.
+ */
+function file_view( array $f ): array {
+	$id = (int) ( $f['id'] ?? 0 );
+	if ( ! $id && ! empty( $f['url'] ) ) {
+		return $f; // Imported from another site: link to where it lives.
+	}
+	$url = $id ? wp_get_attachment_url( $id ) : false;
+	if ( ! $url ) {
+		return $f + array( 'missing' => true );
+	}
+	$f['url']   = $url;
+	$f['title'] = html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' );
+	if ( str_starts_with( (string) ( $f['type'] ?? '' ), 'image/' ) ) {
+		$img = wp_get_attachment_image_src( $id, 'medium_large' );
+		if ( $img ) {
+			$f['preview'] = $img[0];
+			$f['width']   = (int) $img[1];
+			$f['height']  = (int) $img[2];
+		}
+	}
+	return $f;
 }
 
 /* -------------------------------------------------------------------------
@@ -740,7 +809,7 @@ function format_messages( object $t, array $atts, array $ments ): array {
 			'created'     => iso( $m->created ),
 			'text'        => $m->body,
 			'mentions'    => $ments[ (int) $t->id ][ $mid ] ?? array(),
-			'files'       => json_decode( $m->files, true ) ?: array(),
+			'files'       => array_map( __NAMESPACE__ . '\\file_view', json_decode( $m->files, true ) ?: array() ),
 			'attachments' => $atts[ (int) $t->id ][ $mid ] ?? array(),
 			'edited'      => iso( $m->edited ),
 		);
@@ -910,6 +979,12 @@ function summarize( array $rows, int $user_id ): array {
  */
 function counts( int $user_id ): array {
 	global $wpdb;
+	// Asked on every admin page (menu badge): cache per person until anything changes.
+	$key    = 'flurfunk_counts_' . $user_id . '_' . revision( $user_id );
+	$cached = get_transient( $key );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
 	$t   = table( 'threads' );
 	$m   = table( 'messages' );
 	$r   = table( 'reads' );
@@ -946,6 +1021,7 @@ function counts( int $user_id ): array {
 		$out['mentions'] += $row->mentioned && $n ? 1 : 0;
 		$out['tasks']    += 'open' === $row->status ? 1 : 0;
 	}
+	set_transient( $key, $out, 10 * MINUTE_IN_SECONDS );
 	return $out;
 }
 

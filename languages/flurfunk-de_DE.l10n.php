@@ -171,6 +171,7 @@ return array(
 		'done' => 'erledigt',
 		'just now' => 'gerade eben',
 		'last: %1$s, %2$s' => 'zuletzt %1$s, %2$s',
+		'no longer available' => 'nicht mehr vorhanden',
 		'open' => 'offen',
 		'sent' => 'versendet',
 		'slash command' . chr(4) . 'newsletter' => 'newsletter',

@@ -280,3 +280,22 @@
 .ff-note { margin: 0; padding: 12px 0; color: var(--ff-muted); font-size: 13px; }
 .ff-session { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 100000; padding: 10px 16px; border-radius: 8px; background: #b42318; color: #fff; font-weight: 600; box-shadow: 0 10px 30px rgb(0 0 0 / .3); }
 .ff-session a { color: #fff !important; text-decoration: underline; margin-left: 8px; }
+
+/* Files: previews and players */
+.ff-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ff-media { margin: 0; max-width: min(28rem, 100%); }
+.ff-image { display: block; width: 18rem; max-width: 100%; max-height: 18rem; border: 1px solid var(--ff-line); border-radius: 8px; overflow: hidden; background: var(--ff-soft); }
+.ff-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ff-audio, .ff-video { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--ff-line); border-radius: 8px; background: var(--ff-soft); font-size: 13px; }
+.ff-audio audio { width: 22rem; max-width: 100%; height: 34px; }
+.ff-video video { width: 100%; max-height: 22rem; border-radius: 4px; background: #000; }
+.ff-media figcaption small, .ff-file small { color: var(--ff-muted); }
+.ff-file.is-missing { color: var(--ff-muted); border-style: dashed; }
+.ff-files .ff-file { margin: 0; }
+
+/* Formatting */
+.ff-text ul, .ff-text ol { margin: 4px 0; padding-left: 1.4em; }
+.ff-text li { margin: 0; }
+.ff-text blockquote { margin: 4px 0; padding: 4px 10px; color: var(--ff-muted); background: var(--ff-soft); border-radius: 6px; font-style: italic; }
+.ff-text code { padding: 1px 4px; border-radius: 4px; background: var(--ff-soft2); font-size: .92em; }
+.ff-code { margin: 6px 0; padding: 8px 10px; border-radius: 6px; background: var(--ff-soft2); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
