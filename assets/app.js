@@ -976,15 +976,24 @@
 				updateBadge( boot.counts.total );
 			} catch ( e ) {}
 		};
+		// What can change while a thread is open: new, edited or deleted messages, the status, the
+		// thread text, refreshed cards.
+		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) ) ).join( '|' );
 		const pollPane = async () => {
-			if ( ! ui.thread || pane.contains( document.activeElement ) && document.activeElement.tagName === 'TEXTAREA' && document.activeElement.value ) {
+			const active = document.activeElement;
+			const busy = pane.contains( active ) && ( ( 'TEXTAREA' === active.tagName && active.value ) || active.closest( '.ff-edit, .ff-pop' ) ) || $( '.ff-edit', pane );
+			if ( ! ui.thread || busy ) {
 				return;
 			}
 			const th = await api( 'threads/' + ui.thread );
-			const last = ( a ) => ( a.messages.length ? a.messages[ a.messages.length - 1 ].id : 0 );
-			if ( ui.current && last( th ) !== last( ui.current ) ) {
+			if ( ui.current && signature( th ) !== signature( ui.current ) ) {
+				const body = $( '.ff-pane-body', pane );
+				const atEnd = body && body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+				const top = body ? body.scrollTop : 0;
 				ui.current = th;
-				$( '.ff-msgs', pane ).innerHTML = messagesHtml( th );
+				renderPane( th );
+				const nb = $( '.ff-pane-body', pane );
+				nb.scrollTop = atEnd ? nb.scrollHeight : top;
 			}
 		};
 		const setView = ( view ) => {
@@ -1063,6 +1072,13 @@
 				ui.settings = false;
 				renderNav();
 				$( '.ff-me-tile', nav ).focus();
+			} else if ( 'Escape' === e.key && ui.thread && ! e.defaultPrevented && ! e.target.closest( '.ff-compose, .ff-edit, .ff-pop, .ff-menu' ) ) {
+				const id = ui.thread;
+				closeThread();
+				const post = feed.querySelector( '.ff-post[data-id="' + id + '"]' );
+				if ( post ) {
+					post.focus();
+				}
 			}
 		} );
 		root.addEventListener( 'change', async ( e ) => {
@@ -1089,6 +1105,7 @@
 		renderFeed();
 		renderComposer();
 		await loadList();
+		updateBadge( boot.counts.total );
 		if ( ui.thread ) {
 			openThread( ui.thread );
 		}
@@ -1101,8 +1118,13 @@
 	};
 
 	/* Badge on the admin menu item (OpenStation's dock reads the same markup). */
+	const baseTitle = document.title.replace( /^\(\d+\) /, '' );
 	const updateBadge = ( n ) => {
 		const show = boot && boot.me.prefs.badge && n > 0;
+		// The tab or window title carries the number too, e.g. "(3) Flurfunk".
+		if ( document.getElementById( 'flurfunk-app' ) ) {
+			document.title = ( show ? '(' + n + ') ' : '' ) + baseTitle;
+		}
 		document.querySelectorAll( '#toplevel_page_flurfunk .wp-menu-name, #adminmenu a[href$="page=flurfunk"] .wp-menu-name' ).forEach( ( el ) => {
 			let b = el.querySelector( '.awaiting-mod' );
 			if ( ! show ) {

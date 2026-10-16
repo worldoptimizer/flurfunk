@@ -229,6 +229,27 @@ test.describe( 'team', () => {
 		await other.context().close();
 	} );
 
+	test( 'an open thread follows edits and ticks by others; Escape closes it', async ( { page, browser } ) => {
+		test.skip( ! process.env.FF_TEAM2, 'needs a second team account' );
+		const other = await ( await browser.newContext() ).newPage();
+		await login( other, process.env.FF_TEAM2, process.env.FF_TEAM2_PASS );
+		await openApp( other );
+		const th = await api( other, 'threads', { channel: 'general', body: 'e2e folgt ' + Date.now(), task: true } );
+		const msg = await api( other, 'threads/' + th.id + '/messages', { body: 'vorher' } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await expect( page.locator( '.ff-pane .ff-msg', { hasText: 'vorher' } ) ).toBeVisible();
+		await page.locator( '.ff-head' ).click();
+		const mid = msg.messages[ msg.messages.length - 1 ].id;
+		await other.evaluate( ( id ) => window.Flurfunk.api( 'messages/' + id, { method: 'POST', body: { body: 'nachher' } } ), mid );
+		await api( other, 'threads/' + th.id + '/status', { status: 'done' } );
+		await other.context().close();
+		await expect( page.locator( '.ff-pane .ff-msg', { hasText: 'nachher' } ) ).toBeVisible( { timeout: 45_000 } );
+		await expect( page.locator( '.ff-pane .ff-root-row input[data-ff=done]' ) ).toBeChecked();
+		await page.keyboard.press( 'Escape' );
+		await expect( page.locator( '.ff-pane' ) ).toBeHidden();
+	} );
+
 	test( 'unread number appears for others and goes away after reading', async ( { page, browser } ) => {
 		test.skip( ! process.env.FF_TEAM2, 'needs a second team account' );
 		const other = await ( await browser.newContext() ).newPage();
