@@ -273,6 +273,10 @@ class Command {
 			}
 		}
 		if ( is_wp_error( $r ) ) {
+			// Don't leave uploaded files behind when the post itself failed.
+			foreach ( $files as $f ) {
+				wp_delete_attachment( $f, true );
+			}
 			WP_CLI::error( $r );
 		}
 		WP_CLI::success( $thread ? "Reply $r in thread $thread." : "Thread $r." );
