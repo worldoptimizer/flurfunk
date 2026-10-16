@@ -305,6 +305,31 @@ list( $s ) = $req( 'POST', 'cards/' . $card['id'] . '/refresh', array() );
 $check( "nobody can refresh cards in threads they can't see", 404 === $s || 409 === $s, $s );
 $as( $team );
 
+WP_CLI::log( 'Bundle with files' );
+$as( $team );
+$bf = Flurfunk\Files\store( 'ff-test-bundle.txt', "Inhalt fürs Bündel\n" );
+$bt = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Bündel' ) );
+Store\add_message( $bt, array( 'body' => 'mit Datei', 'files' => array( $bf ) ) );
+$dir  = get_temp_dir() . 'ff-test-bundle-' . wp_generate_password( 6, false );
+$data = Flurfunk\Transfer\export( $dir );
+$mine = array_values( array_filter( $data['threads'], fn ( $x ) => (int) $x['id'] === (int) $bt ) );
+$rel  = $mine[0]['messages'][0]['files'][0]['bundle'] ?? '';
+$check( 'export with a folder copies the files and notes their path', '' !== $rel && is_readable( $dir . '/' . $rel ), $rel );
+$data['site']     = 'https://bundle.example/';
+$data['threads']  = $mine;
+$data['channels'] = array_values( array_filter( $data['channels'], fn ( $c ) => 'ff-test' === $c['id'] ) );
+$r    = Flurfunk\Transfer\import( $data, $dir );
+$new  = Store\thread_by_ref( 'import:' . substr( md5( 'https://bundle.example/' ), 0, 8 ) . ':' . $bt );
+$nf   = $new ? ( Store\full_thread( (int) $new->id, $team )['messages'][0]['files'][0] ?? array() ) : array();
+$check( 'import stores bundled files again as Flurfunk files', 1 === $r['files'] && ! empty( $nf['id'] ) && $nf['id'] !== $bf && false === $nf['library'] && file_get_contents( get_attached_file( $nf['id'] ) ) === "Inhalt fürs Bündel\n", $nf );
+wp_delete_attachment( $bf, true );
+if ( ! empty( $nf['id'] ) ) {
+	wp_delete_attachment( $nf['id'], true );
+}
+array_map( 'wp_delete_file', glob( $dir . '/files/*' ) ?: array() );
+@rmdir( $dir . '/files' ); // phpcs:ignore
+@rmdir( $dir ); // phpcs:ignore
+
 WP_CLI::log( 'Mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );

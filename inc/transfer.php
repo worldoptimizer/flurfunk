@@ -3,6 +3,10 @@
  * Export and import as JSON ("flurfunk/1") – for backups, moving sites, or moving to another
  * chat tool later. People are matched by email address on import.
  *
+ * With a bundle folder, files travel along: the export copies them to <folder>/files/ and notes
+ * the path; the import stores them again as Flurfunk files on the new site (and adds them to the
+ * media library if they were there before). Without a folder, files stay links to the old site.
+ *
  * @package Flurfunk
  */
 
@@ -15,8 +19,10 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Everything as one array.
+ *
+ * @param string $bundle Folder to copy files into ('' = links only).
  */
-function export(): array {
+function export( string $bundle = '' ): array {
 	global $wpdb;
 	$people = array();
 	$add    = static function ( int $id ) use ( &$people ): void {
@@ -42,6 +48,22 @@ function export(): array {
 	foreach ( $rows as $r ) {
 		$t             = Store\format_thread( $r, $atts, $ments );
 		$t['messages'] = Store\format_messages( $r, $atts, $ments );
+		if ( '' !== $bundle ) {
+			foreach ( $t['messages'] as &$msg ) {
+				foreach ( $msg['files'] ?? array() as $i => $f ) {
+					$src = ! empty( $f['id'] ) ? get_attached_file( (int) $f['id'] ) : '';
+					if ( $src && is_readable( $src ) ) {
+						$rel = 'files/' . (int) $f['id'] . '-' . wp_basename( $src );
+						wp_mkdir_p( $bundle . '/files' );
+						if ( ! file_exists( $bundle . '/' . $rel ) ) {
+							copy( $src, $bundle . '/' . $rel );
+						}
+						$msg['files'][ $i ]['bundle'] = $rel;
+					}
+				}
+			}
+			unset( $msg );
+		}
 		$t['read']     = (object) ( $reads[ (int) $r->id ] ?? array() );
 		$add( (int) $r->author_id );
 		$add( (int) $r->resolved_by );
@@ -63,10 +85,39 @@ function export(): array {
 /**
  * Import. Threads already imported (same source site and ID) are skipped.
  *
- * @param array $data Export.
- * @return array{threads:int, messages:int, skipped:int}
+ * @param array  $data   Export.
+ * @param string $bundle Folder the export's files were copied to ('' = keep links).
+ * @return array{threads:int, messages:int, skipped:int, files:int}
  */
-function import( array $data ): array {
+function import( array $data, string $bundle = '' ): array {
+	$stored = array();
+	$file   = static function ( array $f ) use ( $bundle, &$stored ): array {
+		$plain = array(
+			'id'   => 0,
+			'name' => (string) ( $f['name'] ?? '' ),
+			'size' => (int) ( $f['size'] ?? 0 ),
+			'type' => (string) ( $f['type'] ?? '' ),
+			'url'  => esc_url_raw( (string) ( $f['url'] ?? '' ) ),
+		);
+		$rel = (string) ( $f['bundle'] ?? '' );
+		if ( '' === $bundle || '' === $rel || str_contains( $rel, '..' ) || ! is_readable( $bundle . '/' . $rel ) ) {
+			return $plain;
+		}
+		if ( ! isset( $stored[ $rel ] ) ) {
+			$id = \Flurfunk\Files\store( $plain['name'] ?: wp_basename( $rel ), (string) file_get_contents( $bundle . '/' . $rel ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			if ( is_wp_error( $id ) ) {
+				return $plain;
+			}
+			if ( ! empty( $f['title'] ) ) {
+				wp_update_post( array( 'ID' => $id, 'post_title' => (string) $f['title'] ) );
+			}
+			if ( ! empty( $f['library'] ) ) {
+				delete_post_meta( $id, \Flurfunk\Files\META );
+			}
+			$stored[ $rel ] = $id;
+		}
+		return Store\files( array( $stored[ $rel ] ), get_current_user_id(), false )[0] ?? $plain;
+	};
 	if ( 'flurfunk/1' !== ( $data['format'] ?? '' ) ) {
 		return array( 'threads' => 0, 'messages' => 0, 'skipped' => 0, 'error' => 'format' );
 	}
@@ -91,7 +142,7 @@ function import( array $data ): array {
 		);
 	}
 	$source = md5( (string) ( $data['site'] ?? '' ) );
-	$count  = array( 'threads' => 0, 'messages' => 0, 'skipped' => 0 );
+	$count  = array( 'threads' => 0, 'messages' => 0, 'skipped' => 0, 'files' => 0 );
 	foreach ( (array) ( $data['threads'] ?? array() ) as $t ) {
 		$ref = (string) ( $t['ref_key'] ?? '' ) ?: 'import:' . substr( $source, 0, 8 ) . ':' . (int) $t['id'];
 		if ( Store\thread_by_ref( $ref ) ) {
@@ -126,17 +177,9 @@ function import( array $data ): array {
 					'type'        => $m['type'] ?? 'message',
 					'status'      => $m['status'] ?? '',
 					'body'        => $text( (string) ( $m['text'] ?? '' ) ),
-					// Media IDs belong to the source site: keep name, type and a link to the original.
-					'files'       => array_map(
-						static fn ( $f ) => array(
-							'id'   => 0,
-							'name' => (string) ( $f['name'] ?? '' ),
-							'size' => (int) ( $f['size'] ?? 0 ),
-							'type' => (string) ( $f['type'] ?? '' ),
-							'url'  => esc_url_raw( (string) ( $f['url'] ?? '' ) ),
-						),
-						(array) ( $m['files'] ?? array() )
-					),
+					// Media IDs belong to the source site: files from a bundle are stored again,
+					// otherwise name, type and a link to the original remain.
+					'files'       => array_map( $file, (array) ( $m['files'] ?? array() ) ),
 					'attachments' => (array) ( $m['attachments'] ?? array() ),
 					'mentions'    => array_filter( array_map( $user, (array) ( $m['mentions'] ?? array() ) ) ),
 					'author'      => $user( $m['author'] ?? 0 ),
@@ -152,5 +195,6 @@ function import( array $data ): array {
 			Store\mark_read( $id, $uid );
 		}
 	}
+	$count['files'] = count( $stored );
 	return $count;
 }

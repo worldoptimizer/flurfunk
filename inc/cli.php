@@ -22,11 +22,26 @@ class Command {
 	 * ## OPTIONS
 	 *
 	 * [<file>]
-	 * : Write to this file instead of the screen.
+	 * : Write to this file instead of the screen. With --files: a folder.
 	 *
-	 * @param array $args Arguments.
+	 * [--files]
+	 * : Copy all files along (folder with flurfunk.json and files/), for moving to another site.
+	 *
+	 * @param array $args       Arguments.
+	 * @param array $assoc_args Options.
 	 */
-	public function export( array $args ): void {
+	public function export( array $args, array $assoc_args = array() ): void {
+		if ( ! empty( $assoc_args['files'] ) ) {
+			$dir = rtrim( (string) ( $args[0] ?? '' ), '/' );
+			if ( '' === $dir ) {
+				WP_CLI::error( 'Name a folder for the bundle.' );
+			}
+			wp_mkdir_p( $dir );
+			$data = \Flurfunk\Transfer\export( $dir );
+			file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			WP_CLI::success( sprintf( 'Exported %d threads with files to %s', count( $data['threads'] ), $dir ) );
+			return;
+		}
 		$json = (string) wp_json_encode( \Flurfunk\Transfer\export(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 		if ( ! empty( $args[0] ) ) {
 			file_put_contents( $args[0], $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions
@@ -42,20 +57,25 @@ class Command {
 	 * ## OPTIONS
 	 *
 	 * <file>
-	 * : Export file.
+	 * : Export file, or a bundle folder from `export --files`.
 	 *
 	 * @param array $args Arguments.
 	 */
 	public function import( array $args ): void {
-		$data = json_decode( (string) file_get_contents( $args[0] ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$bundle = is_dir( $args[0] ) ? rtrim( $args[0], '/' ) : '';
+		if ( ! get_current_user_id() ) {
+			$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+			wp_set_current_user( (int) ( $admins[0] ?? 0 ) ); // Files are stored in someone's name.
+		}
+		$data = json_decode( (string) file_get_contents( $bundle ? $bundle . '/flurfunk.json' : $args[0] ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		if ( ! is_array( $data ) ) {
 			WP_CLI::error( 'Not a JSON file.' );
 		}
-		$r = \Flurfunk\Transfer\import( $data );
+		$r = \Flurfunk\Transfer\import( $data, $bundle );
 		if ( ! empty( $r['error'] ) ) {
 			WP_CLI::error( 'Unknown format.' );
 		}
-		WP_CLI::success( sprintf( '%d threads, %d messages imported, %d skipped.', $r['threads'], $r['messages'], $r['skipped'] ) );
+		WP_CLI::success( sprintf( '%d threads, %d messages, %d files imported, %d skipped.', $r['threads'], $r['messages'], $r['files'], $r['skipped'] ) );
 	}
 
 	/**
