@@ -108,6 +108,12 @@ Flurfunk\Admin\enqueue();
 
 A thread is created on the first reply or tick, so nothing needs seeding.
 
+## Integrations
+
+Optional cards for other plugins live in `integrations/` and load only when that plugin is active:
+
+- **MailerPress** – `/newsletter`: campaign with status, lists and subscribed recipients, numbers after sending, link into the editor (team only).
+
 ## Development
 
 - `tools/strings.py` – collect the JavaScript strings into `inc/strings.php`.

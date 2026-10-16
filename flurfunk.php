@@ -22,6 +22,7 @@
  *   inc/admin.php      overview app, editor panel, posts list column, OpenStation bits
  *   inc/transfer.php   JSON export and import
  *   inc/cli.php        wp flurfunk …
+ *   integrations/      optional cards for other plugins (MailerPress), loaded only when present
  *
  * Everything site-specific lives outside this plugin and plugs in through the hooks and
  * functions documented in README.md.
@@ -46,6 +47,16 @@ require_once FLURFUNK_DIR . 'inc/notify.php';
 require_once FLURFUNK_DIR . 'inc/rest.php';
 require_once FLURFUNK_DIR . 'inc/admin.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
+
+// Optional integrations with other plugins, each only when that plugin is active.
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		if ( defined( 'MAILERPRESS_VERSION' ) ) {
+			require_once FLURFUNK_DIR . 'integrations/mailerpress.php';
+		}
+	}
+);
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once FLURFUNK_DIR . 'inc/cli.php';
