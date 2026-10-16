@@ -1162,6 +1162,13 @@
 				refresh();
 			}
 		} );
+		// Escape closes the open thread even when nothing inside the app has focus.
+		document.addEventListener( 'keydown', ( e ) => {
+			if ( 'Escape' !== e.key || ! ui.thread || e.defaultPrevented || ui.settings || root.contains( e.target ) || ( e.target.closest && e.target.closest( 'input, textarea, select, [contenteditable]' ) ) ) {
+				return;
+			}
+			closeThread();
+		} );
 		head.addEventListener( 'submit', ( e ) => {
 			e.preventDefault();
 			const q = e.target.elements.q.value.trim();
