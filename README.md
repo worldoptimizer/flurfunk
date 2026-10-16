@@ -80,6 +80,7 @@ window.Flurfunk.registerCard( 'myplugin/report', ( s, h ) => '<b>' + h.esc( s.ti
 | --- | --- |
 | `flurfunk_settings` | adjust settings in code |
 | `flurfunk_user_kind` | `team`, `guest` or `''` for a user |
+| `flurfunk_channel_level` | per-person access to a channel (private channels) |
 | `flurfunk_owned_post_ids` | posts that count as a person's own (co-authors) |
 | `flurfunk_post_owners` | who owns a post (for the "can read this" hint) |
 | `flurfunk_can_target` | may a person attach a thread to a target |

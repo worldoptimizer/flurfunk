@@ -67,11 +67,16 @@ function can_manage( int $user_id = 0 ): bool {
  * @param int    $user_id User.
  */
 function level( object $channel, int $user_id ): string {
-	$kind = kind( $user_id );
-	if ( '' === $kind || ! empty( $channel->archived ) ) {
-		return 'none';
+	static $cache = array();
+	$key = $channel->id . ':' . $user_id;
+	if ( isset( $cache[ $key ] ) ) {
+		return $cache[ $key ];
 	}
-	return 'team' === $kind ? (string) $channel->access_team : (string) $channel->access_guests;
+	$kind  = kind( $user_id );
+	$level = '' === $kind || ! empty( $channel->archived ) ? 'none' : ( 'team' === $kind ? (string) $channel->access_team : (string) $channel->access_guests );
+	// E.g. a private channel for a few people: return 'none' for everyone else.
+	$level = (string) apply_filters( 'flurfunk_channel_level', $level, $channel, $user_id, $kind );
+	return $cache[ $key ] = in_array( $level, LEVELS, true ) ? $level : 'none';
 }
 
 /**
