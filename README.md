@@ -15,6 +15,25 @@ desktop.
 Everything site-specific (logo, colours, who is team or guest, channels) is set under
 *Settings → Flurfunk* or added by another plugin through the API below.
 
+## Files
+
+Files attached in Flurfunk are normal WordPress attachments stored in `uploads/flurfunk/<year>/<month>/<random>/`
+and hidden from the media library. Images show as previews, audio and video as players. "Add to
+media library" only removes the mark – the file keeps its place and address, so nothing that
+uses it breaks. Hidden files nothing refers to any more are deleted after 30 days.
+
+## Assistants (agents, scripts)
+
+```bash
+wp flurfunk bot-create --name="Assistent" --default   # account without editing rights
+wp flurfunk bot-password <id>                          # application password for the REST API
+wp flurfunk post --channel=general --title="Report" --body="…" --file=report.csv
+wp flurfunk post --ref=checklist:billing --card='flurfunk/post:{"id":12}'
+```
+
+Assistants take part like the team (including private channels they are invited to through
+`flurfunk_channel_level`) and are marked "Assistant" in the conversation.
+
 ## People and access
 
 A person is **team** or **guest** (capabilities chosen in the settings; default
@@ -31,6 +50,8 @@ format, `flurfunk/1`:
 ```bash
 wp flurfunk export backup.json
 wp flurfunk import backup.json
+wp flurfunk export bundle/ --files     # with all files, for moving to another site
+wp flurfunk import bundle/
 wp flurfunk status
 wp flurfunk channel news --name="News" --guests=own-posts
 ```
@@ -125,6 +146,17 @@ Flurfunk\Admin\enqueue();
 ```
 
 A thread is created on the first reply or tick, so nothing needs seeding.
+
+A whole channel as a numbered checklist (open items first, done below, new items at the end):
+
+```js
+Flurfunk.mountChannel( element, { channel: 'questions', newLabel: 'New question' } );
+```
+
+Cards can be refreshed in place ("Update"), which asks the provider for a new snapshot.
+
+Personal data: Flurfunk takes part in WordPress's export and erase tools. Deleting a user
+hands their messages to the person who receives their posts, or keeps them as "deleted user".
 
 ## Integrations
 
