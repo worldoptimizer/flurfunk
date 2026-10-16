@@ -53,6 +53,7 @@
 	};
 	const person = ( id ) => ( boot && boot.people.find( ( p ) => p.id === id ) ) || ( boot && boot.me.id === id ? boot.me : { id, name: '?', role: '', kind: '' } );
 	const channelOf = ( slug ) => boot.channels.find( ( c ) => c.id === slug );
+	const chName = ( slug ) => ( channelOf( slug ) || { name: slug } ).name || slug;
 
 	const locale = () => ( boot && boot.locale ) || document.documentElement.lang || 'en';
 	const when = ( iso ) => {
@@ -465,7 +466,7 @@
 			const [ kind, a, b ] = ui.view.split( ':' );
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
-				return { title: '#' + a, sub: c ? c.topic : '', args: { channel: a }, channel: a };
+				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a }, channel: a };
 			}
 			if ( 'target' === kind ) {
 				const info = boot.recent.concat( boot.targets ).find( ( x ) => x.type === a && x.id === +b );
@@ -497,7 +498,7 @@
 				+ btn( 'mentions', '@', t( 'Mentions' ), c.mentions )
 				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 ) + ( c.tasks ? '' : '' )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
-				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.id, c.channels[ ch.id ] || 0, ch.name ) ).join( '' )
+				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : t( 'Posts' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
@@ -522,7 +523,7 @@
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
 			+ ava( th.author ) + '<div class="ff-post-body">'
-			+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( th.channel ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
+			+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<div class="ff-text ff-clamp">' + rich( th.body ) + '</div>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
@@ -549,14 +550,14 @@
 		const renderComposer = () => {
 			const v = viewInfo();
 			const startable = boot.channels.filter( ( c ) => 'all' === c.level || ( 'own-posts' === c.level && v.target ) || 'own-posts' === c.level );
-			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.id ) + '</option>' ).join( '' ) + '</select>';
+			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>';
 			const guest = 'guest' === boot.me.kind;
 			const tgSel = v.target ? '' : '<select name="target" aria-label="' + esc( t( 'Attached to' ) ) + '">' + ( guest ? '' : '<option value="">' + esc( t( 'Attached to: nothing' ) ) + '</option>' ) + boot.targets.map( ( x ) => '<option value="' + esc( x.type + ':' + x.id ) + '">' + esc( t( 'Post: %s', x.title.length > 40 ? x.title.slice( 0, 38 ) + ' …' : x.title ) ) + '</option>' ).join( '' ) + '</select>';
 			const c = composer( {
 				key: 'new:' + ui.view,
 				className: 'ff-new-thread',
 				autoGrow: true,
-				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', v.channel ) : t( 'New thread … (@name, / for cards)' ),
+				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', chName( v.channel ) ) : t( 'New thread … (@name, / for cards)' ),
 				submitLabel: t( 'Start thread' ),
 				extra: chSel + tgSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>',
 				onSubmit: async ( payload, form ) => {
@@ -574,7 +575,7 @@
 		const renderPane = ( th ) => {
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
-			pane.innerHTML = '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( th.channel ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
+			pane.innerHTML = '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
@@ -780,7 +781,7 @@
 				+ list.map( ( th ) => '<div class="ff-box' + ( 'done' === th.status ? ' is-done' : '' ) + '" data-id="' + th.id + '">'
 					+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' ) + '</div>'
 					+ ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + cards( th.attachments )
-					+ '<p class="ff-meta">' + esc( person( th.author ).name + ' · ' + when( th.created ) + ' · #' + th.channel ) + ' ' + audiencePill( th ) + '</p>'
+					+ '<p class="ff-meta">' + esc( person( th.author ).name + ' · ' + when( th.created ) + ' · #' + chName( th.channel ) ) + ' ' + audiencePill( th ) + '</p>'
 					+ summary( th, open.has( th.id ), 'toggle' )
 					+ ( full[ th.id ] ? messagesHtml( full[ th.id ] ) + '<div class="ff-reply-slot"></div>' : ( th.replies ? '' : '<div class="ff-reply-slot"></div>' ) )
 					+ '</div>' ).join( '' )
@@ -808,7 +809,7 @@
 				label: t( 'New conversation about this post' ),
 				placeholder: t( 'What is it about? (@name, / for cards)' ),
 				submitLabel: t( 'Start' ),
-				extra: '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + chans.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.id ) + '</option>' ).join( '' ) + '</select><label class="ff-check"><input type="checkbox" name="task" checked> ' + esc( t( 'Task' ) ) + '</label>',
+				extra: '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + chans.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select><label class="ff-check"><input type="checkbox" name="task" checked> ' + esc( t( 'Task' ) ) + '</label>',
 				onSubmit: async ( payload, form ) => {
 					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: form.elements.channel.value, target, task: form.elements.task.checked } ) } );
 					open.add( th.id );
