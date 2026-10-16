@@ -201,13 +201,13 @@ class Command {
 	 * [--task]
 	 * : New thread is a task.
 	 *
-	 * [--target=<type:id>]
+	 * [--target=<target>]
 	 * : Attach a new thread to e.g. post:12.
 	 *
-	 * [--file=<paths>]
+	 * [--file=<files>]
 	 * : Files to attach, comma-separated. They become Flurfunk files.
 	 *
-	 * [--card=<provider:json>]
+	 * [--card=<card>]
 	 * : A card, e.g. 'flurfunk/post:{"id":12}'.
 	 *
 	 * [--as=<user>]
