@@ -393,6 +393,33 @@ test.describe( 'team', () => {
 		}
 	} );
 
+	test( 'the sidebar can be dragged wider and keeps its width', async ( { page } ) => {
+		const nav = page.locator( '.ff-nav' );
+		const before = ( await nav.boundingBox() ).width;
+		const h = await page.locator( '.ff-nav > .ff-resize' ).boundingBox();
+		await page.mouse.move( h.x + h.width / 2, h.y + 200 );
+		await page.mouse.down();
+		await page.mouse.move( h.x + 80, h.y + 200, { steps: 8 } );
+		await page.mouse.up();
+		const after = ( await nav.boundingBox() ).width;
+		expect( after ).toBeGreaterThan( before + 50 );
+		await openApp( page );
+		expect( Math.abs( ( await page.locator( '.ff-nav' ).boundingBox() ).width - after ) ).toBeLessThan( 3 );
+		await page.locator( '.ff-nav > .ff-resize' ).dblclick();
+		expect( Math.abs( ( await page.locator( '.ff-nav' ).boundingBox() ).width - before ) ).toBeLessThan( 3 );
+	} );
+
+	test( 'the list shows a short preview, lists keep their bullets', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', title: 'e2e Liste ' + Date.now(), body: 'Absatz\n\n• eins\n• zwei\n• drei\n• vier' } );
+		await openApp( page );
+		const post = page.locator( `.ff-post[data-id="${ th.id }"]` );
+		await expect( post.locator( '.ff-preview' ) ).toContainText( 'Absatz · eins · zwei' );
+		expect( await post.locator( 'ul' ).count() ).toBe( 0 );
+		await post.click();
+		const li = page.locator( '.ff-pane .ff-root-msg li' ).first();
+		expect( await li.evaluate( ( e ) => getComputedStyle( e.parentElement ).listStyleType ) ).toBe( 'disc' );
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];

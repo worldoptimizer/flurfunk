@@ -160,7 +160,7 @@
 			out.push( line + '\n' );
 		} );
 		flush();
-		s = out.join( '' ).replace( /\n$/, '' ).replace( /\n/g, '<br>' ).replace( /(<\/(?:ul|ol|blockquote)>)<br>/g, '$1' );
+		s = out.join( '' ).replace( /\n+$/, '' ).replace( /\n/g, '<br>' ).replace( /(<\/(?:ul|ol|blockquote)>)<br>/g, '$1' ).replace( /(?:<br>)+(<(?:ul|ol|blockquote))/g, '$1' );
 		return s.replace( /\u0000(\d+)\u0000/g, ( all, i ) => keep[ +i ] );
 	};
 
@@ -262,6 +262,8 @@
 
 	// Name in bold; assistants (agents, scripts) are marked so nobody mistakes them for a person.
 	const nameHtml = ( id ) => '<b>' + esc( person( id ).name ) + '</b>' + ( person( id ).bot ? ' <span class="ff-pill is-bot">' + esc( t( 'Assistant' ) ) + '</span>' : '' );
+	// One-line preview for lists: mentions and links stay, formatting and line structure don't.
+	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.manage );
 	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
 	const messagesHtml = ( th ) => {
@@ -825,12 +827,85 @@
 			history.replaceState( null, '', location.pathname + '?' + p.toString() );
 		};
 
+		/* column widths: drag the edge, arrow keys, double-click resets */
+		const colsKey = 'flurfunk-cols-' + boot.me.id;
+		const cols = ( () => {
+			try {
+				return JSON.parse( window.localStorage.getItem( colsKey ) || '{}' ) || {};
+			} catch ( e ) {
+				return {};
+			}
+		} )();
+		const applyCols = () => {
+			[ 'nav', 'pane' ].forEach( ( c ) => ( cols[ c ] ? app.style.setProperty( '--ff-' + c + '-w', cols[ c ] + 'px' ) : app.style.removeProperty( '--ff-' + c + '-w' ) ) );
+			try {
+				window.localStorage.setItem( colsKey, JSON.stringify( cols ) );
+			} catch ( e ) {}
+		};
+		const limits = ( c ) => {
+			const w = app.getBoundingClientRect().width;
+			return 'nav' === c ? [ 160, Math.max( 160, Math.min( 440, w * 0.4 ) ) ] : [ 280, Math.max( 280, w * 0.6 ) ];
+		};
+		const setCol = ( c, px ) => {
+			const [ lo, hi ] = limits( c );
+			cols[ c ] = Math.round( Math.min( hi, Math.max( lo, px ) ) );
+			applyCols();
+			const h = root.querySelector( '.ff-resize[data-col="' + c + '"]' );
+			if ( h ) {
+				h.setAttribute( 'aria-valuenow', cols[ c ] );
+			}
+		};
+		const resizer = ( c, label ) => {
+			const [ lo, hi ] = limits( c );
+			const now = cols[ c ] || ( 'nav' === c ? 240 : 400 );
+			return '<div class="ff-resize" data-col="' + c + '" role="separator" aria-orientation="vertical" tabindex="0" aria-valuemin="' + Math.round( lo ) + '" aria-valuemax="' + Math.round( hi ) + '" aria-valuenow="' + Math.round( Math.min( hi, Math.max( lo, now ) ) ) + '" aria-label="' + esc( label ) + '" title="' + esc( label ) + '"></div>';
+		};
+		applyCols();
+		root.addEventListener( 'pointerdown', ( e ) => {
+			const h = e.target.closest( '.ff-resize' );
+			if ( ! h ) {
+				return;
+			}
+			e.preventDefault();
+			const c = h.dataset.col;
+			const box = app.getBoundingClientRect();
+			h.setPointerCapture( e.pointerId );
+			h.classList.add( 'is-dragging' );
+			app.classList.add( 'is-resizing' );
+			const move = ( ev ) => setCol( c, 'nav' === c ? ev.clientX - box.left : box.right - ev.clientX );
+			const up = () => {
+				h.removeEventListener( 'pointermove', move );
+				h.classList.remove( 'is-dragging' );
+				app.classList.remove( 'is-resizing' );
+			};
+			h.addEventListener( 'pointermove', move );
+			h.addEventListener( 'pointerup', up, { once: true } );
+			h.addEventListener( 'pointercancel', up, { once: true } );
+		} );
+		root.addEventListener( 'dblclick', ( e ) => {
+			const h = e.target.closest( '.ff-resize' );
+			if ( h ) {
+				delete cols[ h.dataset.col ];
+				applyCols();
+			}
+		} );
+		root.addEventListener( 'keydown', ( e ) => {
+			const h = e.target.closest && e.target.closest( '.ff-resize' );
+			if ( h && ( 'ArrowLeft' === e.key || 'ArrowRight' === e.key ) ) {
+				e.preventDefault();
+				const c = h.dataset.col;
+				const now = ( 'nav' === c ? nav : pane ).getBoundingClientRect().width;
+				const step = ( 'ArrowRight' === e.key ? 1 : -1 ) * ( 'nav' === c ? 1 : -1 ) * 16;
+				setCol( c, now + step );
+			}
+		} );
+
 		/* nav */
 		const renderNav = () => {
 			const c = boot.counts;
 			const btn = ( view, glyph, label, n, title ) => '<button type="button" data-ff="nav" data-view="' + esc( view ) + '"' + ( ui.view === view && ! ui.threadOnly ? ' aria-current="true"' : '' ) + ( n ? ' class="is-unread"' : '' ) + ( title ? ' title="' + esc( title ) + '"' : '' ) + '><span class="ff-glyph" aria-hidden="true">' + glyph + '</span><span class="ff-lbl">' + esc( label ) + '</span>' + ( n ? '<b>' + n + '</b>' : '' ) + '</button>';
 			const targets = boot.recent.filter( ( x ) => x.title );
-			nav.innerHTML = '<div class="ff-ws">' + ( boot.look.logo ? '<img src="' + esc( boot.look.logo ) + '" alt="">' : '' ) + '<span>' + esc( boot.look.name ) + '</span></div>'
+			nav.innerHTML = resizer( 'nav', t( 'Drag to make the sidebar wider or narrower' ) ) + '<div class="ff-ws">' + ( boot.look.logo ? '<img src="' + esc( boot.look.logo ) + '" alt="">' : '' ) + '<span>' + esc( boot.look.name ) + '</span></div>'
 				+ '<div class="ff-nav-list">'
 				+ btn( 'all', '≡', t( 'All threads' ), 0 )
 				+ btn( 'mentions', '@', t( 'Mentions' ), c.mentions )
@@ -873,7 +948,7 @@
 			+ ava( th.author ) + '<div class="ff-post-body">'
 			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
-			+ ( th.body ? '<div class="ff-text ff-clamp">' + rich( th.body ) + '</div>' : '' )
+			+ ( th.body ? '<p class="ff-preview">' + preview( th.body ) + '</p>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
 			+ summary( th, false, 'open' ) + '</div></article>';
 		const renderFeed = () => {
@@ -929,7 +1004,7 @@
 		const renderPane = ( th ) => {
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
-			pane.innerHTML = '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
+			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
@@ -1153,7 +1228,7 @@
 	};
 
 	/* Badge on the admin menu item (OpenStation's dock reads the same markup). */
-	const baseTitle = document.title.replace( /^\(\d+\) /, '' );
+	const baseTitle = String( document.title || '' ).replace( /^\(\d+\) /, '' );
 	const updateBadge = ( n ) => {
 		const show = boot && boot.me.prefs.badge && n > 0;
 		// The tab or window title carries the number too, e.g. "(3) Flurfunk".

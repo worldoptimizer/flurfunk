@@ -71,6 +71,8 @@ return array(
 		'Deleted user' => 'Gelöschte Person',
 		'Done' => 'Erledigt',
 		'Draft' => 'Entwurf',
+		'Drag to make the sidebar wider or narrower' => 'Ziehen, um die Seitenleiste breiter oder schmaler zu machen',
+		'Drag to make the thread wider or narrower' => 'Ziehen, um den Thread breiter oder schmaler zu machen',
 		'Edit' => 'Bearbeiten',
 		'Editors and up (edit_others_posts)' => 'Redakteur:innen und höher (edit_others_posts)',
 		'Email me' => 'Mail an mich',
