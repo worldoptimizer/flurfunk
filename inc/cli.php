@@ -149,23 +149,11 @@ class Command {
 	 * @param array $assoc_args Options.
 	 */
 	public function bot_create( array $args, array $assoc_args ): void {
-		$login = sanitize_user( $assoc_args['login'] ?? 'flurfunk-assistent' );
-		$user  = get_user_by( 'login', $login );
-		$id    = $user ? $user->ID : wp_insert_user(
-			array(
-				'user_login'   => $login,
-				'user_pass'    => wp_generate_password( 40 ),
-				'user_email'   => $login . '@invalid.invalid',
-				'display_name' => $assoc_args['name'] ?? 'Assistent',
-				'role'         => 'subscriber',
-			)
-		);
+		$id = \Flurfunk\Access\create_bot( $assoc_args['name'] ?? 'Assistent', $assoc_args['login'] ?? 'flurfunk-assistent' );
 		if ( is_wp_error( $id ) ) {
 			WP_CLI::error( $id );
 		}
-		update_user_meta( $id, 'flurfunk_bot', 1 );
-		\Flurfunk\Notify\save_prefs( (int) $id, array( 'mail' => 'none', 'badge' => false ) );
-		if ( ! empty( $assoc_args['default'] ) || ! get_option( 'flurfunk_bot_default' ) ) {
+		if ( ! empty( $assoc_args['default'] ) ) {
 			update_option( 'flurfunk_bot_default', (int) $id, false );
 		}
 		WP_CLI::success( sprintf( 'Assistant %s (%d).', get_userdata( $id )->display_name, $id ) );

@@ -148,6 +148,9 @@ add_action(
 		foreach ( (array) ( $in['channels'] ?? array() ) as $slug => $c ) {
 			Store\ensure_channel( (string) $slug, (array) $c + array( 'archived' => empty( $c['active'] ) ? 1 : 0 ), true );
 		}
+		if ( ! empty( $in['new_bot']['name'] ) ) {
+			Access\create_bot( (string) $in['new_bot']['name'], 'flurfunk-' . sanitize_title( (string) $in['new_bot']['name'] ) );
+		}
 		$new = (array) ( $in['new_channel'] ?? array() );
 		if ( '' !== trim( (string) ( $new['name'] ?? '' ) ) ) {
 			$slug = sanitize_key( ( $new['slug'] ?? '' ) ?: sanitize_title( (string) $new['name'] ) );
@@ -251,6 +254,22 @@ function render(): void {
 						<td><?php $select( 'new_channel[access_team]', $levels, 'all' ); ?></td>
 						<td><?php $select( 'new_channel[access_guests]', $levels, 'none' ); ?></td>
 						<td><input type="number" style="width:5em" name="new_channel[position]" value="100"></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<h2><?php esc_html_e( 'Assistants', 'flurfunk' ); ?></h2>
+			<p class="description" style="max-width:46rem"><?php esc_html_e( 'Accounts for agents and scripts. They take part like the team, have no editing rights in WordPress and are marked "Assistant" in conversations. Agents connect with an application password from the account\'s profile page.', 'flurfunk' ); ?></p>
+			<table class="widefat striped" style="max-width:46rem">
+				<tbody>
+				<?php foreach ( get_users( array( 'meta_key' => 'flurfunk_bot' ) ) as $bot ) : // phpcs:ignore WordPress.DB.SlowDBQuery ?>
+					<tr>
+						<td><strong><?php echo esc_html( $bot->display_name ); ?></strong><br><code><?php echo esc_html( $bot->user_login ); ?></code> · ID <?php echo (int) $bot->ID; ?><?php echo (int) get_option( 'flurfunk_bot_default' ) === $bot->ID ? ' · ' . esc_html__( 'default for wp flurfunk post', 'flurfunk' ) : ''; ?></td>
+						<td><a href="<?php echo esc_url( get_edit_user_link( $bot->ID ) . '#application-passwords-section' ); ?>"><?php esc_html_e( 'Application passwords', 'flurfunk' ); ?></a></td>
+					</tr>
+				<?php endforeach; ?>
+					<tr>
+						<td colspan="2"><label><?php esc_html_e( 'New assistant', 'flurfunk' ); ?> <input name="new_bot[name]" placeholder="<?php esc_attr_e( 'Name', 'flurfunk' ); ?>"></label></td>
 					</tr>
 				</tbody>
 			</table>

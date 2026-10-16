@@ -376,6 +376,23 @@ test.describe( 'team', () => {
 		await expect( page.locator( '.ff-pane .ff-root-msg .ff-card' ) ).toBeVisible();
 	} );
 
+	test( 'search finds a reply and mark-all-read clears numbers', async ( { page } ) => {
+		const word = 'Suchwort' + Date.now();
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Suche' } );
+		await api( page, 'threads/' + th.id + '/messages', { body: 'darin steht ' + word } );
+		await openApp( page );
+		await page.locator( '.ff-search input' ).fill( word );
+		await page.locator( '.ff-search input' ).press( 'Enter' );
+		await expect( page.locator( '.ff-head h1' ) ).toContainText( word );
+		await expect( page.locator( '.ff-post' ) ).toHaveCount( 1 );
+		await page.locator( '.ff-nav button[data-view="all"]' ).click();
+		const btn = page.locator( '[data-ff="read-all"]' );
+		if ( await btn.count() ) {
+			await btn.click();
+			await expect( page.locator( '.ff-nav b' ) ).toHaveCount( 0 );
+		}
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];

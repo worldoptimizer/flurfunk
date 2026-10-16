@@ -53,6 +53,37 @@ function is_bot( int $user_id ): bool {
 }
 
 /**
+ * Create (or mark) an assistant account: a subscriber without editing rights.
+ *
+ * @param string $name  Display name.
+ * @param string $login Login name.
+ * @return int|\WP_Error User ID.
+ */
+function create_bot( string $name = 'Assistent', string $login = 'flurfunk-assistent' ) {
+	$login = sanitize_user( $login, true ) ?: 'flurfunk-assistent';
+	$user  = get_user_by( 'login', $login );
+	$id    = $user ? $user->ID : wp_insert_user(
+		array(
+			'user_login'   => $login,
+			'user_pass'    => wp_generate_password( 40 ),
+			'user_email'   => $login . '@invalid.invalid',
+			'display_name' => sanitize_text_field( $name ) ?: 'Assistent',
+			'role'         => 'subscriber',
+		)
+	);
+	if ( is_wp_error( $id ) ) {
+		return $id;
+	}
+	update_user_meta( $id, 'flurfunk_bot', 1 );
+	\Flurfunk\Notify\save_prefs( (int) $id, array( 'mail' => 'none', 'badge' => false ) );
+	if ( ! get_option( 'flurfunk_bot_default' ) ) {
+		update_option( 'flurfunk_bot_default', (int) $id, false );
+	}
+	\Flurfunk\Store\bump();
+	return (int) $id;
+}
+
+/**
  * May the person use Flurfunk at all?
  *
  * @param int $user_id User (0 = current).

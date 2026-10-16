@@ -299,12 +299,15 @@
 	/* ------------------------------------------------------------------ edit and delete */
 
 	const rawText = ( text ) => String( text || '' ).replace( /<@(\d+)>/g, ( all, id ) => '@' + person( +id ).name );
-	const startEdit = ( holder, text, onSave ) => {
+	const startEdit = ( holder, text, onSave, title ) => {
 		const form = document.createElement( 'form' );
 		form.className = 'ff-edit';
-		form.innerHTML = '<textarea rows="3" aria-label="' + esc( t( 'Edit' ) ) + '"></textarea><div class="ff-row"><button type="submit" class="ff-send">' + esc( t( 'Save' ) ) + '</button><button type="button" class="ff-link" data-ff="edit-cancel">' + esc( t( 'Cancel' ) ) + '</button></div><p class="ff-error" role="alert" hidden></p>';
+		form.innerHTML = ( 'string' === typeof title ? '<input type="text" name="title" class="ff-title-input" aria-label="' + esc( t( 'Title' ) ) + '">' : '' ) + '<textarea rows="3" aria-label="' + esc( t( 'Edit' ) ) + '"></textarea><div class="ff-row"><button type="submit" class="ff-send">' + esc( t( 'Save' ) ) + '</button><button type="button" class="ff-link" data-ff="edit-cancel">' + esc( t( 'Cancel' ) ) + '</button></div><p class="ff-error" role="alert" hidden></p>';
 		const ta = $( 'textarea', form );
 		ta.value = rawText( text );
+		if ( form.elements.title ) {
+			form.elements.title.value = title;
+		}
 		holder.hidden = true;
 		holder.after( form );
 		ta.focus();
@@ -330,7 +333,7 @@
 		form.addEventListener( 'submit', async ( e ) => {
 			e.preventDefault();
 			try {
-				await onSave( encode( ta.value.trim() ) );
+				await onSave( encode( ta.value.trim() ), form.elements.title ? form.elements.title.value.trim() : undefined );
 			} catch ( x ) {
 				const er = $( '.ff-error', form );
 				er.textContent = x.message;
@@ -391,7 +394,7 @@
 			const th = threads.find( ( x ) => x.id === +el.dataset.tid );
 			const holder = $( '.ff-text', el.closest( '.ff-msg-body, .ff-box' ) );
 			if ( th && holder ) {
-				startEdit( holder, th.body, async ( text ) => onUpdate( await api( 'threads/' + th.id + '/edit', { method: 'POST', body: { body: text } } ) ) );
+				startEdit( holder, th.body, async ( text, title ) => onUpdate( await api( 'threads/' + th.id + '/edit', { method: 'POST', body: undefined === title ? { body: text } : { body: text, title } } ) ), th.title || undefined );
 			}
 			return true;
 		}
@@ -809,6 +812,10 @@
 			if ( 'tasks' === kind ) {
 				return { title: t( 'Open tasks' ), sub: t( 'Everything not ticked off yet' ), args: { view: 'tasks' } };
 			}
+			if ( 'search' === kind ) {
+				const q = ui.view.slice( 7 );
+				return { title: t( 'Search: %s', q ), sub: t( 'Threads and replies that contain it' ), args: { view: 'all', q }, search: q };
+			}
 			return { title: t( 'All threads' ), sub: t( 'Latest activity first' ), args: { view: 'all' } };
 		};
 
@@ -851,9 +858,16 @@
 		};
 
 		/* feed */
+		const unreadHere = () => {
+			const v = viewInfo();
+			const c = boot.counts;
+			return v.channel ? c.channels[ v.channel ] || 0 : v.target ? c.targets[ v.target.type + ':' + v.target.id ] || 0 : c.total;
+		};
 		const renderHead = () => {
 			const v = viewInfo();
-			head.innerHTML = '<h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p>';
+			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p></div>'
+				+ '<div class="ff-head-tools">' + ( unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
+				+ '<form class="ff-search" role="search"><input type="search" name="q" value="' + esc( v.search || '' ) + '" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Search conversations' ) ) + '"></form></div>';
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
 			+ ava( th.author ) + '<div class="ff-post-body">'
@@ -972,6 +986,9 @@
 				if ( ! ui.settings ) {
 					renderNav(); // Not while the settings are open: that would steal the focus.
 				}
+				if ( ! head.contains( document.activeElement ) ) {
+					renderHead();
+				}
 				await loadList();
 				updateBadge( boot.counts.total );
 			} catch ( e ) {}
@@ -1056,10 +1073,28 @@
 				}
 				applyLook( root );
 				renderNav();
+			} else if ( 'read-all' === act ) {
+				const v = viewInfo();
+				const r = await api( 'read', { method: 'POST', body: v.channel ? { channel: v.channel } : {} } );
+				boot.counts = r;
+				renderNav();
+				renderHead();
+				await loadList();
+				updateBadge( boot.counts.total );
 			} else if ( 'make-task' === act ) {
 				ui.current = await api( 'threads/' + ui.thread + '/status', { method: 'POST', body: { status: 'open' } } );
 				renderPane( ui.current );
 				refresh();
+			}
+		} );
+		head.addEventListener( 'submit', ( e ) => {
+			e.preventDefault();
+			const q = e.target.elements.q.value.trim();
+			setView( q ? 'search:' + q : 'all' );
+			const box = $( '.ff-search input', head );
+			if ( box ) {
+				box.focus();
+				box.setSelectionRange( box.value.length, box.value.length );
 			}
 		} );
 		root.addEventListener( 'keydown', ( e ) => {

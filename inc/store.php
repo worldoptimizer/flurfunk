@@ -574,6 +574,28 @@ function edit_thread( int $thread_id, array $args ) {
 }
 
 /**
+ * Mark everything a person can see as read, optionally only in one channel.
+ *
+ * @param int    $user_id User.
+ * @param string $channel Channel short name ('' = all).
+ * @return int Threads marked.
+ */
+function mark_all_read( int $user_id, string $channel = '' ): int {
+	global $wpdb;
+	$where = Access\where( $user_id );
+	if ( '' !== $channel ) {
+		$c      = channel_by_slug( $channel );
+		$where .= ' AND t.channel_id = ' . ( $c ? (int) $c->id : 0 );
+	}
+	$rows = $wpdb->get_results( 'SELECT t.id, ( SELECT COALESCE( MAX(m.id), 0 ) FROM ' . table( 'messages' ) . ' m WHERE m.thread_id = t.id ) last FROM ' . table( 'threads' ) . " t WHERE $where" ); // phpcs:ignore WordPress.DB
+	foreach ( $rows as $r ) {
+		$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen) VALUES (%d, %d, %d, %s) ON DUPLICATE KEY UPDATE last_message_id = GREATEST(last_message_id, VALUES(last_message_id)), seen = VALUES(seen)', $user_id, (int) $r->id, (int) $r->last, now() ) ); // phpcs:ignore WordPress.DB
+	}
+	update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
+	return count( $rows );
+}
+
+/**
  * Revision counter: changes whenever something changes, so cached numbers expire at once.
  * Reading only affects the reader, so it bumps that person's own counter.
  *
@@ -961,7 +983,7 @@ function audience( object $t ): array {
  * Threads for the overview: summary with reply count, participants and unread count.
  *
  * @param int   $user_id User.
- * @param array $args    view (all|mentions|tasks), channel (short name), target ('post:ID'), ref_prefix,
+ * @param array $args    view (all|mentions|tasks), channel (short name), target ('post:ID'), ref_prefix, q (search),
  *                       before (ISO, for paging), limit, order ('ref' = oldest first).
  * @return array[]
  */
@@ -982,6 +1004,11 @@ function list_threads( int $user_id, array $args = array() ): array {
 	}
 	if ( 'tasks' === $view ) {
 		$where[] = "t.status = 'open'";
+	}
+	$q = trim( (string) ( $args['q'] ?? '' ) );
+	if ( '' !== $q ) {
+		$like    = '%' . $wpdb->esc_like( $q ) . '%';
+		$where[] = $wpdb->prepare( '( t.title LIKE %s OR t.body LIKE %s OR t.id IN ( SELECT thread_id FROM ' . table( 'messages' ) . " WHERE type = 'message' AND body LIKE %s ) )", $like, $like, $like );
 	}
 	if ( 'mentions' === $view ) {
 		$where[] = $wpdb->prepare( 't.id IN (SELECT thread_id FROM ' . table( 'mentions' ) . ' WHERE user_id = %d)', $user_id );

@@ -4,7 +4,8 @@
  *
  *   GET  bootstrap                 me, people, channels, providers, counts, look
  *   GET  counts                    unread numbers
- *   GET  threads                   list (view, channel, target, ref_prefix, before, limit, order)
+ *   GET  threads                   list (view, channel, target, ref_prefix, before, limit, order, q)
+ *   POST read                      mark all as read ({ channel } optional)
  *   POST threads                   new thread (with ref_key: returns the existing one if present)
  *   GET  threads/<id>              thread with messages; marks it read
  *   POST threads/<id>/messages     reply
@@ -68,6 +69,7 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/read', array( 'methods' => 'POST', 'callback' => static fn ( WP_REST_Request $r ) => array( 'marked' => Store\mark_all_read( get_current_user_id(), sanitize_key( (string) ( $r->get_json_params()['channel'] ?? '' ) ) ) ) + Store\counts( get_current_user_id() ), 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/cards/(?P<id>\d+)/refresh', array( 'methods' => 'POST', 'callback' => static function ( WP_REST_Request $r ) {
 		$tid = Store\refresh_card( (int) $r['id'] );
 		return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
@@ -167,7 +169,7 @@ function decorate( array $t ): array {
  * @param WP_REST_Request $r Request.
  */
 function list_threads( WP_REST_Request $r ): array {
-	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'limit', 'order' ) ) );
+	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'limit', 'order', 'q' ) ) );
 	return array_map( __NAMESPACE__ . '\\decorate', Store\list_threads( get_current_user_id(), array_map( 'sanitize_text_field', $args ) ) );
 }
 

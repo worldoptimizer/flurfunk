@@ -330,6 +330,25 @@ array_map( 'wp_delete_file', glob( $dir . '/files/*' ) ?: array() );
 @rmdir( $dir . '/files' ); // phpcs:ignore
 @rmdir( $dir ); // phpcs:ignore
 
+WP_CLI::log( 'Search and read all' );
+$as( $team );
+$needle = 'Zebrastreifen' . wp_generate_password( 4, false, false );
+$st     = Store\create_thread( array( 'channel' => 'ff-test', 'title' => 'Suchtest', 'body' => 'nichts' ) );
+Store\add_message( $st, array( 'body' => "in einer Antwort: $needle" ) );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'q' => $needle ) );
+$check( 'search finds a thread by a word in a reply', 1 === count( $l ) && (int) $l[0]['id'] === (int) $st, wp_list_pluck( $l, 'id' ) );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'q' => '%' ) );
+$check( 'search treats % literally', 200 === $s );
+$as( $guest );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'q' => $needle ) );
+$check( 'search never shows what the person may not see', array() === $l );
+$as( $team2 );
+list( $s, $r ) = $req( 'POST', 'read', array( 'channel' => 'ff-test' ) );
+$check( 'marking a channel as read clears its count', 200 === $s && 0 === (int) ( $r['channels']['ff-test'] ?? 0 ), $r['channels'] ?? $s );
+$as( $team );
+list( $s, $x ) = $req( 'POST', 'threads/' . $st . '/edit', array( 'title' => 'Neuer Titel', 'body' => 'nichts' ) );
+$check( 'the thread title can be edited', 200 === $s && 'Neuer Titel' === $x['title'], $x['title'] ?? $s );
+
 WP_CLI::log( 'Mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );
