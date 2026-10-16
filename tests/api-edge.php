@@ -265,6 +265,7 @@ if ( ! is_wp_error( $bfile ) ) {
 WP_CLI::log( 'Brake and privacy' );
 $as( $team2 );
 add_filter( 'flurfunk_rate_limit', fn () => 3 );
+delete_transient( 'flurfunk_rate_' . $team2 . '_' . gmdate( 'YmdHi' ) );
 $codes = array();
 for ( $i = 0; $i < 5; $i++ ) {
 	list( $s ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'schnell ' . $i ) );
