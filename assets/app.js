@@ -208,7 +208,7 @@
 		const state = { files: [], atts: [], busy: false };
 		const id = 'ff-ta-' + o.key.replace( /[^a-z0-9_-]/gi, '-' );
 		el.innerHTML = ( o.label ? '<label class="ff-label" for="' + id + '">' + esc( o.label ) + '</label>' : '' )
-			+ '<textarea id="' + id + '" rows="2" placeholder="' + esc( o.placeholder || t( 'Write … (@name, / for cards)' ) ) + '"' + ( o.label ? '' : ' aria-label="' + esc( o.placeholder || t( 'Message' ) ) + '"' ) + '></textarea>'
+			+ '<textarea id="' + id + '" rows="' + ( o.autoGrow ? 1 : 2 ) + '" placeholder="' + esc( o.placeholder || t( 'Write … (@name, / for cards)' ) ) + '"' + ( o.label ? '' : ' aria-label="' + esc( o.placeholder || t( 'Message' ) ) + '"' ) + '></textarea>'
 			+ '<div class="ff-menu-slot"></div><div class="ff-pending"></div>'
 			+ '<div class="ff-row"><div class="ff-left">'
 			+ ( boot.me.upload ? '<label class="ff-link ff-upload">' + icon.clip + '<span>' + esc( t( 'Attach file' ) ) + '</span><input type="file" multiple hidden></label>' : '' )
@@ -277,7 +277,16 @@
 			menu( '', [] );
 		};
 
+		// Grow with the text (up to 40% of the window), never shrink below the start height.
+		const grow = () => {
+			if ( ! o.autoGrow ) {
+				return;
+			}
+			ta.style.height = 'auto';
+			ta.style.height = Math.min( ta.scrollHeight + 2, Math.round( window.innerHeight * 0.4 ) ) + 'px';
+		};
 		ta.addEventListener( 'input', () => {
+			grow();
 			drafts[ o.key ] = ta.value;
 			el.classList.toggle( 'has-text', '' !== ta.value );
 			updateMenu();
@@ -387,6 +396,7 @@
 				ta.value = '';
 				drafts[ o.key ] = '';
 				el.classList.remove( 'has-text' );
+				ta.style.height = '';
 				state.files = [];
 				state.atts = [];
 				showPending();
@@ -433,7 +443,7 @@
 		}
 		applyLook( root );
 		const params = new URLSearchParams( location.search );
-		const ui = { view: params.get( 'view' ) || 'all', thread: null, list: [], more: false, settings: false, loading: false };
+		const ui = { view: params.get( 'view' ) || 'all', thread: null, list: [], more: false, settings: false, loading: true };
 		const start = ui.view.match( /^thread:(\d+)$/ );
 		if ( start ) {
 			ui.view = 'all';
@@ -528,7 +538,6 @@
 			if ( append && ui.list.length ) {
 				args.before = ui.list[ ui.list.length - 1 ].activity;
 			}
-			ui.loading = ! append && ! ui.list.length;
 			const items = await api( 'threads?' + query( args ) );
 			ui.list = append ? ui.list.concat( items ) : items;
 			ui.more = items.length === 40;
@@ -546,6 +555,7 @@
 			const c = composer( {
 				key: 'new:' + ui.view,
 				className: 'ff-new-thread',
+				autoGrow: true,
 				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', v.channel ) : t( 'New thread … (@name, / for cards)' ),
 				submitLabel: t( 'Start thread' ),
 				extra: chSel + tgSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>',
@@ -639,6 +649,7 @@
 		const setView = ( view ) => {
 			ui.view = view;
 			ui.list = [];
+			ui.loading = true;
 			closeThread();
 			renderNav();
 			renderHead();
