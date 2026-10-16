@@ -16,6 +16,7 @@
  *   inc/access.php     who sees what: team and guests per channel
  *   inc/store.php      reading and writing, data format "flurfunk/1"
  *   inc/providers.php  providers for slash commands and cards (the extension API)
+ *   inc/targets.php    what threads can be attached to (posts built in, more via the API)
  *   inc/settings.php   branding and defaults (name, logo, colours, access)
  *   inc/notify.php     email notifications following each person's preferences
  *   inc/rest.php       REST API for the interface (flurfunk/v1)
@@ -42,6 +43,7 @@ require_once FLURFUNK_DIR . 'inc/schema.php';
 require_once FLURFUNK_DIR . 'inc/access.php';
 require_once FLURFUNK_DIR . 'inc/store.php';
 require_once FLURFUNK_DIR . 'inc/providers.php';
+require_once FLURFUNK_DIR . 'inc/targets.php';
 require_once FLURFUNK_DIR . 'inc/settings.php';
 require_once FLURFUNK_DIR . 'inc/notify.php';
 require_once FLURFUNK_DIR . 'inc/rest.php';
@@ -80,6 +82,16 @@ add_action(
  */
 function flurfunk_register_provider( string $id, array $args ): void {
 	Flurfunk\Providers\register( $id, $args );
+}
+
+/**
+ * Register something threads can be attached to (see inc/targets.php and README.md).
+ *
+ * @param string $type Type key, e.g. "dossier".
+ * @param array  $args label, search, info, can.
+ */
+function flurfunk_register_target( string $type, array $args ): void {
+	Flurfunk\Targets\register( $type, $args );
 }
 
 /**

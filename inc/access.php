@@ -143,13 +143,12 @@ function can_start( object $channel, string $target_type, int $target_id, int $u
 /**
  * May the person attach a thread to this target?
  *
- * @param string $type    Target type (built in: post).
+ * @param string $type    Target type (see inc/targets.php).
  * @param int    $id      Target ID.
  * @param int    $user_id User.
  */
 function can_target( string $type, int $id, int $user_id ): bool {
-	$ok = 'post' === $type && get_post( $id ) && ( 'team' === kind( $user_id ) || in_array( $id, owned_post_ids( $user_id ), true ) );
-	return (bool) apply_filters( 'flurfunk_can_target', $ok, $type, $id, $user_id );
+	return (bool) apply_filters( 'flurfunk_can_target', \Flurfunk\Targets\can( $type, $id, $user_id ), $type, $id, $user_id );
 }
 
 /**

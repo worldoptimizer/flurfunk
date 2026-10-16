@@ -25,7 +25,20 @@
 	const esc = ( s ) => String( s ?? '' ).replace( /[&<>"']/g, ( c ) => ( { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } )[ c ] );
 	const $ = ( sel, el ) => ( el || document ).querySelector( sel );
 
-	const api = async ( path, opts = {} ) => {
+	// Shown once when WordPress has logged the person out (the page itself still looks alive).
+	let sessionShown = false;
+	const sessionEnded = () => {
+		if ( sessionShown ) {
+			return;
+		}
+		sessionShown = true;
+		const bar = document.createElement( 'div' );
+		bar.className = 'ff-root ff-session';
+		bar.setAttribute( 'role', 'alert' );
+		bar.innerHTML = esc( t( 'Your session has ended. Please log in again.' ) ) + ( cfg.loginUrl ? ' <a href="' + esc( cfg.loginUrl ) + '" target="_top">' + esc( t( 'Log in' ) ) + '</a>' : '' );
+		document.body.append( bar );
+	};
+	const api = async ( path, opts = {}, retried = false ) => {
 		const res = await fetch( cfg.root + path, {
 			method: opts.method || 'GET',
 			credentials: 'same-origin',
@@ -34,6 +47,19 @@
 		} );
 		const data = await res.json().catch( () => null );
 		if ( ! res.ok ) {
+			const code = data && data.code;
+			// Windows stay open for days; WordPress nonces don't. Fetch a fresh one once and retry.
+			if ( ! retried && 'rest_cookie_invalid_nonce' === code && cfg.ajaxUrl ) {
+				const fresh = await fetch( cfg.ajaxUrl + '?action=rest-nonce', { credentials: 'same-origin' } ).then( ( r ) => r.text() ).catch( () => '0' );
+				if ( fresh && '0' !== fresh.trim() ) {
+					cfg.nonce = fresh.trim();
+					return api( path, opts, true );
+				}
+			}
+			if ( 401 === res.status || 'rest_cookie_invalid_nonce' === code || 'rest_not_logged_in' === code ) {
+				sessionEnded();
+				throw new Error( t( 'Your session has ended. Please log in again.' ) );
+			}
 			throw new Error( ( data && data.message ) || res.statusText );
 		}
 		return data;
@@ -46,6 +72,7 @@
 		if ( ! bootPromise || fresh ) {
 			bootPromise = api( 'bootstrap' ).then( ( b ) => {
 				boot = b;
+				loadDrafts();
 				return b;
 			} );
 		}
@@ -84,9 +111,10 @@
 	};
 
 	const initials = ( name ) => String( name || '?' ).trim().split( /\s+/ ).slice( 0, 2 ).map( ( w ) => w[ 0 ] ).join( '' ).toUpperCase();
+	const photo = ( p ) => ( p.avatar ? '<img src="' + esc( p.avatar ) + '" alt="" loading="lazy" onerror="this.remove()">' : '' );
 	const ava = ( id, cls ) => {
 		const p = person( id );
-		return '<span class="ff-ava' + ( 'guest' === p.kind ? ' is-guest' : '' ) + ( boot && id === boot.me.id ? ' is-me' : '' ) + ( cls ? ' ' + cls : '' ) + '" aria-hidden="true">' + esc( initials( p.name ) ) + '</span>';
+		return '<span class="ff-ava' + ( 'guest' === p.kind ? ' is-guest' : '' ) + ( boot && id === boot.me.id ? ' is-me' : '' ) + ( cls ? ' ' + cls : '' ) + '" aria-hidden="true">' + esc( initials( p.name ) ) + photo( p ) + '</span>';
 	};
 
 	const linkify = ( html ) => html.replace( /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>' );
@@ -169,10 +197,17 @@
 			+ ( last ? '<span>' + esc( t( 'last: %1$s, %2$s', person( last.author ).name, when( last.created ) ) ) + '</span>' : '' ) + '</button>';
 	};
 
+	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.manage );
+	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
 	const messagesHtml = ( th ) => {
 		let html = '';
 		let prev = null;
 		( th.messages || [] ).forEach( ( m ) => {
+			if ( 'deleted' === m.type ) {
+				html += '<li class="ff-event is-deleted">' + esc( t( '%s deleted a message', person( m.author ).name ) ) + '</li>';
+				prev = null;
+				return;
+			}
 			if ( 'status' === m.type ) {
 				const name = esc( person( m.author ).name );
 				const text = 'done' === m.status ? t( '%s marked this as done', name ) : 'open' === m.status ? t( '%s reopened this', name ) : t( '%s removed the task', name );
@@ -185,16 +220,211 @@
 			html += '<li class="ff-msg' + ( cont ? ' is-cont' : '' ) + ( unread ? ' is-unread' : '' ) + '" id="ff-m-' + m.id + '">' + ava( m.author ) + '<div class="ff-msg-body">'
 				+ ( cont ? '' : '<p class="ff-who"><b>' + esc( person( m.author ).name ) + '</b> <span>' + esc( person( m.author ).role ) + ' · ' + esc( when( m.created ) ) + '</span></p>' )
 				+ ( m.text ? '<div class="ff-text">' + rich( m.text ) + '</div>' : '' )
+				+ ( m.edited ? '<small class="ff-edited">' + esc( t( '(edited)' ) ) + '</small>' : '' )
 				+ cards( m.attachments ) + files( m.files )
-				+ '</div></li>';
+				+ actions( m ) + '</div></li>';
 			prev = m;
 		} );
 		return html ? '<ol class="ff-thread">' + html + '</ol>' : '';
 	};
 
+	/* ------------------------------------------------------------------ edit and delete */
+
+	const rawText = ( text ) => String( text || '' ).replace( /<@(\d+)>/g, ( all, id ) => '@' + person( +id ).name );
+	const startEdit = ( holder, text, onSave ) => {
+		const form = document.createElement( 'form' );
+		form.className = 'ff-edit';
+		form.innerHTML = '<textarea rows="3" aria-label="' + esc( t( 'Edit' ) ) + '"></textarea><div class="ff-row"><button type="submit" class="ff-send">' + esc( t( 'Save' ) ) + '</button><button type="button" class="ff-link" data-ff="edit-cancel">' + esc( t( 'Cancel' ) ) + '</button></div><p class="ff-error" role="alert" hidden></p>';
+		const ta = $( 'textarea', form );
+		ta.value = rawText( text );
+		holder.hidden = true;
+		holder.after( form );
+		ta.focus();
+		const cancel = () => {
+			form.remove();
+			holder.hidden = false;
+		};
+		form.addEventListener( 'click', ( e ) => {
+			if ( e.target.closest( '[data-ff="edit-cancel"]' ) ) {
+				e.stopPropagation();
+				cancel();
+			}
+		} );
+		form.addEventListener( 'keydown', ( e ) => {
+			if ( 'Escape' === e.key ) {
+				e.preventDefault();
+				cancel();
+			} else if ( 'Enter' === e.key && ( e.metaKey || e.ctrlKey ) ) {
+				e.preventDefault();
+				form.requestSubmit();
+			}
+		} );
+		form.addEventListener( 'submit', async ( e ) => {
+			e.preventDefault();
+			try {
+				await onSave( encode( ta.value.trim() ) );
+			} catch ( x ) {
+				const er = $( '.ff-error', form );
+				er.textContent = x.message;
+				er.hidden = false;
+			}
+		} );
+	};
+	/**
+	 * Edit/delete buttons inside any view. Returns true when the click was one of them.
+	 *
+	 * @param {Element}  el       Clicked element with data-ff.
+	 * @param {Object[]} threads  Full threads shown in this view.
+	 * @param {Function} onUpdate Called with the updated thread.
+	 */
+	const messageAction = async ( el, threads, onUpdate ) => {
+		const act = el.dataset.ff;
+		if ( 'msg-edit' === act || 'msg-del' === act ) {
+			const mid = +el.dataset.mid;
+			if ( 'msg-del' === act ) {
+				if ( window.confirm( t( 'Delete this message?' ) ) ) {
+					onUpdate( await api( 'messages/' + mid, { method: 'DELETE' } ) );
+				}
+				return true;
+			}
+			const m = threads.flatMap( ( x ) => x.messages || [] ).find( ( x ) => x.id === mid );
+			const body = el.closest( '.ff-msg-body' );
+			let holder = $( '.ff-text', body );
+			if ( ! holder ) {
+				holder = document.createElement( 'div' );
+				holder.className = 'ff-text';
+				$( '.ff-who', body ) ? $( '.ff-who', body ).after( holder ) : body.prepend( holder );
+			}
+			startEdit( holder, m ? m.text : '', async ( text ) => onUpdate( await api( 'messages/' + mid, { method: 'POST', body: { body: text } } ) ) );
+			return true;
+		}
+		if ( 'thread-edit' === act ) {
+			const th = threads.find( ( x ) => x.id === +el.dataset.tid );
+			const holder = $( '.ff-text', el.closest( '.ff-msg-body, .ff-box' ) );
+			if ( th && holder ) {
+				startEdit( holder, th.body, async ( text ) => onUpdate( await api( 'threads/' + th.id + '/edit', { method: 'POST', body: { body: text } } ) ) );
+			}
+			return true;
+		}
+		return false;
+	};
+
+	/* ------------------------------------------------------------------ target picker */
+
+	/**
+	 * "Attached to": a searchable picker instead of a long list. Shows the person's recent
+	 * targets first and searches every target type as they type.
+	 *
+	 * @param {boolean} guest Guests must pick one of their own posts.
+	 */
+	const targetPicker = ( guest ) => {
+		const wrap = document.createElement( 'div' );
+		wrap.className = 'ff-picker';
+		wrap.innerHTML = '<input type="hidden" name="target" value=""><button type="button" class="ff-pick" aria-haspopup="listbox" aria-expanded="false"></button>'
+			+ '<div class="ff-pop" hidden><input type="search" class="ff-pick-q" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Attached to' ) ) + '"><div class="ff-pick-list" role="listbox" aria-label="' + esc( t( 'Attached to' ) ) + '"></div></div>';
+		const hidden = $( 'input[type=hidden]', wrap );
+		const btn = $( '.ff-pick', wrap );
+		const pop = $( '.ff-pop', wrap );
+		const q = $( '.ff-pick-q', wrap );
+		const list = $( '.ff-pick-list', wrap );
+		let items = [];
+		const set = ( x ) => {
+			hidden.value = x ? x.type + ':' + x.id : '';
+			btn.innerHTML = icon.doc + '<span>' + esc( x ? x.title : t( 'Attached to: nothing' ) ) + '</span>' + icon.chev;
+			btn.title = x ? ( x.label || '' ) + ': ' + x.title : '';
+		};
+		const option = ( x, i ) => '<button type="button" role="option" data-i="' + i + '"><span><b>' + esc( x ? x.title : t( 'Nothing' ) ) + '</b><small>' + esc( x ? [ x.label, x.subtitle || x.status ].filter( Boolean ).join( ' · ' ) : t( 'A thread without a target' ) ) + '</small></span></button>';
+		const show = ( found ) => {
+			items = ( guest ? [] : [ null ] ).concat( found );
+			list.innerHTML = items.map( option ).join( '' ) + ( found.length ? '' : '<p class="ff-menu-h">' + esc( t( 'Nothing found.' ) ) + '</p>' );
+		};
+		const close = () => {
+			pop.hidden = true;
+			btn.setAttribute( 'aria-expanded', 'false' );
+		};
+		let timer = null;
+		let seq = 0;
+		q.addEventListener( 'input', () => {
+			clearTimeout( timer );
+			const mySeq = ++seq;
+			timer = setTimeout( () => api( 'targets?' + query( { q: q.value } ) ).then( ( r ) => mySeq === seq && show( r ) ).catch( () => {} ), 200 );
+		} );
+		btn.addEventListener( 'click', () => {
+			if ( ! pop.hidden ) {
+				close();
+				return;
+			}
+			pop.hidden = false;
+			btn.setAttribute( 'aria-expanded', 'true' );
+			q.value = '';
+			show( boot.targets );
+			q.focus();
+		} );
+		list.addEventListener( 'click', ( e ) => {
+			const o = e.target.closest( '[data-i]' );
+			if ( o ) {
+				set( items[ +o.dataset.i ] );
+				close();
+				btn.focus();
+			}
+		} );
+		wrap.addEventListener( 'keydown', ( e ) => {
+			const opts = [ ...list.querySelectorAll( 'button' ) ];
+			const i = opts.indexOf( document.activeElement );
+			if ( 'Escape' === e.key && ! pop.hidden ) {
+				e.preventDefault();
+				e.stopPropagation();
+				close();
+				btn.focus();
+			} else if ( 'ArrowDown' === e.key && ! pop.hidden ) {
+				e.preventDefault();
+				( opts[ Math.min( opts.length - 1, i + 1 ) ] || q ).focus();
+			} else if ( 'ArrowUp' === e.key && ! pop.hidden ) {
+				e.preventDefault();
+				( i > 0 ? opts[ i - 1 ] : q ).focus();
+			} else if ( 'Enter' === e.key && document.activeElement === q ) {
+				e.preventDefault();
+				if ( opts[ guest ? 0 : 1 ] || opts[ 0 ] ) {
+					( opts[ guest ? 0 : 1 ] || opts[ 0 ] ).click();
+				}
+			}
+		} );
+		document.addEventListener( 'mousedown', ( e ) => {
+			if ( ! pop.hidden && ! wrap.contains( e.target ) ) {
+				close();
+			}
+		} );
+		set( guest && boot.targets[ 0 ] ? boot.targets[ 0 ] : null );
+		return wrap;
+	};
+
 	/* ------------------------------------------------------------------ composer */
 
-	const drafts = {};
+	// Drafts survive a reload (kept per person in this browser only).
+	let drafts = {};
+	const draftsKey = () => 'flurfunk-drafts-' + ( boot ? boot.me.id : 0 );
+	function loadDrafts() {
+		try {
+			drafts = JSON.parse( window.localStorage.getItem( draftsKey() ) || '{}' ) || {};
+		} catch ( e ) {
+			drafts = {};
+		}
+	}
+	let draftTimer = null;
+	const saveDrafts = () => {
+		clearTimeout( draftTimer );
+		draftTimer = setTimeout( () => {
+			try {
+				const keep = {};
+				Object.keys( drafts ).forEach( ( k ) => {
+					if ( drafts[ k ] ) {
+						keep[ k ] = drafts[ k ];
+					}
+				} );
+				window.localStorage.setItem( draftsKey(), JSON.stringify( keep ) );
+			} catch ( e ) {}
+		}, 300 );
+	};
 	const MENTION = /(?:^|\s)@([\p{L}\p{N}._-]*)$/u;
 	const SLASH = /(?:^|\s)\/([a-z0-9_-]*)(?:[ \t]+([^\n]*))?$/i;
 
@@ -239,6 +469,7 @@
 			ta.value = ta.value.slice( 0, start ) + text + ta.value.slice( ta.selectionStart );
 			ta.selectionStart = ta.selectionEnd = start + text.length;
 			drafts[ o.key ] = ta.value;
+			saveDrafts();
 		};
 		let searchTimer = null;
 		let searchSeq = 0;
@@ -289,6 +520,7 @@
 		ta.addEventListener( 'input', () => {
 			grow();
 			drafts[ o.key ] = ta.value;
+			saveDrafts();
 			el.classList.toggle( 'has-text', '' !== ta.value );
 			updateMenu();
 		} );
@@ -396,6 +628,7 @@
 			}, el ) ).then( () => {
 				ta.value = '';
 				drafts[ o.key ] = '';
+				saveDrafts();
 				el.classList.remove( 'has-text' );
 				ta.style.height = '';
 				state.files = [];
@@ -409,6 +642,9 @@
 				el.classList.remove( 'is-busy' );
 			} );
 		} );
+		if ( ta.value ) {
+			requestAnimationFrame( grow );
+		}
 		el.focusText = () => {
 			ta.focus();
 			ta.selectionStart = ta.selectionEnd = ta.value.length;
@@ -499,17 +735,20 @@
 				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 ) + ( c.tasks ? '' : '' )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
 				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
-				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : t( 'Posts' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
+				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
-				+ '<button type="button" class="ff-me-tile" data-ff="settings" aria-expanded="' + ui.settings + '"><span class="ff-sq" aria-hidden="true">' + esc( initials( boot.me.name ) ) + '</span><span class="ff-me-name"><strong>' + esc( boot.me.name ) + '</strong><small>' + esc( boot.me.role ) + '</small></span>' + icon.gear + '<span class="screen-reader-text">' + esc( t( 'My settings' ) ) + '</span></button></div>';
+				+ '<button type="button" class="ff-me-tile" data-ff="settings" aria-expanded="' + ui.settings + '"><span class="ff-sq" aria-hidden="true">' + esc( initials( boot.me.name ) ) + photo( person( boot.me.id ) ) + '</span><span class="ff-me-name"><strong>' + esc( boot.me.name ) + '</strong><small>' + esc( boot.me.role ) + '</small></span>' + icon.gear + '<span class="screen-reader-text">' + esc( t( 'My settings' ) ) + '</span></button></div>';
 		};
 		const settingsHtml = () => {
 			const p = boot.me.prefs;
-			const seg = [ [ 'system', t( 'System' ) ], [ 'light', t( 'Light' ) ], [ 'dark', t( 'Dark' ) ] ];
+			const seg = [ [ 'light', t( 'Light' ) ], [ 'dark', t( 'Dark' ) ], [ 'system', t( 'Automatic' ) ] ];
+			const pic = [ [ 'photo', t( 'Photo' ) ], [ 'initials', t( 'Initials' ) ] ];
 			const mail = [ [ 'mentions', t( 'Mentions and replies in my threads' ) ], [ 'all', t( 'Every new message I can see' ) ], [ 'none', t( 'Never – I check myself' ) ] ];
 			return '<div class="ff-settings" role="group" aria-label="' + esc( t( 'My settings' ) ) + '">'
 				+ '<h3>' + esc( t( 'Appearance' ) ) + '</h3><div class="ff-seg">' + seg.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="theme" data-val="' + v + '" aria-pressed="' + ( p.theme === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>'
+				+ '<h3>' + esc( t( 'Profile picture' ) ) + '</h3><div class="ff-seg">' + pic.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="avatar" data-val="' + v + '" aria-pressed="' + ( p.avatar === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>'
+				+ '<p class="ff-meta">' + esc( t( 'Your picture from your profile or Gravatar. Without one, your initials show.' ) ) + '</p>'
 				+ '<h3>' + esc( t( 'Email me' ) ) + '</h3>' + mail.map( ( [ v, l ] ) => '<label><input type="radio" name="ff-mail" data-ff="pref" data-pref="mail" value="' + v + '"' + ( p.mail === v ? ' checked' : '' ) + '> ' + esc( l ) + '</label>' ).join( '' )
 				+ '<h3>' + esc( t( 'Badge' ) ) + '</h3><label><input type="checkbox" data-ff="pref" data-pref="badge"' + ( p.badge ? ' checked' : '' ) + '> ' + esc( t( 'Show the unread number on the menu icon' ) ) + '</label>'
 				+ ( boot.settings ? '<a class="ff-link" href="' + esc( boot.settings ) + '" target="_top">' + esc( t( 'Flurfunk settings for this site' ) ) + '</a>' : '' )
@@ -552,14 +791,17 @@
 			const startable = boot.channels.filter( ( c ) => 'all' === c.level || ( 'own-posts' === c.level && v.target ) || 'own-posts' === c.level );
 			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>';
 			const guest = 'guest' === boot.me.kind;
-			const tgSel = v.target ? '' : '<select name="target" aria-label="' + esc( t( 'Attached to' ) ) + '">' + ( guest ? '' : '<option value="">' + esc( t( 'Attached to: nothing' ) ) + '</option>' ) + boot.targets.map( ( x ) => '<option value="' + esc( x.type + ':' + x.id ) + '">' + esc( t( 'Post: %s', x.title.length > 40 ? x.title.slice( 0, 38 ) + ' …' : x.title ) ) + '</option>' ).join( '' ) + '</select>';
+			if ( ! startable.length || ( guest && ! boot.targets.length && ! v.target ) ) {
+				slot.innerHTML = '<p class="ff-note">' + esc( guest ? t( 'You can start conversations about your own posts. As soon as you have one, you can start here.' ) : t( 'You cannot start threads here.' ) ) + '</p>';
+				return;
+			}
 			const c = composer( {
 				key: 'new:' + ui.view,
 				className: 'ff-new-thread',
 				autoGrow: true,
 				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', chName( v.channel ) ) : t( 'New thread … (@name, / for cards)' ),
 				submitLabel: t( 'Start thread' ),
-				extra: chSel + tgSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>',
+				extra: chSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>',
 				onSubmit: async ( payload, form ) => {
 					const tg = v.target ? v.target : form.elements.target && form.elements.target.value ? { type: form.elements.target.value.split( ':' )[ 0 ], id: +form.elements.target.value.split( ':' )[ 1 ] } : null;
 					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: v.channel || form.elements.channel.value, target: tg, task: form.elements.task.checked } ) } );
@@ -568,6 +810,9 @@
 					openThread( th.id, th );
 				},
 			} );
+			if ( ! v.target ) {
+				$( '.ff-left', c ).insertBefore( targetPicker( guest ), $( '.ff-check', c ) );
+			}
 			slot.replaceChildren( c );
 		};
 
@@ -580,7 +825,7 @@
 				+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ cards( th.attachments ) + targetChip( th )
-				+ '<div class="ff-root-row">' + statusPill( th ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + '</div>'
+				+ '<div class="ff-root-row">' + statusPill( th ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
 			const c = composer( {
 				key: 'thread:' + th.id,
@@ -665,6 +910,13 @@
 			if ( ! el || ! root.contains( el ) || el.closest( '.ff-compose' ) ) {
 				return;
 			}
+			if ( await messageAction( el, ui.current ? [ ui.current ] : [], ( th ) => {
+				ui.current = th;
+				renderPane( th );
+				refresh();
+			} ) ) {
+				return;
+			}
 			const act = el.dataset.ff;
 			if ( 'nav' === act ) {
 				setView( el.dataset.view );
@@ -685,8 +937,19 @@
 				ui.settings = ! ui.settings;
 				renderNav();
 				$( '.ff-me-tile', nav ).focus();
-			} else if ( 'pref' === act && 'theme' === el.dataset.pref ) {
-				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { theme: el.dataset.val } } );
+			} else if ( 'pref' === act && el.dataset.val ) {
+				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { [ el.dataset.pref ]: el.dataset.val } } );
+				if ( 'avatar' === el.dataset.pref ) {
+					// Everyone's list of people carries the picture; reload it for the new choice.
+					await loadBoot( true );
+					applyLook( root );
+					renderNav();
+					renderFeed();
+					if ( ui.current ) {
+						renderPane( ui.current );
+					}
+					return;
+				}
 				applyLook( root );
 				renderNav();
 			} else if ( 'make-task' === act ) {
@@ -770,6 +1033,7 @@
 		root.classList.add( 'ff-embed' );
 		const open = new Set();
 		let list = [];
+		let shown = [];
 		const startable = () => boot.channels.filter( ( c ) => 'all' === c.level || 'own-posts' === c.level );
 		const draw = async () => {
 			list = await api( 'threads?' + query( { target: target.type + ':' + target.id, limit: 100 } ) );
@@ -777,9 +1041,10 @@
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;
 			} ).catch( () => {} ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, messages: [] } ) ) );
 			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'No conversations about this post yet.' ) ) + '</p>' )
 				+ list.map( ( th ) => '<div class="ff-box' + ( 'done' === th.status ? ' is-done' : '' ) + '" data-id="' + th.id + '">'
-					+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' ) + '</div>'
+					+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 					+ ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + cards( th.attachments )
 					+ '<p class="ff-meta">' + esc( person( th.author ).name + ' · ' + when( th.created ) + ' · #' + chName( th.channel ) ) + ' ' + audiencePill( th ) + '</p>'
 					+ summary( th, open.has( th.id ), 'toggle' )
@@ -817,7 +1082,14 @@
 				},
 			} ) );
 		};
-		root.addEventListener( 'click', ( e ) => {
+		root.addEventListener( 'click', async ( e ) => {
+			const act = e.target.closest( '[data-ff]' );
+			if ( act && ! act.closest( '.ff-compose' ) && await messageAction( act, shown, ( th ) => {
+				open.add( th.id );
+				draw();
+			} ) ) {
+				return;
+			}
 			const el = e.target.closest( '[data-ff="toggle"]' );
 			if ( el && ! el.closest( '.ff-compose' ) ) {
 				const id = +el.closest( '[data-id]' ).dataset.id;
@@ -858,6 +1130,7 @@
 		}
 		const open = new Set();
 		const byRef = {};
+		const fulls = {};
 		const load = async () => {
 			const list = await api( 'threads?' + query( { ref_prefix: opts.prefix || '', limit: 200, order: 'ref' } ) );
 			list.forEach( ( th ) => {
@@ -885,6 +1158,9 @@
 			const th = byRef[ key ];
 			const isOpen = open.has( key ) || ! th || ! th.replies;
 			const full = th && open.has( key ) ? await api( 'threads/' + th.id ) : null;
+			if ( full ) {
+				fulls[ key ] = full;
+			}
 			const task = th ? th.status : ( '1' === el.dataset.task ? 'open' : null );
 			host.innerHTML = '<div class="ff-ref-row">' + ( th ? summary( th, isOpen, 'toggle' ) : '' )
 				+ ( null !== task ? '<label class="ff-state"><input type="checkbox" data-ff="done"' + ( 'done' === task ? ' checked' : '' ) + '> ' + esc( t( 'Done' ) ) + '</label>' : '' ) + '</div>'
@@ -907,7 +1183,14 @@
 				} ) );
 			}
 		};
-		container.addEventListener( 'click', ( e ) => {
+		container.addEventListener( 'click', async ( e ) => {
+			const act = e.target.closest( '.ff-ref [data-ff]' );
+			if ( act && ! act.closest( '.ff-compose' ) && await messageAction( act, Object.values( fulls ), () => {
+				const el = act.closest( '[data-flurfunk-ref]' );
+				load().then( () => draw( el ) );
+			} ) ) {
+				return;
+			}
 			const b = e.target.closest( '.ff-ref [data-ff="toggle"]' );
 			if ( b ) {
 				const el = b.closest( '[data-flurfunk-ref]' );

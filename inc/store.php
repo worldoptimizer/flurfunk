@@ -208,10 +208,31 @@ function person( int $id ): array {
 	$roles = wp_roles()->role_names;
 	$role  = $u->roles ? translate_user_role( $roles[ $u->roles[0] ] ?? $u->roles[0] ) : '';
 	return $cache[ $id ] = array(
-		'id'   => $id,
-		'name' => html_entity_decode( $u->display_name, ENT_QUOTES, 'UTF-8' ),
-		'role' => (string) apply_filters( 'flurfunk_user_role_label', $role, $u ),
-		'kind' => Access\kind( $id ),
+		'id'     => $id,
+		'name'   => html_entity_decode( $u->display_name, ENT_QUOTES, 'UTF-8' ),
+		'role'   => (string) apply_filters( 'flurfunk_user_role_label', $role, $u ),
+		'kind'   => Access\kind( $id ),
+		'avatar' => avatar( $id ),
+	);
+}
+
+/**
+ * Profile picture URL, or '' for initials. Uses WordPress's avatar (uploaded picture via
+ * plugins, otherwise Gravatar) unless the site has avatars switched off or the person chose
+ * initials. "blank" as fallback: without a picture the initials underneath stay visible.
+ *
+ * @param int $id User.
+ */
+function avatar( int $id ): string {
+	if ( ! get_option( 'show_avatars' ) || 'initials' === \Flurfunk\Notify\prefs( $id )['avatar'] ) {
+		return '';
+	}
+	return (string) get_avatar_url(
+		$id,
+		array(
+			'size'    => 96,
+			'default' => 'blank',
+		)
 	);
 }
 
@@ -405,6 +426,88 @@ function set_status( int $thread_id, string $status ) {
 		)
 	);
 	return is_wp_error( $id ) ? $id : true;
+}
+
+/**
+ * May the person change or remove this message / thread? Authors may, and site managers.
+ *
+ * @param int $author  Author of the item.
+ * @param int $user_id User.
+ */
+function can_edit( int $author, int $user_id ): bool {
+	return (bool) apply_filters( 'flurfunk_can_edit', $author === $user_id || Access\can_manage( $user_id ), $author, $user_id );
+}
+
+/**
+ * Change the text of a message (mentions follow the new text).
+ *
+ * @param int    $message_id Message.
+ * @param string $body       New text.
+ * @return int|\WP_Error Thread ID.
+ */
+function edit_message( int $message_id, string $body ) {
+	global $wpdb;
+	$user = get_current_user_id();
+	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE id = %d', $message_id ) ); // phpcs:ignore WordPress.DB
+	$t    = $m ? thread_row( (int) $m->thread_id ) : null;
+	if ( ! $m || ! $t || 'message' !== $m->type || ! Access\can_see( $t, $user ) || ! can_edit( (int) $m->author_id, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$body = clean_text( $body );
+	if ( '' === $body && '[]' === $m->files && ! $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'attachments' ) . ' WHERE message_id = %d', $message_id ) ) ) { // phpcs:ignore WordPress.DB
+		return new \WP_Error( 'flurfunk_empty', __( 'The message is empty.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$wpdb->update( table( 'messages' ), array( 'body' => $body, 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	save_mentions( $t, $message_id, mentions_in( $body, $t ) );
+	do_action( 'flurfunk_message_edited', $t, $message_id );
+	return (int) $t->id;
+}
+
+/**
+ * Remove a message. A short note stays in its place so replies keep their context.
+ *
+ * @param int $message_id Message.
+ * @return int|\WP_Error Thread ID.
+ */
+function delete_message( int $message_id ) {
+	global $wpdb;
+	$user = get_current_user_id();
+	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE id = %d', $message_id ) ); // phpcs:ignore WordPress.DB
+	$t    = $m ? thread_row( (int) $m->thread_id ) : null;
+	if ( ! $m || ! $t || 'message' !== $m->type || ! Access\can_see( $t, $user ) || ! can_edit( (int) $m->author_id, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$wpdb->update( table( 'messages' ), array( 'type' => 'deleted', 'body' => '', 'files' => '[]', 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'attachments' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	do_action( 'flurfunk_message_deleted', $t, $message_id );
+	return (int) $t->id;
+}
+
+/**
+ * Change title and text of a thread.
+ *
+ * @param int   $thread_id Thread.
+ * @param array $args      title, body.
+ * @return true|\WP_Error
+ */
+function edit_thread( int $thread_id, array $args ) {
+	global $wpdb;
+	$user = get_current_user_id();
+	$t    = thread_row( $thread_id );
+	if ( ! $t || ! Access\can_see( $t, $user ) || ! can_edit( (int) $t->author_id, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$title = array_key_exists( 'title', $args ) ? sanitize_text_field( (string) $args['title'] ) : $t->title;
+	$body  = array_key_exists( 'body', $args ) ? clean_text( $args['body'] ) : $t->body;
+	if ( '' === $title && '' === $body ) {
+		return new \WP_Error( 'flurfunk_empty', __( 'The conversation is empty.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$wpdb->update( table( 'threads' ), array( 'title' => $title, 'body' => $body ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => $thread_id, 'message_id' => 0 ) ); // phpcs:ignore WordPress.DB
+	save_mentions( $t, 0, mentions_in( $body, $t ) );
+	return true;
 }
 
 /**
@@ -611,6 +714,15 @@ function format_messages( object $t, array $atts, array $ments ): array {
 	$out  = array();
 	foreach ( $rows as $m ) {
 		$mid = (int) $m->id;
+		if ( 'deleted' === $m->type ) {
+			$out[] = array(
+				'id'      => $mid,
+				'type'    => 'deleted',
+				'author'  => (int) $m->author_id,
+				'created' => iso( $m->created ),
+			);
+			continue;
+		}
 		if ( 'status' === $m->type ) {
 			$out[] = array(
 				'id'      => $mid,

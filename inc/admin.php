@@ -38,6 +38,8 @@ function config(): array {
 		'mediaEndpoint' => esc_url_raw( rest_url( 'wp/v2/media' ) ),
 		'mediaUrl'      => admin_url( 'upload.php?item=' ),
 		'appUrl'        => url(),
+		'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+		'loginUrl'      => wp_login_url( url() ),
 		'i18n'          => \Flurfunk\Strings\all(),
 	);
 }

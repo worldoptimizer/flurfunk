@@ -3,7 +3,8 @@
  * Personal preferences and email notifications.
  *
  * Preferences (one user meta entry per person, "flurfunk_prefs"):
- *   theme  system|light|dark
+ *   theme  light (default) | dark | system
+ *   avatar photo (profile picture or Gravatar, default) | initials
  *   mail   mentions (mentions and replies in my threads) | all (everything I may see) | none
  *   badge  show the unread number on the menu/dock icon
  *
@@ -30,9 +31,10 @@ const PREFS = 'flurfunk_prefs';
 function prefs( int $user_id ): array {
 	$p = (array) get_user_meta( $user_id, PREFS, true );
 	return array(
-		'theme' => in_array( $p['theme'] ?? '', array( 'system', 'light', 'dark' ), true ) ? $p['theme'] : 'system',
-		'mail'  => in_array( $p['mail'] ?? '', array( 'mentions', 'all', 'none' ), true ) ? $p['mail'] : 'mentions',
-		'badge' => isset( $p['badge'] ) ? (bool) $p['badge'] : true,
+		'theme'  => in_array( $p['theme'] ?? '', array( 'system', 'light', 'dark' ), true ) ? $p['theme'] : 'light',
+		'avatar' => in_array( $p['avatar'] ?? '', array( 'photo', 'initials' ), true ) ? $p['avatar'] : 'photo',
+		'mail'   => in_array( $p['mail'] ?? '', array( 'mentions', 'all', 'none' ), true ) ? $p['mail'] : 'mentions',
+		'badge'  => isset( $p['badge'] ) ? (bool) $p['badge'] : true,
 	);
 }
 
@@ -43,7 +45,7 @@ function prefs( int $user_id ): array {
  * @param array $in      Changes.
  */
 function save_prefs( int $user_id, array $in ): array {
-	$p = array_merge( prefs( $user_id ), array_intersect_key( $in, array_flip( array( 'theme', 'mail', 'badge' ) ) ) );
+	$p = array_merge( prefs( $user_id ), array_intersect_key( $in, array_flip( array( 'theme', 'mail', 'badge', 'avatar' ) ) ) );
 	update_user_meta( $user_id, PREFS, $p );
 	return prefs( $user_id );
 }

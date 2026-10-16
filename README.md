@@ -68,8 +68,24 @@ renderer). A custom look in JavaScript:
 window.Flurfunk.registerCard( 'myplugin/report', ( s, h ) => '<b>' + h.esc( s.title ) + '</b>' );
 ```
 
+### Targets
+
+Threads can hang on a post (built in) or on anything a plugin registers:
+
+```php
+flurfunk_register_target( 'dossier', array(
+	'label'  => 'Dossier',
+	'search' => fn ( string $q, int $user_id ) => array( array( 'id' => 12, 'title' => 'Balkan', 'subtitle' => '38 posts' ) ),
+	'info'   => fn ( int $id ) => array( 'title' => 'Balkan', 'url' => admin_url( '…' ) ), // null = gone
+	'can'    => fn ( int $user_id, int $id ) => true,                                       // default: team only
+) );
+```
+
+The "Attached to" picker searches all registered types. Guests only ever see their own posts.
+
 ### Functions
 
+- `flurfunk_register_target( $type, $args )` – something threads can be attached to.
 - `flurfunk_ensure_channel( $slug, $args )` – create a channel your plugin needs.
 - `flurfunk_unread_count( $user_id )` – for badges elsewhere.
 - `flurfunk_url( $view )` – link into the app (`channel:news`, `target:post:12`, `thread:5`).
@@ -85,6 +101,7 @@ window.Flurfunk.registerCard( 'myplugin/report', ( s, h ) => '<b>' + h.esc( s.ti
 | `flurfunk_post_owners` | who owns a post (for the "can read this" hint) |
 | `flurfunk_can_target` | may a person attach a thread to a target |
 | `flurfunk_can_resolve` | may a person tick a task off |
+| `flurfunk_can_edit` | may a person edit or delete a message or thread (default: author and admins) |
 | `flurfunk_target_info` | title and link of a target |
 | `flurfunk_user_role_label` | role shown next to names |
 | `flurfunk_notify_recipients`, `flurfunk_mail` | who gets mails, mail content (false = skip) |
@@ -92,7 +109,8 @@ window.Flurfunk.registerCard( 'myplugin/report', ( s, h ) => '<b>' + h.esc( s.ti
 
 ### Actions
 
-`flurfunk_thread_created( $thread )`, `flurfunk_message_added( $thread, $message_id )`.
+`flurfunk_thread_created( $thread )`, `flurfunk_message_added( $thread, $message_id )`,
+`flurfunk_message_edited( $thread, $message_id )`, `flurfunk_message_deleted( $thread, $message_id )`.
 
 ### Embeds
 
@@ -113,6 +131,14 @@ A thread is created on the first reply or tick, so nothing needs seeding.
 Optional cards for other plugins live in `integrations/` and load only when that plugin is active:
 
 - **MailerPress** – `/newsletter`: campaign with status, lists and subscribed recipients, numbers after sending, link into the editor (team only).
+
+## Tests
+
+- `wp eval-file tests/api-edge.php <team> <team2> <guest>` – 50 checks on rights, input, mentions,
+  read state, paging, editing, targets, mails, export/import. Works on staging, cleans up after itself.
+- `tests/e2e` – Playwright against a running site (`FF_BASE`, `FF_TEAM`, `FF_TEAM_PASS`, `FF_TEAM2`,
+  `FF_TEAM2_PASS`, `FF_GUEST`, `FF_GUEST_PASS`, optional `FF_QUERY`): layout at several widths,
+  escaping, mentions, slash menu, picker, edit/delete, drafts, expired nonce, logout, accessibility.
 
 ## Development
 

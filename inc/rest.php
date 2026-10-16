@@ -9,7 +9,11 @@
  *   GET  threads/<id>              thread with messages; marks it read
  *   POST threads/<id>/messages     reply
  *   POST threads/<id>/status       open | done | ''
+ *   POST threads/<id>/edit         title, body (author or manager)
+ *   POST messages/<id>             new text (author or manager)
+ *   DELETE messages/<id>           remove (a note stays in its place)
  *   GET  providers/<id>/search     suggestions for a slash command
+ *   GET  targets?q=                things a thread can be attached to
  *   POST me/prefs                  theme, mail, badge
  *
  * @package Flurfunk
@@ -50,8 +54,18 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\get_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/messages', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\add_message', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route( NS, '/threads/(?P<id>\d+)/edit', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\edit_thread', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route(
+		NS,
+		'/messages/(?P<id>\d+)',
+		array(
+			array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\edit_message', 'permission_callback' => $auth, 'args' => $id ),
+			array( 'methods' => 'DELETE', 'callback' => __NAMESPACE__ . '\\delete_message', 'permission_callback' => $auth, 'args' => $id ),
+		)
+	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/targets', array( 'methods' => 'GET', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Targets\search( sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() ), 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/me/prefs', array( 'methods' => 'POST', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Notify\save_prefs( get_current_user_id(), (array) $r->get_json_params() ), 'permission_callback' => $auth ) );
 }
 
@@ -99,16 +113,10 @@ function bootstrap(): array {
  * @param int $uid User.
  */
 function my_targets( int $uid ): array {
-	$args = array(
-		'post_type'      => \Flurfunk\Settings\get()['post_types'],
-		'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private' ),
-		'posts_per_page' => 30,
-		'orderby'        => 'modified',
+	return array_map(
+		static fn ( $t ) => target_info( $t['type'], $t['id'] ) + array( 'id' => $t['id'] ),
+		array_slice( \Flurfunk\Targets\search( '', $uid ), 0, 15 )
 	);
-	if ( 'team' !== Access\kind( $uid ) ) {
-		$args['post__in'] = Access\owned_post_ids( $uid ) ?: array( 0 );
-	}
-	return array_map( static fn ( $p ) => target_info( 'post', $p->ID ) + array( 'id' => $p->ID ), get_posts( $args ) );
 }
 
 /**
@@ -121,17 +129,13 @@ function target_info( string $type, int $id ): array {
 	static $cache = array();
 	$key = $type . ':' . $id;
 	if ( ! isset( $cache[ $key ] ) ) {
-		$info = array(
-			'type'  => $type,
-			'title' => '',
-			'url'   => '',
+		$info          = \Flurfunk\Targets\info( $type, $id ) ?? array(
+			'title'  => '',
+			'url'    => '',
+			'status' => '',
+			'label'  => '',
 		);
-		if ( 'post' === $type && ( $p = get_post( $id ) ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
-			$info['title']  = html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ) ?: __( '(no title)', 'flurfunk' );
-			$info['url']    = current_user_can( 'edit_post', $id ) ? (string) get_edit_post_link( $id, 'raw' ) : (string) get_permalink( $p );
-			$info['status'] = get_post_status_object( $p->post_status )->label ?? $p->post_status;
-		}
-		$cache[ $key ] = (array) apply_filters( 'flurfunk_target_info', $info, $type, $id );
+		$cache[ $key ] = (array) apply_filters( 'flurfunk_target_info', array( 'type' => $type ) + $info, $type, $id );
 	}
 	return $cache[ $key ];
 }
@@ -236,4 +240,34 @@ function set_status( WP_REST_Request $r ) {
 function search( WP_REST_Request $r ) {
 	$items = \Flurfunk\Providers\search( (string) $r['provider'], sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() );
 	return null === $items ? new \WP_Error( 'flurfunk_provider', __( 'Unknown command.', 'flurfunk' ), array( 'status' => 404 ) ) : $items;
+}
+
+/**
+ * POST threads/<id>/edit.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function edit_thread( WP_REST_Request $r ) {
+	$ok = Store\edit_thread( (int) $r['id'], array_intersect_key( (array) $r->get_json_params(), array_flip( array( 'title', 'body' ) ) ) );
+	return is_wp_error( $ok ) ? $ok : decorate( Store\full_thread( (int) $r['id'], get_current_user_id() ) );
+}
+
+/**
+ * POST messages/<id>.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function edit_message( WP_REST_Request $r ) {
+	$tid = Store\edit_message( (int) $r['id'], (string) ( $r->get_json_params()['body'] ?? '' ) );
+	return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
+}
+
+/**
+ * DELETE messages/<id>.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function delete_message( WP_REST_Request $r ) {
+	$tid = Store\delete_message( (int) $r['id'] );
+	return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
 }
