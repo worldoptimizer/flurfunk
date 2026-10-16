@@ -143,7 +143,7 @@ add_action(
 						static fn ( \WP_Post $p ) => array(
 							'id'       => $p->ID,
 							'title'    => html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ) ?: __( '(no title)', 'flurfunk' ),
-							'subtitle' => implode( ' · ', array_filter( array( get_post_type_object( $p->post_type )->labels->singular_name ?? '', get_post_status_object( $p->post_status )->label ?? '', get_the_date( '', $p ) ) ) ),
+							'subtitle' => implode( ' · ', array_filter( array( count( \Flurfunk\Settings\get()['post_types'] ) > 1 ? ( get_post_type_object( $p->post_type )->labels->singular_name ?? '' ) : '', get_post_status_object( $p->post_status )->label ?? '', get_the_date( '', $p ) ) ) ),
 						),
 						get_posts( $args )
 					);
