@@ -21,6 +21,7 @@ function all(): array {
 		'Your session has ended. Please log in again.' => __( 'Your session has ended. Please log in again.', 'flurfunk' ),
 		'Log in' => __( 'Log in', 'flurfunk' ),
 		'just now' => __( 'just now', 'flurfunk' ),
+		'Update' => __( 'Update', 'flurfunk' ),
 		'Remove card' => __( 'Remove card', 'flurfunk' ),
 		'Only in Flurfunk so far. Adding it keeps the file where it is.' => __( 'Only in Flurfunk so far. Adding it keeps the file where it is.', 'flurfunk' ),
 		'Add to media library' => __( 'Add to media library', 'flurfunk' ),

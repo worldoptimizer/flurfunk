@@ -289,6 +289,22 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $tmpu );
 wp_delete_user( $bot );
 
+WP_CLI::log( 'Card refresh' );
+$as( $team );
+$cpost = wp_insert_post( array( 'post_title' => 'ff-test Karte alt', 'post_status' => 'draft', 'post_type' => 'post' ) );
+list( $s, $x ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'Karte', 'attachments' => array( array( 'provider' => 'flurfunk/post', 'ref' => array( 'id' => $cpost ) ) ) ) );
+$card = end( $x['messages'] )['attachments'][0];
+wp_update_post( array( 'ID' => $cpost, 'post_title' => 'ff-test Karte neu' ) );
+list( $s, $x ) = $req( 'POST', 'cards/' . $card['id'] . '/refresh', array() );
+$check( 'a card can be refreshed and shows the new state', 200 === $s && 'ff-test Karte neu' === end( $x['messages'] )['attachments'][0]['snapshot']['title'], $s );
+wp_delete_post( $cpost, true );
+list( $s ) = $req( 'POST', 'cards/' . $card['id'] . '/refresh', array() );
+$check( 'refreshing a card whose source is gone keeps the old snapshot', 409 === $s, $s );
+$as( $guest );
+list( $s ) = $req( 'POST', 'cards/' . $card['id'] . '/refresh', array() );
+$check( "nobody can refresh cards in threads they can't see", 404 === $s || 409 === $s, $s );
+$as( $team );
+
 WP_CLI::log( 'Mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );

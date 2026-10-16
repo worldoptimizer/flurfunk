@@ -207,7 +207,9 @@
 		} catch ( e ) {
 			inner = genericCard( s );
 		}
-		return '<div class="ff-card"><span class="ff-card-kind">' + esc( p.label ) + ( p.command ? ' <small>/' + esc( p.command ) + '</small>' : '' ) + '</span>' + inner
+		const canRefresh = a.id && remove === undefined && boot && boot.providers.some( ( x ) => x.id === a.provider );
+		return '<div class="ff-card"><span class="ff-card-kind">' + esc( p.label ) + ( p.command ? ' <small>/' + esc( p.command ) + '</small>' : '' )
+			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' + inner
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};
 	const cards = ( list ) => ( list && list.length ? '<div class="ff-cards">' + list.map( ( a ) => card( a ) ).join( '' ) + '</div>' : '' );
@@ -362,6 +364,16 @@
 				$( '.ff-who', body ) ? $( '.ff-who', body ).after( holder ) : body.prepend( holder );
 			}
 			startEdit( holder, m ? m.text : '', async ( text ) => onUpdate( await api( 'messages/' + mid, { method: 'POST', body: { body: text } } ) ) );
+			return true;
+		}
+		if ( 'card-refresh' === act ) {
+			el.disabled = true;
+			try {
+				onUpdate( await api( 'cards/' + el.dataset.cid + '/refresh', { method: 'POST', body: {} } ) );
+			} catch ( x ) {
+				el.disabled = false;
+				el.textContent = x.message;
+			}
 			return true;
 		}
 		if ( 'adopt' === act ) {

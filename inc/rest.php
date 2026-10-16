@@ -14,6 +14,7 @@
  *   DELETE messages/<id>           remove (a note stays in its place)
  *   GET  providers/<id>/search     suggestions for a slash command
  *   GET  targets?q=                things a thread can be attached to
+ *   POST cards/<id>/refresh        fetch a fresh snapshot for a card
  *   POST files                     upload a Flurfunk file (raw body, Content-Disposition: filename)
  *   POST files/<id>/adopt          add a Flurfunk file to the media library
  *   POST me/prefs                  theme, mail, badge
@@ -67,6 +68,10 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/cards/(?P<id>\d+)/refresh', array( 'methods' => 'POST', 'callback' => static function ( WP_REST_Request $r ) {
+		$tid = Store\refresh_card( (int) $r['id'] );
+		return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
+	}, 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/files', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\upload', 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/files/(?P<id>\d+)/adopt', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\adopt', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/targets', array( 'methods' => 'GET', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Targets\search( sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() ), 'permission_callback' => $auth ) );

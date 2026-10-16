@@ -307,6 +307,54 @@ test.describe( 'team', () => {
 		await expect( page.locator( '.ff-session' ) ).toBeVisible();
 	} );
 
+	test( 'a channel as checklist: add an item, reply, tick it off', async ( { page } ) => {
+		await page.evaluate( () => {
+			const d = document.createElement( 'div' );
+			d.id = 'ff-checklist-test';
+			document.querySelector( '.ff-app' ).replaceWith( d );
+			window.Flurfunk.mountChannel( d, { channel: 'general' } );
+		} );
+		const list = page.locator( '#ff-checklist-test' );
+		await list.locator( '.ff-new-slot input[name=title]' ).waitFor();
+		const title = 'e2e Punkt ' + Date.now();
+		await list.locator( '.ff-new-slot input[name=title]' ).fill( title );
+		await list.locator( '.ff-new-slot textarea' ).fill( 'Worum es geht' );
+		await list.locator( '.ff-new-slot .ff-send' ).click();
+		const item = list.locator( '.ff-item', { hasText: title } );
+		await expect( item ).toBeVisible();
+		await item.locator( '[data-ff="answer"]' ).click();
+		await item.locator( 'textarea' ).fill( 'erste Antwort' );
+		await item.locator( '.ff-send' ).click();
+		await expect( list.locator( '.ff-item', { hasText: title } ).locator( '.ff-msg', { hasText: 'erste Antwort' } ) ).toBeVisible();
+		await list.locator( '.ff-item', { hasText: title } ).locator( 'input[data-ff=done]' ).check();
+		await expect( list.locator( '.ff-item.is-done', { hasText: title } ) ).toBeVisible();
+		await expect( list.locator( '.ff-done-h' ) ).toBeVisible();
+	} );
+
+	test( 'a Flurfunk file can be added to the media library', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Datei ' + Date.now() } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await page.locator( '.ff-pane input[type=file]' ).setInputFiles( { name: 'e2e-notiz.txt', mimeType: 'text/plain', buffer: Buffer.from( 'Notiz' ) } );
+		await expect( page.locator( '.ff-pane .ff-pending small' ) ).toHaveCount( 0, { timeout: 60_000 } );
+		await page.locator( '.ff-pane .ff-send' ).click();
+		const adopt = page.locator( '.ff-pane .ff-msg [data-ff="adopt"]' ).last();
+		await expect( adopt ).toBeVisible();
+		await adopt.click();
+		await expect( page.locator( '.ff-pane .ff-msg [data-ff="adopt"]' ) ).toHaveCount( 0 );
+	} );
+
+	test( 'a card can be updated in place', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Karte ' + Date.now(), attachments: [ { provider: 'flurfunk/post', ref: { id: boot.targets[ 0 ].id } } ] } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		const btn = page.locator( '.ff-pane .ff-root-msg [data-ff="card-refresh"]' );
+		await expect( btn ).toBeVisible();
+		await btn.click();
+		await expect( page.locator( '.ff-pane .ff-root-msg .ff-card' ) ).toBeVisible();
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];

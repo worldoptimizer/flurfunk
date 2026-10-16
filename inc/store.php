@@ -674,6 +674,30 @@ function save_attachments( object $thread, int $message_id, array $list, int $us
 }
 
 /**
+ * Fetch a fresh snapshot for a card (same provider, same reference). The provider checks again
+ * whether the person may see it.
+ *
+ * @param int $attachment_id Card row.
+ * @return int|\WP_Error Thread ID.
+ */
+function refresh_card( int $attachment_id ) {
+	global $wpdb;
+	$user = get_current_user_id();
+	$row  = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'attachments' ) . ' WHERE id = %d', $attachment_id ) ); // phpcs:ignore WordPress.DB
+	$t    = $row ? thread_row( (int) $row->thread_id ) : null;
+	if ( ! $row || ! $t || ! Access\can_see( $t, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+	}
+	$snap = \Flurfunk\Providers\snapshot( $row->provider, (array) json_decode( $row->ref, true ), $user );
+	if ( null === $snap ) {
+		return new \WP_Error( 'flurfunk_card', __( 'This card cannot be updated (any more).', 'flurfunk' ), array( 'status' => 409 ) );
+	}
+	$wpdb->update( table( 'attachments' ), array( 'snapshot' => (string) wp_json_encode( $snap ) ), array( 'id' => $attachment_id ) ); // phpcs:ignore WordPress.DB
+	bump();
+	return (int) $t->id;
+}
+
+/**
  * Validate and describe files from the media library.
  *
  * @param array $ids     Media library IDs (or ready descriptions on import).
@@ -753,6 +777,7 @@ function attachments_for( array $thread_ids ): array {
 	$out  = array();
 	foreach ( $rows as $r ) {
 		$out[ (int) $r->thread_id ][ (int) $r->message_id ][] = array(
+			'id'       => (int) $r->id,
 			'provider' => $r->provider,
 			'ref'      => json_decode( $r->ref, true ) ?: array(),
 			'snapshot' => json_decode( $r->snapshot, true ) ?: array(),
