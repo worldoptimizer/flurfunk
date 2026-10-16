@@ -215,6 +215,7 @@ function person( int $id ): array {
 		'name'   => html_entity_decode( $u->display_name, ENT_QUOTES, 'UTF-8' ),
 		'role'   => (string) apply_filters( 'flurfunk_user_role_label', $role, $u ),
 		'kind'   => Access\kind( $id ),
+		'bot'    => Access\is_bot( $id ),
 		'avatar' => avatar( $id ),
 	);
 }
@@ -245,11 +246,21 @@ function avatar( int $id ): string {
  * @return array[]
  */
 function people(): array {
-	$users = get_users(
-		array(
-			'capability' => 'edit_posts',
-			'fields'     => 'ID',
-			'orderby'    => 'display_name',
+	$users = array_unique(
+		array_merge(
+			get_users(
+				array(
+					'capability' => 'edit_posts',
+					'fields'     => 'ID',
+					'orderby'    => 'display_name',
+				)
+			),
+			get_users(
+				array(
+					'meta_key' => 'flurfunk_bot', // phpcs:ignore WordPress.DB.SlowDBQuery
+					'fields'   => 'ID',
+				)
+			)
 		)
 	);
 	return array_values( array_filter( array_map( static fn ( $id ) => person( (int) $id ), $users ), static fn ( $p ) => '' !== $p['kind'] ) );
@@ -282,6 +293,28 @@ function thread_by_ref( string $ref_key ): ?object {
 }
 
 /**
+ * Brake for runaway scripts: at most N new threads and messages per person and minute
+ * (filter flurfunk_rate_limit, default 30; 0 = off).
+ *
+ * @param int $user_id User.
+ * @return true|\WP_Error
+ */
+function rate_limit( int $user_id ) {
+	// Site managers are exempt (imports, tests); runaway scripts run as assistants or editors.
+	$max = (int) apply_filters( 'flurfunk_rate_limit', Access\can_manage( $user_id ) ? 0 : 30, $user_id );
+	if ( $max <= 0 ) {
+		return true;
+	}
+	$key  = 'flurfunk_rate_' . $user_id . '_' . gmdate( 'YmdHi' );
+	$used = (int) get_transient( $key );
+	if ( $used >= $max ) {
+		return new \WP_Error( 'flurfunk_rate', __( 'That was a lot at once. Please wait a minute.', 'flurfunk' ), array( 'status' => 429 ) );
+	}
+	set_transient( $key, $used + 1, 2 * MINUTE_IN_SECONDS );
+	return true;
+}
+
+/**
  * Create a thread.
  *
  * @param array $args channel (short name), target {type,id}, title, body, task, attachments[], ref_key,
@@ -304,6 +337,10 @@ function create_thread( array $args, bool $check = true ) {
 	}
 	if ( $check && ! Access\can_start( $channel, $type, $tid, $author ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot start a conversation here.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$rate = $check ? rate_limit( $author ) : true;
+	if ( is_wp_error( $rate ) ) {
+		return $rate;
 	}
 	$body  = clean_text( $args['body'] ?? '' );
 	$title = sanitize_text_field( (string) ( $args['title'] ?? '' ) );
@@ -373,8 +410,12 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 	if ( ! $thread || ( $check && ! Access\can_see( $thread, $author ) ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
 	}
-	$type  = 'status' === ( $args['type'] ?? '' ) ? 'status' : 'message';
+	$type  = in_array( $args['type'] ?? '', array( 'status', 'deleted' ), true ) ? $args['type'] : 'message';
 	$body  = 'message' === $type ? clean_text( $args['body'] ?? '' ) : '';
+	$rate  = $check && 'message' === $type ? rate_limit( $author ) : true;
+	if ( is_wp_error( $rate ) ) {
+		return $rate;
+	}
 	$files = files( (array) ( $args['files'] ?? array() ), $author, $check );
 	if ( 'message' === $type && '' === $body && ! $files && empty( $args['attachments'] ) ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The message is empty.', 'flurfunk' ), array( 'status' => 400 ) );
@@ -679,8 +720,9 @@ function file_view( array $f ): array {
 	if ( ! $url ) {
 		return $f + array( 'missing' => true );
 	}
-	$f['url']   = $url;
-	$f['title'] = html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' );
+	$f['url']     = $url;
+	$f['title']   = html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' );
+	$f['library'] = ! \Flurfunk\Files\is_hidden( $id );
 	if ( str_starts_with( (string) ( $f['type'] ?? '' ), 'image/' ) ) {
 		$img = wp_get_attachment_image_src( $id, 'medium_large' );
 		if ( $img ) {
@@ -777,9 +819,12 @@ function format_thread( object $t, array $atts = array(), array $ments = array()
  * @param array  $ments Mentions.
  * @return array[]
  */
-function format_messages( object $t, array $atts, array $ments ): array {
+function format_messages( object $t, array $atts, array $ments, int $limit = 0 ): array {
 	global $wpdb;
-	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE thread_id = %d ORDER BY id', $t->id ) ); // phpcs:ignore WordPress.DB
+	// Very long threads: the newest $limit messages (oldest first); 0 = all (export).
+	$rows = $limit
+		? array_reverse( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE thread_id = %d ORDER BY id DESC LIMIT %d', $t->id, $limit ) ) ) // phpcs:ignore WordPress.DB
+		: (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE thread_id = %d ORDER BY id', $t->id ) ); // phpcs:ignore WordPress.DB
 	$out  = array();
 	foreach ( $rows as $m ) {
 		$mid = (int) $m->id;
@@ -831,8 +876,13 @@ function full_thread( int $id, int $user_id ) {
 	}
 	$atts  = attachments_for( array( $id ) );
 	$ments = mentions_for( array( $id ) );
+	$limit    = (int) apply_filters( 'flurfunk_thread_limit', 300 );
+	$messages = format_messages( $t, $atts, $ments, $limit );
+	global $wpdb;
+	$total = count( $messages ) < $limit ? count( $messages ) : (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'messages' ) . ' WHERE thread_id = %d', $id ) ); // phpcs:ignore WordPress.DB
 	return format_thread( $t, $atts, $ments ) + array(
-		'messages' => format_messages( $t, $atts, $ments ),
+		'messages' => $messages,
+		'older'    => max( 0, $total - count( $messages ) ),
 		'read'     => read_state( array( $id ), $user_id )[ $id ] ?? 0,
 		'audience' => audience( $t ),
 	);

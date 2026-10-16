@@ -36,10 +36,20 @@ function kind( int $user_id = 0 ): string {
 	$kind = '';
 	if ( $user ) {
 		$s    = \Flurfunk\Settings\get();
-		$kind = user_can( $user, $s['team_cap'] ) ? 'team' : ( '' !== $s['guest_cap'] && user_can( $user, $s['guest_cap'] ) ? 'guest' : '' );
+		$kind = is_bot( $user_id ) || user_can( $user, $s['team_cap'] ) ? 'team' : ( '' !== $s['guest_cap'] && user_can( $user, $s['guest_cap'] ) ? 'guest' : '' );
 		$kind = (string) apply_filters( 'flurfunk_user_kind', $kind, $user );
 	}
 	return $cache[ $user_id ] = $kind;
+}
+
+/**
+ * Assistant accounts (agents, scripts): a normal user with a mark, shown as "Assistant" in the
+ * interface. They take part like the team but need no editing rights of their own.
+ *
+ * @param int $user_id User.
+ */
+function is_bot( int $user_id ): bool {
+	return (bool) get_user_meta( $user_id, 'flurfunk_bot', true );
 }
 
 /**

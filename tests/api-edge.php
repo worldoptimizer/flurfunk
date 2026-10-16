@@ -227,6 +227,67 @@ $f = end( $x['messages'] )['files'][0] ?? array();
 $check( 'a file deleted from the media library is marked missing', ! empty( $f['missing'] ) && empty( $f['url'] ), $f );
 $check( 'files from another site keep their link', 'https://elsewhere.example/a.pdf' === ( Store\file_view( array( 'id' => 0, 'name' => 'a.pdf', 'url' => 'https://elsewhere.example/a.pdf' ) )['url'] ?? '' ) );
 
+WP_CLI::log( 'Flurfunk files' );
+$as( $team );
+$fid = Flurfunk\Files\store( 'ff-test-notiz.txt', "Notiz\n" );
+$check( 'uploads go into the Flurfunk folder', ! is_wp_error( $fid ) && str_contains( (string) get_attached_file( $fid ), '/flurfunk/' ), is_wp_error( $fid ) ? $fid->get_error_message() : get_attached_file( $fid ) );
+$lib = new WP_Query( array( 'post_type' => 'attachment', 'post_status' => 'inherit', 'post__in' => array( $fid ), 'fields' => 'ids', 'meta_query' => array( array( 'key' => Flurfunk\Files\META, 'compare' => 'NOT EXISTS' ) ) ) );
+$check( 'they are hidden from the media library', 0 === $lib->post_count );
+list( $s, $x ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'Notiz anbei', 'files' => array( $fid ) ) );
+$f = end( $x['messages'] )['files'][0] ?? array();
+$check( 'a message shows them as not yet in the library', false === ( $f['library'] ?? null ), $f );
+$path = get_attached_file( $fid );
+list( $s, $f2 ) = $req( 'POST', 'files/' . $fid . '/adopt', array() );
+$check( 'adopting keeps the same file and address', 200 === $s && true === $f2['library'] && get_attached_file( $fid ) === $path && $f2['url'] === $f['url'], $f2 );
+$old = Flurfunk\Files\store( 'ff-test-alt.txt', "alt\n" );
+update_post_meta( $old, Flurfunk\Files\META, time() - 40 * DAY_IN_SECONDS );
+$keep = Flurfunk\Files\store( 'ff-test-genutzt.txt', "genutzt\n" );
+update_post_meta( $keep, Flurfunk\Files\META, time() - 40 * DAY_IN_SECONDS );
+$req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'genutzt', 'files' => array( $keep ) ) );
+Flurfunk\Files\cleanup();
+$check( 'cleanup removes old unused Flurfunk files only', ! get_post( $old ) && get_post( $keep ) && get_post( $fid ) );
+wp_delete_attachment( $keep, true );
+wp_delete_attachment( $fid, true );
+
+WP_CLI::log( 'Assistant' );
+$bot = wp_insert_user( array( 'user_login' => 'ff-test-bot-' . wp_generate_password( 4, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber', 'display_name' => 'Testassistent' ) );
+update_user_meta( $bot, 'flurfunk_bot', 1 );
+$check( 'an assistant counts as team without editing rights', 'team' === Flurfunk\Access\kind( $bot ) && ! user_can( $bot, 'edit_posts' ) );
+$as( $bot );
+list( $s, $x ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'automatisch' ) );
+$check( 'an assistant can reply and is marked as such', 200 === $s && Store\person( $bot )['bot'], $s );
+$bfile = Flurfunk\Files\store( 'ff-test-bot.txt', "bot\n" );
+$check( 'an assistant can attach files', ! is_wp_error( $bfile ) );
+if ( ! is_wp_error( $bfile ) ) {
+	wp_delete_attachment( $bfile, true );
+}
+
+WP_CLI::log( 'Brake and privacy' );
+$as( $team2 );
+add_filter( 'flurfunk_rate_limit', fn () => 3 );
+$codes = array();
+for ( $i = 0; $i < 5; $i++ ) {
+	list( $s ) = $req( 'POST', 'threads/' . $t2['id'] . '/messages', array( 'body' => 'schnell ' . $i ) );
+	$codes[] = $s;
+}
+remove_all_filters( 'flurfunk_rate_limit' );
+$check( 'too many messages in a minute are refused with 429', in_array( 429, $codes, true ) && 200 === $codes[0], $codes );
+$as( $team );
+$tmpu = wp_insert_user( array( 'user_login' => 'ff-test-priv-' . wp_generate_password( 4, false ), 'user_email' => 'ff-priv-' . wp_generate_password( 6, false ) . '@example.invalid', 'user_pass' => wp_generate_password(), 'role' => 'editor' ) );
+$as( $tmpu );
+$ptid = Store\create_thread( array( 'channel' => 'ff-test', 'title' => 'Privat', 'body' => 'meine Daten' ) );
+Store\add_message( $ptid, array( 'body' => 'noch mehr Daten' ) );
+$email = get_userdata( $tmpu )->user_email;
+$ex    = Flurfunk\Privacy\export( $email );
+$check( 'personal data export lists threads and messages', 2 === count( $ex['data'] ), count( $ex['data'] ) );
+Flurfunk\Privacy\erase( $email );
+$as( $team );
+list( $s, $x ) = $req( 'GET', 'threads/' . $ptid );
+$check( 'erasing keeps the thread but removes text and author', 200 === $s && 0 === $x['author'] && ! str_contains( wp_json_encode( $x ), 'Daten' ), $x['body'] ?? $s );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $tmpu );
+wp_delete_user( $bot );
+
 WP_CLI::log( 'Mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );

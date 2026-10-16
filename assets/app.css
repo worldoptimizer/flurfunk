@@ -299,3 +299,11 @@
 .ff-text blockquote { margin: 4px 0; padding: 4px 10px; color: var(--ff-muted); background: var(--ff-soft); border-radius: 6px; font-style: italic; }
 .ff-text code { padding: 1px 4px; border-radius: 4px; background: var(--ff-soft2); font-size: .92em; }
 .ff-code { margin: 6px 0; padding: 8px 10px; border-radius: 6px; background: var(--ff-soft2); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Flurfunk files: "add to media library" */
+.ff-media-wrap { display: inline-grid; gap: 4px; justify-items: start; max-width: 100%; }
+.ff-adopt { padding: 0; border: 0; background: none; color: var(--ff-muted); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.ff-adopt:hover { color: var(--ff-accent-text); }
+.ff-adopted { color: var(--ff-ok); font-size: 12px; }
+.ff-pill.is-bot { background: var(--ff-soft2); color: var(--ff-ink); font-weight: 600; }
+.ff-target.is-gone { color: var(--ff-muted) !important; border-style: dashed; }

@@ -17,6 +17,8 @@
  *   inc/store.php      reading and writing, data format "flurfunk/1"
  *   inc/providers.php  providers for slash commands and cards (the extension API)
  *   inc/targets.php    what threads can be attached to (posts built in, more via the API)
+ *   inc/files.php      Flurfunk files: own folder, hidden from the media library until adopted
+ *   inc/privacy.php    personal data export/erase, cleanup when users are deleted
  *   inc/settings.php   branding and defaults (name, logo, colours, access)
  *   inc/notify.php     email notifications following each person's preferences
  *   inc/rest.php       REST API for the interface (flurfunk/v1)
@@ -44,6 +46,8 @@ require_once FLURFUNK_DIR . 'inc/access.php';
 require_once FLURFUNK_DIR . 'inc/store.php';
 require_once FLURFUNK_DIR . 'inc/providers.php';
 require_once FLURFUNK_DIR . 'inc/targets.php';
+require_once FLURFUNK_DIR . 'inc/files.php';
+require_once FLURFUNK_DIR . 'inc/privacy.php';
 require_once FLURFUNK_DIR . 'inc/settings.php';
 require_once FLURFUNK_DIR . 'inc/notify.php';
 require_once FLURFUNK_DIR . 'inc/rest.php';
@@ -65,6 +69,7 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 }
 
 register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
+register_deactivation_hook( __FILE__, static fn () => wp_clear_scheduled_hook( 'flurfunk_cleanup_files' ) );
 
 add_action(
 	'init',

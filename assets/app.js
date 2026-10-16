@@ -215,6 +215,7 @@
 	const files = ( list ) => {
 		const items = ( list || [] ).map( ( f ) => {
 			const type = String( f.type || '' );
+			const adopt = false === f.library && boot && boot.me.upload ? '<button type="button" class="ff-adopt" data-ff="adopt" data-fid="' + f.id + '" title="' + esc( t( 'Only in Flurfunk so far. Adding it keeps the file where it is.' ) ) + '">' + esc( t( 'Add to media library' ) ) + '</button>' : '';
 			// The media library title if someone set one, otherwise the file name.
 			const name = f.title && f.title !== String( f.name ).replace( /\.[^.]+$/, '' ) ? f.title : f.name;
 			const label = esc( name ) + ' <small>· ' + size( f.size ) + '</small>';
@@ -223,22 +224,22 @@
 			}
 			if ( type.startsWith( 'image/' ) ) {
 				const ratio = f.width && f.height ? ' style="aspect-ratio:' + f.width + '/' + f.height + '"' : '';
-				return '<a class="ff-media ff-image" href="' + esc( f.url ) + '" target="_blank" rel="noopener"' + ratio + '><img src="' + esc( f.preview || f.url ) + '" alt="' + esc( f.name ) + '" loading="lazy"></a>';
+				return '<span class="ff-media-wrap"><a class="ff-media ff-image" href="' + esc( f.url ) + '" target="_blank" rel="noopener"' + ratio + '><img src="' + esc( f.preview || f.url ) + '" alt="' + esc( name ) + '" loading="lazy"></a>' + adopt + '</span>';
 			}
 			if ( type.startsWith( 'audio/' ) ) {
-				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio></figure>';
+				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio>' + adopt + '</figure>';
 			}
 			if ( type.startsWith( 'video/' ) ) {
-				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption></figure>';
+				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption>' + adopt + '</figure>';
 			}
-			return '<a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>';
+			return '<span class="ff-media-wrap"><a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>' + adopt + '</span>';
 		} );
 		return items.length ? '<div class="ff-files">' + items.join( '' ) + '</div>' : '';
 	};
 
 	/* ------------------------------------------------------------------ pieces */
 
-	const targetChip = ( th ) => ( th.target && th.target.title
+	const targetChip = ( th ) => ( th.target && ! th.target.title ? '<span class="ff-target is-gone">' + icon.doc + '<span>' + esc( t( 'deleted' ) ) + '</span></span>' : th.target && th.target.title
 		? '<a class="ff-target" href="' + esc( th.target.url ) + '" target="_top" data-ff="target" data-type="' + esc( th.target.type ) + '" data-id="' + th.target.id + '" title="' + esc( t( 'Conversations about this post' ) ) + '">' + icon.doc + '<span>' + esc( th.target.title ) + '</span></a>'
 		: '' );
 	const statusPill = ( th ) => ( 'done' === th.status ? '<span class="ff-pill is-done">' + esc( t( 'done' ) ) + '</span>' : 'open' === th.status ? '<span class="ff-pill is-open">' + esc( t( 'open' ) ) + '</span>' : '' );
@@ -257,11 +258,16 @@
 			+ ( last ? '<span>' + esc( t( 'last: %1$s, %2$s', person( last.author ).name, when( last.created ) ) ) + '</span>' : '' ) + '</button>';
 	};
 
+	// Name in bold; assistants (agents, scripts) are marked so nobody mistakes them for a person.
+	const nameHtml = ( id ) => '<b>' + esc( person( id ).name ) + '</b>' + ( person( id ).bot ? ' <span class="ff-pill is-bot">' + esc( t( 'Assistant' ) ) + '</span>' : '' );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.manage );
 	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
 	const messagesHtml = ( th ) => {
 		let html = '';
 		let prev = null;
+		if ( th.older ) {
+			html += '<li class="ff-event">' + esc( t( '%s earlier messages are not shown here.', th.older ) ) + '</li>';
+		}
 		( th.messages || [] ).forEach( ( m ) => {
 			if ( 'deleted' === m.type ) {
 				html += '<li class="ff-event is-deleted">' + esc( t( '%s deleted a message', person( m.author ).name ) ) + '</li>';
@@ -278,7 +284,7 @@
 			const cont = prev && prev.author === m.author && new Date( m.created ) - new Date( prev.created ) < 5 * 60e3;
 			const unread = th.read >= 0 && m.id > th.read && m.author !== boot.me.id;
 			html += '<li class="ff-msg' + ( cont ? ' is-cont' : '' ) + ( unread ? ' is-unread' : '' ) + '" id="ff-m-' + m.id + '">' + ava( m.author ) + '<div class="ff-msg-body">'
-				+ ( cont ? '' : '<p class="ff-who"><b>' + esc( person( m.author ).name ) + '</b> <span>' + esc( person( m.author ).role ) + ' · ' + esc( when( m.created ) ) + '</span></p>' )
+				+ ( cont ? '' : '<p class="ff-who">' + nameHtml( m.author ) + ' <span>' + esc( person( m.author ).role ) + ' · ' + esc( when( m.created ) ) + '</span></p>' )
 				+ ( m.text ? '<div class="ff-text">' + rich( m.text ) + '</div>' : '' )
 				+ ( m.edited ? '<small class="ff-edited">' + esc( t( '(edited)' ) ) + '</small>' : '' )
 				+ cards( m.attachments ) + files( m.files )
@@ -356,6 +362,17 @@
 				$( '.ff-who', body ) ? $( '.ff-who', body ).after( holder ) : body.prepend( holder );
 			}
 			startEdit( holder, m ? m.text : '', async ( text ) => onUpdate( await api( 'messages/' + mid, { method: 'POST', body: { body: text } } ) ) );
+			return true;
+		}
+		if ( 'adopt' === act ) {
+			const fid = +el.dataset.fid;
+			await api( 'files/' + fid + '/adopt', { method: 'POST', body: {} } );
+			const th = threads.find( ( x ) => ( x.messages || [] ).some( ( m ) => ( m.files || [] ).some( ( f ) => f.id === fid ) ) );
+			if ( th ) {
+				onUpdate( await api( 'threads/' + th.id + '?peek=1' ) );
+			} else {
+				el.replaceWith( Object.assign( document.createElement( 'small' ), { className: 'ff-adopted', textContent: t( 'In the media library' ) } ) );
+			}
 			return true;
 		}
 		if ( 'thread-edit' === act ) {
@@ -644,7 +661,7 @@
 					const entry = { name: f.name, size: f.size, uploading: true };
 					state.files.push( entry );
 					showPending();
-					fetch( cfg.mediaEndpoint, {
+					fetch( cfg.fileEndpoint, {
 						method: 'POST',
 						credentials: 'same-origin',
 						headers: { 'X-WP-Nonce': cfg.nonce, 'Content-Disposition': 'attachment; filename="' + encodeURIComponent( f.name ) + '"', 'Content-Type': f.type || 'application/octet-stream' },
@@ -822,7 +839,7 @@
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
 			+ ava( th.author ) + '<div class="ff-post-body">'
-			+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
+			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<div class="ff-text ff-clamp">' + rich( th.body ) + '</div>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
@@ -882,7 +899,7 @@
 			app.classList.add( 'has-pane' );
 			pane.innerHTML = '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
-				+ '<p class="ff-who"><b>' + esc( person( th.author ).name ) + '</b> <span>' + esc( when( th.created ) ) + '</span></p>'
+				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ cards( th.attachments ) + targetChip( th )
 				+ '<div class="ff-root-row">' + statusPill( th ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'

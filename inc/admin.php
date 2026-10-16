@@ -35,8 +35,7 @@ function config(): array {
 	return array(
 		'root'          => esc_url_raw( rest_url( 'flurfunk/v1/' ) ),
 		'nonce'         => wp_create_nonce( 'wp_rest' ),
-		'mediaEndpoint' => esc_url_raw( rest_url( 'wp/v2/media' ) ),
-		'mediaUrl'      => admin_url( 'upload.php?item=' ),
+		'fileEndpoint'  => esc_url_raw( rest_url( 'flurfunk/v1/files' ) ),
 		'appUrl'        => url(),
 		'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 		'loginUrl'      => wp_login_url( url() ),

@@ -328,9 +328,10 @@ test.describe( 'team', () => {
 			await toggle.click();
 		}
 		const ta = panel.locator( '.ff-compose textarea' ).last();
-		await ta.fill( 'e2e aus dem Editor' );
+		const text = 'e2e aus dem Editor ' + Date.now();
+		await ta.fill( text );
 		await panel.locator( '.ff-compose .ff-send' ).last().click();
-		await expect( panel.locator( '.ff-box', { hasText: 'e2e aus dem Editor' } ) ).toBeVisible();
+		await expect( panel.locator( '.ff-box', { hasText: text } ) ).toBeVisible();
 	} );
 } );
 

@@ -14,6 +14,8 @@
  *   DELETE messages/<id>           remove (a note stays in its place)
  *   GET  providers/<id>/search     suggestions for a slash command
  *   GET  targets?q=                things a thread can be attached to
+ *   POST files                     upload a Flurfunk file (raw body, Content-Disposition: filename)
+ *   POST files/<id>/adopt          add a Flurfunk file to the media library
  *   POST me/prefs                  theme, mail, badge
  *
  * @package Flurfunk
@@ -65,6 +67,8 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/files', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\upload', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/files/(?P<id>\d+)/adopt', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\adopt', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/targets', array( 'methods' => 'GET', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Targets\search( sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() ), 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/me/prefs', array( 'methods' => 'POST', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Notify\save_prefs( get_current_user_id(), (array) $r->get_json_params() ), 'permission_callback' => $auth ) );
 }
@@ -270,4 +274,26 @@ function edit_message( WP_REST_Request $r ) {
 function delete_message( WP_REST_Request $r ) {
 	$tid = Store\delete_message( (int) $r['id'] );
 	return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
+}
+
+/**
+ * POST files: the body is the file, the name comes from Content-Disposition (like wp/v2/media).
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function upload( WP_REST_Request $r ) {
+	$disposition = (string) $r->get_header( 'content_disposition' );
+	$name        = preg_match( '/filename\*?=(?:UTF-8\'\')?"?([^";]+)"?/i', $disposition, $m ) ? rawurldecode( $m[1] ) : 'datei';
+	$id          = \Flurfunk\Files\store( $name, (string) $r->get_body() );
+	return is_wp_error( $id ) ? $id : Store\file_view( Store\files( array( $id ), get_current_user_id(), true )[0] ?? array( 'id' => $id ) );
+}
+
+/**
+ * POST files/<id>/adopt.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function adopt( WP_REST_Request $r ) {
+	$ok = \Flurfunk\Files\adopt( (int) $r['id'] );
+	return is_wp_error( $ok ) ? $ok : Store\file_view( Store\files( array( (int) $r['id'] ), get_current_user_id(), false )[0] ?? array() );
 }
