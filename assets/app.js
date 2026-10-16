@@ -516,6 +516,7 @@
 		const state = { files: [], atts: [], busy: false };
 		const id = 'ff-ta-' + o.key.replace( /[^a-z0-9_-]/gi, '-' );
 		el.innerHTML = ( o.label ? '<label class="ff-label" for="' + id + '">' + esc( o.label ) + '</label>' : '' )
+			+ ( o.titleField ? '<input type="text" name="title" class="ff-title-input" placeholder="' + esc( o.titleField ) + '" aria-label="' + esc( o.titleField ) + '">' : '' )
 			+ '<textarea id="' + id + '" rows="' + ( o.autoGrow ? 1 : 2 ) + '" placeholder="' + esc( o.placeholder || t( 'Write … (@name, / for cards)' ) ) + '"' + ( o.label ? '' : ' aria-label="' + esc( o.placeholder || t( 'Message' ) ) + '"' ) + '></textarea>'
 			+ '<div class="ff-menu-slot"></div><div class="ff-pending"></div>'
 			+ '<div class="ff-row"><div class="ff-left">'
@@ -691,7 +692,8 @@
 				err.hidden = false;
 				return;
 			}
-			if ( ! text && ! state.files.length && ! state.atts.length && ! o.allowEmpty ) {
+			const title = el.elements.title ? el.elements.title.value.trim() : '';
+			if ( ! text && ! title && ! state.files.length && ! state.atts.length && ! o.allowEmpty ) {
 				ta.focus();
 				return;
 			}
@@ -699,11 +701,15 @@
 			err.hidden = true;
 			el.classList.add( 'is-busy' );
 			Promise.resolve( o.onSubmit( {
+				...( el.elements.title ? { title } : {} ),
 				body: text,
 				files: state.files.map( ( f ) => f.id ),
 				attachments: state.atts.map( ( a ) => ( { provider: a.provider, ref: a.ref } ) ),
 			}, el ) ).then( () => {
 				ta.value = '';
+				if ( el.elements.title ) {
+					el.elements.title.value = '';
+				}
 				drafts[ o.key ] = '';
 				saveDrafts();
 				el.classList.remove( 'has-text' );
@@ -1297,8 +1303,123 @@
 		await Promise.all( els.map( draw ) );
 	};
 
+	/* ================================================================== a channel as a checklist page */
+
+	/**
+	 * A channel shown as a numbered list: each thread with its full text, files and cards, a tick
+	 * box for tasks and the conversation underneath. Open items first, done ones below. New items
+	 * can be added at the end. Used e.g. for a page of open questions.
+	 *
+	 * @param {Element} root
+	 * @param {Object}  opts channel, newLabel (heading of the form), titleLabel.
+	 */
+	const mountChannel = async ( root, opts ) => {
+		await loadBoot();
+		applyLook( root, true );
+		root.classList.add( 'ff-embed', 'ff-checklist' );
+		const open = new Set();
+		const answering = new Set();
+		let shown = [];
+		const item = ( th, n, full ) => '<article class="ff-item' + ( 'done' === th.status ? ' is-done' : '' ) + '" data-id="' + th.id + '" id="ff-item-' + th.id + '">'
+			+ '<span class="ff-num" aria-hidden="true">' + ( 'done' === th.status ? '✓' : n ) + '</span><div class="ff-item-body">'
+			+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' )
+			+ ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
+			+ '<div class="ff-msg-body">' + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + '</div>'
+			+ cards( th.attachments ) + targetChip( th )
+			+ '<p class="ff-meta">' + nameHtml( th.author ) + ' · ' + esc( when( th.created ) ) + ' ' + audiencePill( th ) + '</p>'
+			+ ( th.replies ? summary( th, open.has( th.id ), 'toggle' ) : '<button type="button" class="ff-link ff-answer" data-ff="answer">' + esc( t( 'Reply' ) ) + '</button>' )
+			+ ( full ? messagesHtml( full ) : '' )
+			+ ( full || answering.has( th.id ) ? '<div class="ff-reply-slot"></div>' : '' )
+			+ '</div></article>';
+		const draw = async () => {
+			const list = await api( 'threads?' + query( { channel: opts.channel, limit: 200, order: 'ref' } ) );
+			const full = {};
+			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
+				full[ id ] = th;
+			} ).catch( () => {} ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, messages: [] } ) ) );
+			const todo = list.filter( ( th ) => 'done' !== th.status );
+			const done = list.filter( ( th ) => 'done' === th.status );
+			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'Nothing here yet.' ) ) + '</p>' )
+				+ todo.map( ( th, i ) => item( th, i + 1, full[ th.id ] ) ).join( '' )
+				+ ( done.length ? '<h2 class="ff-done-h">' + esc( t( 'Done' ) ) + ' <span>' + done.length + '</span></h2>' + done.map( ( th ) => item( th, '', full[ th.id ] ) ).join( '' ) : '' )
+				+ '<div class="ff-new-slot"></div>';
+			root.querySelectorAll( '.ff-item' ).forEach( ( box ) => {
+				const id = +box.dataset.id;
+				const slot = $( '.ff-reply-slot', box );
+				if ( slot ) {
+					const c = composer( {
+						key: 'thread:' + id,
+						placeholder: t( 'Reply … (@name, / for cards)' ),
+						submitLabel: t( 'Reply' ),
+						onSubmit: async ( payload ) => {
+							await api( 'threads/' + id + '/messages', { method: 'POST', body: payload } );
+							open.add( id );
+							answering.delete( id );
+							await draw();
+						},
+					} );
+					slot.replaceChildren( c );
+					if ( answering.has( id ) ) {
+						c.focusText();
+					}
+				}
+			} );
+			$( '.ff-new-slot', root ).replaceChildren( composer( {
+				key: 'new:channel:' + opts.channel,
+				label: opts.newLabel || t( 'New item' ),
+				titleField: opts.titleLabel || t( 'Title' ),
+				placeholder: t( 'What is it about? (@name, / for cards)' ),
+				submitLabel: t( 'Add' ),
+				extra: '<label class="ff-check"><input type="checkbox" name="task" checked> ' + esc( t( 'Task' ) ) + '</label>',
+				onSubmit: async ( payload, form ) => {
+					await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: opts.channel, task: form.elements.task.checked } ) } );
+					await draw();
+				},
+			} ) );
+		};
+		root.addEventListener( 'click', async ( e ) => {
+			const el = e.target.closest( '[data-ff]' );
+			if ( ! el || el.closest( '.ff-compose' ) ) {
+				return;
+			}
+			if ( await messageAction( el, shown, ( th ) => {
+				open.add( th.id );
+				draw();
+			} ) ) {
+				return;
+			}
+			const id = +( el.closest( '[data-id]' ) || {} ).dataset?.id;
+			if ( 'toggle' === el.dataset.ff ) {
+				if ( open.has( id ) ) {
+					open.delete( id );
+				} else {
+					open.add( id );
+				}
+				draw();
+			} else if ( 'answer' === el.dataset.ff ) {
+				answering.add( id );
+				draw();
+			}
+		} );
+		root.addEventListener( 'change', async ( e ) => {
+			if ( 'done' === e.target.dataset.ff ) {
+				await api( 'threads/' + e.target.dataset.id + '/status', { method: 'POST', body: { status: e.target.checked ? 'done' : 'open' } } );
+				draw();
+			}
+		} );
+		root.innerHTML = '<p class="ff-loading">' + esc( t( 'Loading …' ) ) + '</p>';
+		await draw();
+		const hash = location.hash.match( /^#ff-item-(\d+)$/ );
+		if ( hash && document.getElementById( 'ff-item-' + hash[ 1 ] ) ) {
+			document.getElementById( 'ff-item-' + hash[ 1 ] ).scrollIntoView();
+		}
+		return { refresh: draw };
+	};
+
 	window.Flurfunk = {
 		mountApp,
+		mountChannel,
 		mountTarget,
 		mountRefs,
 		registerCard: ( id, fn ) => {

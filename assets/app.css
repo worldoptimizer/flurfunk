@@ -307,3 +307,17 @@
 .ff-adopted { color: var(--ff-ok); font-size: 12px; }
 .ff-pill.is-bot { background: var(--ff-soft2); color: var(--ff-ink); font-weight: 600; }
 .ff-target.is-gone { color: var(--ff-muted) !important; border-style: dashed; }
+
+/* A channel as a checklist page */
+.ff-checklist { max-width: 52rem; font-size: 14px; }
+.ff-item { display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 0 10px; padding: 20px 0; border-bottom: 1px solid var(--ff-line); }
+.ff-num { font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--ff-accent-text); }
+.ff-item.is-done .ff-num { color: var(--ff-ok); }
+.ff-item.is-done h3 { color: var(--ff-muted) !important; }
+.ff-item .ff-box-head h3 { font-size: 17px; }
+.ff-item .ff-text { margin-top: 6px; line-height: 1.6; }
+.ff-answer { margin-top: 8px; }
+.ff-done-h { margin: 28px 0 0; font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ff-muted) !important; }
+.ff-done-h span { font-weight: 400; }
+.ff-checklist .ff-new-slot { padding-top: 18px; }
+.ff-root .ff-title-input { width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); font-weight: 700; }

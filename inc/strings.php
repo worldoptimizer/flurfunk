@@ -115,6 +115,10 @@ function all(): array {
 		'What is it about? (@name, / for cards)' => __( 'What is it about? (@name, / for cards)', 'flurfunk' ),
 		'Start' => __( 'Start', 'flurfunk' ),
 		'No replies yet' => __( 'No replies yet', 'flurfunk' ),
+		'Nothing here yet.' => __( 'Nothing here yet.', 'flurfunk' ),
+		'New item' => __( 'New item', 'flurfunk' ),
+		'Title' => __( 'Title', 'flurfunk' ),
+		'Add' => __( 'Add', 'flurfunk' ),
 		'Conversations' => __( 'Conversations', 'flurfunk' ),
 	);
 }
