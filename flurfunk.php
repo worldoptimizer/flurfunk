@@ -1,0 +1,102 @@
+<?php
+/**
+ * Plugin Name:       Flurfunk
+ * Description:       Team conversations inside WordPress: channels, threads and tasks, attachable to posts, with mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and inside the OpenStation desktop.
+ * Version:           0.1.0
+ * Requires at least: 6.5
+ * Requires PHP:      8.1
+ * Author:            Max Ziebell
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       flurfunk
+ * Domain Path:       /languages
+ *
+ * Layout:
+ *   inc/schema.php     own tables (versioned, upgrade steps)
+ *   inc/access.php     who sees what: team and guests per channel
+ *   inc/store.php      reading and writing, data format "flurfunk/1"
+ *   inc/providers.php  providers for slash commands and cards (the extension API)
+ *   inc/settings.php   branding and defaults (name, logo, colours, access)
+ *   inc/notify.php     email notifications following each person's preferences
+ *   inc/rest.php       REST API for the interface (flurfunk/v1)
+ *   inc/admin.php      overview app, editor panel, posts list column, OpenStation bits
+ *   inc/transfer.php   JSON export and import
+ *   inc/cli.php        wp flurfunk …
+ *
+ * Everything site-specific lives outside this plugin and plugs in through the hooks and
+ * functions documented in README.md.
+ *
+ * @package Flurfunk
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+const FLURFUNK_VERSION = '0.1.0';
+define( 'FLURFUNK_FILE', __FILE__ );
+define( 'FLURFUNK_DIR', plugin_dir_path( __FILE__ ) );
+define( 'FLURFUNK_URL', plugin_dir_url( __FILE__ ) );
+
+require_once FLURFUNK_DIR . 'inc/strings.php';
+require_once FLURFUNK_DIR . 'inc/schema.php';
+require_once FLURFUNK_DIR . 'inc/access.php';
+require_once FLURFUNK_DIR . 'inc/store.php';
+require_once FLURFUNK_DIR . 'inc/providers.php';
+require_once FLURFUNK_DIR . 'inc/settings.php';
+require_once FLURFUNK_DIR . 'inc/notify.php';
+require_once FLURFUNK_DIR . 'inc/rest.php';
+require_once FLURFUNK_DIR . 'inc/admin.php';
+require_once FLURFUNK_DIR . 'inc/transfer.php';
+
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	require_once FLURFUNK_DIR . 'inc/cli.php';
+}
+
+register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
+
+add_action(
+	'init',
+	static function (): void {
+		load_plugin_textdomain( 'flurfunk', false, dirname( plugin_basename( FLURFUNK_FILE ) ) . '/languages' );
+	},
+	1
+);
+
+/**
+ * Register a provider for slash commands and cards (see inc/providers.php and README.md).
+ *
+ * @param string $id   Identifier, e.g. "myplugin/report".
+ * @param array  $args Provider definition.
+ */
+function flurfunk_register_provider( string $id, array $args ): void {
+	Flurfunk\Providers\register( $id, $args );
+}
+
+/**
+ * Create a channel unless it exists (for plugins that bring their own channels).
+ *
+ * @param string $slug Short name.
+ * @param array  $args name, topic, access_team, access_guests, position.
+ * @return int Channel ID.
+ */
+function flurfunk_ensure_channel( string $slug, array $args = array() ): int {
+	return Flurfunk\Store\ensure_channel( $slug, $args );
+}
+
+/**
+ * Number of unread messages for a person (for badges elsewhere).
+ *
+ * @param int $user_id User (0 = current).
+ */
+function flurfunk_unread_count( int $user_id = 0 ): int {
+	$user_id = $user_id ?: get_current_user_id();
+	return Flurfunk\Access\can_use( $user_id ) ? Flurfunk\Store\counts( $user_id )['total'] : 0;
+}
+
+/**
+ * URL of the overview app, optionally opening a view.
+ *
+ * @param string $view e.g. "channel:general", "target:post:12", "thread:5".
+ */
+function flurfunk_url( string $view = '' ): string {
+	return Flurfunk\Admin\url( $view );
+}

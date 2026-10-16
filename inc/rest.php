@@ -1,0 +1,239 @@
+<?php
+/**
+ * REST API for the interface: /wp-json/flurfunk/v1/…
+ *
+ *   GET  bootstrap                 me, people, channels, providers, counts, look
+ *   GET  counts                    unread numbers
+ *   GET  threads                   list (view, channel, target, ref_prefix, before, limit, order)
+ *   POST threads                   new thread (with ref_key: returns the existing one if present)
+ *   GET  threads/<id>              thread with messages; marks it read
+ *   POST threads/<id>/messages     reply
+ *   POST threads/<id>/status       open | done | ''
+ *   GET  providers/<id>/search     suggestions for a slash command
+ *   POST me/prefs                  theme, mail, badge
+ *
+ * @package Flurfunk
+ */
+
+namespace Flurfunk\Rest;
+
+use Flurfunk\Access;
+use Flurfunk\Store;
+use WP_REST_Request;
+
+defined( 'ABSPATH' ) || exit;
+
+const NS = 'flurfunk/v1';
+
+add_action( 'rest_api_init', __NAMESPACE__ . '\\routes' );
+
+/**
+ * Routes.
+ */
+function routes(): void {
+	$auth = static fn (): bool => is_user_logged_in() && Access\can_use();
+	$id   = array(
+		'id' => array(
+			'type'     => 'integer',
+			'required' => true,
+		),
+	);
+	register_rest_route( NS, '/bootstrap', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\bootstrap', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/counts', array( 'methods' => 'GET', 'callback' => static fn () => Store\counts( get_current_user_id() ), 'permission_callback' => $auth ) );
+	register_rest_route(
+		NS,
+		'/threads',
+		array(
+			array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\list_threads', 'permission_callback' => $auth ),
+			array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\create_thread', 'permission_callback' => $auth ),
+		)
+	);
+	register_rest_route( NS, '/threads/(?P<id>\d+)', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\get_thread', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route( NS, '/threads/(?P<id>\d+)/messages', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\add_message', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route( NS, '/me/prefs', array( 'methods' => 'POST', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Notify\save_prefs( get_current_user_id(), (array) $r->get_json_params() ), 'permission_callback' => $auth ) );
+}
+
+/**
+ * Everything the app needs to start.
+ */
+function bootstrap(): array {
+	$uid      = get_current_user_id();
+	$s        = \Flurfunk\Settings\get();
+	$channels = array();
+	foreach ( Store\channels() as $c ) {
+		$level = Access\level( $c, $uid );
+		if ( 'none' !== $level ) {
+			$channels[] = Store\format_channel( $c ) + array( 'level' => $level );
+		}
+	}
+	$me = Store\person( $uid );
+	return array(
+		'format'    => 'flurfunk/1',
+		'me'        => $me + array(
+			'prefs'  => \Flurfunk\Notify\prefs( $uid ),
+			'manage' => Access\can_manage( $uid ),
+			'upload' => current_user_can( 'upload_files' ),
+		),
+		'people'    => Store\people(),
+		'channels'  => $channels,
+		'providers' => \Flurfunk\Providers\available( $uid ),
+		'counts'    => Store\counts( $uid ),
+		'targets'   => my_targets( $uid ),
+		'recent'    => array_map( static fn ( $t ) => target_info( $t['type'], $t['id'] ) + array( 'id' => $t['id'] ), Store\recent_targets( $uid ) ),
+		'locale'    => str_replace( '_', '-', get_user_locale( $uid ) ),
+		'look'      => array(
+			'name'    => \Flurfunk\Settings\name(),
+			'logo'    => \Flurfunk\Settings\logo(),
+			'accent'  => $s['accent'],
+			'sidebar' => $s['sidebar'],
+		),
+		'settings'  => Access\can_manage( $uid ) ? admin_url( 'options-general.php?page=' . \Flurfunk\Settings\PAGE ) : '',
+	);
+}
+
+/**
+ * Posts the person may attach new threads to (newest first; guests: their own).
+ *
+ * @param int $uid User.
+ */
+function my_targets( int $uid ): array {
+	$args = array(
+		'post_type'      => \Flurfunk\Settings\get()['post_types'],
+		'post_status'    => array( 'publish', 'future', 'draft', 'pending', 'private' ),
+		'posts_per_page' => 30,
+		'orderby'        => 'modified',
+	);
+	if ( 'team' !== Access\kind( $uid ) ) {
+		$args['post__in'] = Access\owned_post_ids( $uid ) ?: array( 0 );
+	}
+	return array_map( static fn ( $p ) => target_info( 'post', $p->ID ) + array( 'id' => $p->ID ), get_posts( $args ) );
+}
+
+/**
+ * Title and link of a target.
+ *
+ * @param string $type Target type.
+ * @param int    $id   Target ID.
+ */
+function target_info( string $type, int $id ): array {
+	static $cache = array();
+	$key = $type . ':' . $id;
+	if ( ! isset( $cache[ $key ] ) ) {
+		$info = array(
+			'type'  => $type,
+			'title' => '',
+			'url'   => '',
+		);
+		if ( 'post' === $type && ( $p = get_post( $id ) ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
+			$info['title']  = html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ) ?: __( '(no title)', 'flurfunk' );
+			$info['url']    = current_user_can( 'edit_post', $id ) ? (string) get_edit_post_link( $id, 'raw' ) : (string) get_permalink( $p );
+			$info['status'] = get_post_status_object( $p->post_status )->label ?? $p->post_status;
+		}
+		$cache[ $key ] = (array) apply_filters( 'flurfunk_target_info', $info, $type, $id );
+	}
+	return $cache[ $key ];
+}
+
+/**
+ * Add target titles for the interface.
+ *
+ * @param array $t Thread in the data format.
+ */
+function decorate( array $t ): array {
+	if ( $t['target'] ) {
+		$t['target'] += target_info( $t['target']['type'], (int) $t['target']['id'] );
+	}
+	return $t;
+}
+
+/**
+ * GET threads.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function list_threads( WP_REST_Request $r ): array {
+	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'limit', 'order' ) ) );
+	return array_map( __NAMESPACE__ . '\\decorate', Store\list_threads( get_current_user_id(), array_map( 'sanitize_text_field', $args ) ) );
+}
+
+/**
+ * GET threads/<id> (marks it as read).
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function get_thread( WP_REST_Request $r ) {
+	$uid = get_current_user_id();
+	$t   = Store\full_thread( (int) $r['id'], $uid );
+	if ( is_wp_error( $t ) ) {
+		return $t;
+	}
+	if ( empty( $r['peek'] ) ) {
+		Store\mark_read( (int) $r['id'], $uid );
+	}
+	return decorate( $t );
+}
+
+/**
+ * POST threads.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function create_thread( WP_REST_Request $r ) {
+	$p   = (array) $r->get_json_params();
+	$ref = sanitize_text_field( (string) ( $p['ref_key'] ?? '' ) );
+	if ( '' !== $ref && ( $existing = Store\thread_by_ref( $ref ) ) && Access\can_see( $existing ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
+		return decorate( Store\full_thread( (int) $existing->id, get_current_user_id() ) );
+	}
+	$id = Store\create_thread(
+		array(
+			'channel'     => (string) ( $p['channel'] ?? '' ),
+			'target'      => is_array( $p['target'] ?? null ) ? $p['target'] : null,
+			'title'       => (string) ( $p['title'] ?? '' ),
+			'body'        => (string) ( $p['body'] ?? '' ),
+			'task'        => ! empty( $p['task'] ),
+			'attachments' => (array) ( $p['attachments'] ?? array() ),
+			'ref_key'     => $ref,
+		)
+	);
+	return is_wp_error( $id ) ? $id : decorate( Store\full_thread( $id, get_current_user_id() ) );
+}
+
+/**
+ * POST threads/<id>/messages.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function add_message( WP_REST_Request $r ) {
+	$p  = (array) $r->get_json_params();
+	$id = Store\add_message(
+		(int) $r['id'],
+		array(
+			'body'        => (string) ( $p['body'] ?? '' ),
+			'files'       => array_map( 'intval', (array) ( $p['files'] ?? array() ) ),
+			'attachments' => (array) ( $p['attachments'] ?? array() ),
+		)
+	);
+	return is_wp_error( $id ) ? $id : decorate( Store\full_thread( (int) $r['id'], get_current_user_id() ) );
+}
+
+/**
+ * POST threads/<id>/status.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function set_status( WP_REST_Request $r ) {
+	$ok = Store\set_status( (int) $r['id'], (string) ( $r->get_json_params()['status'] ?? '' ) );
+	return is_wp_error( $ok ) ? $ok : decorate( Store\full_thread( (int) $r['id'], get_current_user_id() ) );
+}
+
+/**
+ * GET providers/<id>/search.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function search( WP_REST_Request $r ) {
+	$items = \Flurfunk\Providers\search( (string) $r['provider'], sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() );
+	return null === $items ? new \WP_Error( 'flurfunk_provider', __( 'Unknown command.', 'flurfunk' ), array( 'status' => 404 ) ) : $items;
+}
