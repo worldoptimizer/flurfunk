@@ -45,21 +45,18 @@ function remove_dir( string $dir ): void {
 	}
 	$items = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::CHILD_FIRST );
 	foreach ( $items as $item ) {
-		$item->isDir() ? rmdir( $item->getPathname() ) : wp_delete_file( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$item->isDir() ? rmdir( $item->getPathname() ) : wp_delete_file( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- our own temporary folder.
 	}
-	rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- our own temporary folder.
 }
 
 /**
- * Stop unless an administrator sent this form.
- *
- * @param string $action Nonce action.
+ * Stop unless an administrator is asking (the nonce is checked right after, in each handler).
  */
-function check( string $action ): void {
+function check(): void {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		wp_die( esc_html__( 'You cannot change this.', 'flurfunk' ), 403 );
 	}
-	check_admin_referer( $action );
 }
 
 /*
@@ -68,18 +65,19 @@ function check( string $action ): void {
 add_action(
 	'admin_post_flurfunk_export',
 	static function (): void {
-		check( 'flurfunk_export' );
+		check();
+		check_admin_referer( 'flurfunk_export' );
 		$name  = 'flurfunk-' . sanitize_title( wp_parse_url( home_url(), PHP_URL_HOST ) ) . '-' . gmdate( 'Y-m-d' );
 		$flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 		if ( empty( $_POST['files'] ) || ! zip_available() ) {
 			nocache_headers();
 			header( 'Content-Type: application/json; charset=utf-8' );
 			header( 'Content-Disposition: attachment; filename="' . $name . '.json"' );
-			echo wp_json_encode( Transfer\export(), $flags ); // phpcs:ignore WordPress.Security.EscapeOutput
+			echo wp_json_encode( Transfer\export(), $flags ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a JSON download, not HTML.
 			exit;
 		}
 		$dir = temp_dir();
-		file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), $flags ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), $flags ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- our own temporary folder.
 		$zip_file = $dir . '.zip';
 		$zip      = new \ZipArchive();
 		$zip->open( $zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
@@ -93,7 +91,7 @@ add_action(
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . $name . '.zip"' );
 		header( 'Content-Length: ' . filesize( $zip_file ) );
-		readfile( $zip_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		readfile( $zip_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- streams the ZIP we just built.
 		wp_delete_file( $zip_file );
 		exit;
 	}
@@ -105,9 +103,10 @@ add_action(
 add_action(
 	'admin_post_flurfunk_import',
 	static function (): void {
-		check( 'flurfunk_import' );
+		check();
+		check_admin_referer( 'flurfunk_import' );
 		$back = admin_url( 'options-general.php?page=flurfunk-settings#flurfunk-transfer' );
-		$file = $_FILES['file'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$file = $_FILES['file'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- an upload: only its temporary path and name are used, the content is parsed as JSON.
 		if ( ! $file || UPLOAD_ERR_OK !== (int) $file['error'] || ! is_uploaded_file( $file['tmp_name'] ) ) {
 			set_transient( RESULT . get_current_user_id(), array( 'error' => __( 'Please choose an export file.', 'flurfunk' ) ), 300 );
 			wp_safe_redirect( $back );
@@ -133,10 +132,10 @@ add_action(
 			if ( $ok ) {
 				$zip->extractTo( $dir );
 				$zip->close();
-				$json = is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$json = is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file in our temporary folder.
 			}
 		} else {
-			$json = (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$json = (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- the uploaded file.
 		}
 		$data   = json_decode( $json, true );
 		$result = is_array( $data ) ? Transfer\import( $data, $dir ) : array( 'error' => 'format' );
