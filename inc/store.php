@@ -18,6 +18,9 @@ use function Flurfunk\Schema\table;
 
 defined( 'ABSPATH' ) || exit;
 
+// Flurfunk's own tables have no WordPress API to go through. Every query below is prepared.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 // Task states: open → doing (in progress) → waiting (needs an answer) → done.
 const STATUSES = array( 'open', 'doing', 'waiting', 'done' );
 const ACTIVE   = array( 'open', 'doing', 'waiting' );
@@ -88,7 +91,7 @@ function channels( bool $fresh = false ): array {
 	global $wpdb;
 	static $rows = null;
 	if ( null === $rows || $fresh ) {
-		$rows = (array) $wpdb->get_results( 'SELECT * FROM ' . table( 'channels' ) . ' ORDER BY position, name' ); // phpcs:ignore WordPress.DB
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY position, name', table( 'channels' ) ) );
 	}
 	return $rows;
 }
@@ -151,13 +154,13 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
 	}
 	if ( $row ) {
 		if ( $update && $data ) {
-			$wpdb->update( table( 'channels' ), $data, array( 'id' => $row->id ) ); // phpcs:ignore WordPress.DB
+			$wpdb->update( table( 'channels' ), $data, array( 'id' => $row->id ) );
 			channels( true );
 			bump();
 		}
 		return (int) $row->id;
 	}
-	$wpdb->insert( // phpcs:ignore WordPress.DB
+	$wpdb->insert(
 		table( 'channels' ),
 		$data + array(
 			'slug'    => $slug,
@@ -265,7 +268,7 @@ function people(): array {
 			),
 			get_users(
 				array(
-					'meta_key' => 'flurfunk_bot', // phpcs:ignore WordPress.DB.SlowDBQuery
+					'meta_key' => 'flurfunk_bot', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- only a handful of assistant accounts carry this key.
 					'fields'   => 'ID',
 				)
 			)
@@ -285,7 +288,7 @@ function people(): array {
  */
 function thread_row( int $id ): ?object {
 	global $wpdb;
-	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'threads' ) . ' WHERE id = %d', $id ) ); // phpcs:ignore WordPress.DB
+	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', table( 'threads' ), $id ) );
 	return $row ?: null;
 }
 
@@ -296,7 +299,7 @@ function thread_row( int $id ): ?object {
  */
 function thread_by_ref( string $ref_key ): ?object {
 	global $wpdb;
-	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'threads' ) . ' WHERE ref_key = %s ORDER BY id LIMIT 1', $ref_key ) ); // phpcs:ignore WordPress.DB
+	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE ref_key = %s ORDER BY id LIMIT 1', table( 'threads' ), $ref_key ) );
 	return $row ?: null;
 }
 
@@ -360,16 +363,16 @@ function create_thread( array $args, bool $check = true ) {
 	$ref = sanitize_text_field( (string) ( $args['ref_key'] ?? '' ) );
 	if ( '' !== $ref ) {
 		$lock = 'flurfunk_ref_' . md5( $ref );
-		$wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $lock ) ); // phpcs:ignore WordPress.DB
+		$wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 5)', $lock ) );
 		$existing = thread_by_ref( $ref );
 		if ( $existing ) {
-			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) ); // phpcs:ignore WordPress.DB
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 			return (int) $existing->id;
 		}
 	}
 	$created = mysql( $args['created'] ?? null ) ?? now();
 	$status  = $args['status'] ?? ( empty( $args['task'] ) ? '' : 'open' );
-	$wpdb->insert( // phpcs:ignore WordPress.DB
+	$wpdb->insert(
 		table( 'threads' ),
 		array(
 			'channel_id'    => (int) $channel->id,
@@ -389,7 +392,7 @@ function create_thread( array $args, bool $check = true ) {
 	);
 	$id = (int) $wpdb->insert_id;
 	if ( '' !== $ref ) {
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'flurfunk_ref_' . md5( $ref ) ) ); // phpcs:ignore WordPress.DB
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'flurfunk_ref_' . md5( $ref ) ) );
 	}
 	if ( ! $id ) {
 		return new \WP_Error( 'flurfunk_db', __( 'Could not save the conversation.', 'flurfunk' ), array( 'status' => 500 ) );
@@ -408,7 +411,7 @@ function create_thread( array $args, bool $check = true ) {
 			$task['assignees'] = $args['assignees'];
 		}
 		set_task( $id, $task, $check );
-		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'messages' ) . " WHERE thread_id = %d AND type = 'event'", $id ) ); // phpcs:ignore WordPress.DB
+		$wpdb->query( $wpdb->prepare( "DELETE FROM %i WHERE thread_id = %d AND type = 'event'", table( 'messages' ), $id ) );
 	}
 	if ( $check ) {
 		mark_read( $id, $author );
@@ -444,7 +447,7 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The message is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	$created = mysql( $args['created'] ?? null ) ?? now();
-	$wpdb->insert( // phpcs:ignore WordPress.DB
+	$wpdb->insert(
 		table( 'messages' ),
 		array(
 			'thread_id' => $thread_id,
@@ -461,7 +464,7 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 	if ( ! $id ) {
 		return new \WP_Error( 'flurfunk_db', __( 'Could not save the message.', 'flurfunk' ), array( 'status' => 500 ) );
 	}
-	$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'threads' ) . ' SET last_activity = GREATEST(last_activity, %s) WHERE id = %d', $created, $thread_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->query( $wpdb->prepare( 'UPDATE %i SET last_activity = GREATEST(last_activity, %s) WHERE id = %d', table( 'threads' ), $created, $thread_id ) );
 	bump();
 	save_mentions( $thread, $id, $check ? mentions_in( $body, $thread ) : array_map( 'intval', (array) ( $args['mentions'] ?? array() ) ) );
 	save_attachments( $thread, $id, (array) ( $args['attachments'] ?? array() ), $author, $check );
@@ -492,7 +495,7 @@ function set_status( int $thread_id, string $status ) {
 	if ( $thread->status === $status ) {
 		return true;
 	}
-	$wpdb->update( // phpcs:ignore WordPress.DB
+	$wpdb->update(
 		table( 'threads' ),
 		array(
 			'status'      => $status,
@@ -534,18 +537,18 @@ function can_edit( int $author, int $user_id ): bool {
 function edit_message( int $message_id, string $body ) {
 	global $wpdb;
 	$user = get_current_user_id();
-	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE id = %d', $message_id ) ); // phpcs:ignore WordPress.DB
+	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', table( 'messages' ), $message_id ) );
 	$t    = $m ? thread_row( (int) $m->thread_id ) : null;
 	if ( ! $m || ! $t || 'message' !== $m->type || ! Access\can_see( $t, $user ) || ! can_edit( (int) $m->author_id, $user ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
 	$body = clean_text( $body );
-	if ( '' === $body && '[]' === $m->files && ! $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'attachments' ) . ' WHERE message_id = %d', $message_id ) ) ) { // phpcs:ignore WordPress.DB
+	if ( '' === $body && '[]' === $m->files && ! $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE message_id = %d', table( 'attachments' ), $message_id ) ) ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The message is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
-	$wpdb->update( table( 'messages' ), array( 'body' => $body, 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->update( table( 'messages' ), array( 'body' => $body, 'edited' => now() ), array( 'id' => $message_id ) );
 	bump();
-	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) );
 	save_mentions( $t, $message_id, mentions_in( $body, $t ) );
 	do_action( 'flurfunk_message_edited', $t, $message_id );
 	return (int) $t->id;
@@ -560,15 +563,15 @@ function edit_message( int $message_id, string $body ) {
 function delete_message( int $message_id ) {
 	global $wpdb;
 	$user = get_current_user_id();
-	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE id = %d', $message_id ) ); // phpcs:ignore WordPress.DB
+	$m    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', table( 'messages' ), $message_id ) );
 	$t    = $m ? thread_row( (int) $m->thread_id ) : null;
 	if ( ! $m || ! $t || 'message' !== $m->type || ! Access\can_see( $t, $user ) || ! can_edit( (int) $m->author_id, $user ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
-	$wpdb->update( table( 'messages' ), array( 'type' => 'deleted', 'body' => '', 'files' => '[]', 'edited' => now() ), array( 'id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->update( table( 'messages' ), array( 'type' => 'deleted', 'body' => '', 'files' => '[]', 'edited' => now() ), array( 'id' => $message_id ) );
 	bump();
-	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
-	$wpdb->delete( table( 'attachments' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) );
+	$wpdb->delete( table( 'attachments' ), array( 'thread_id' => (int) $t->id, 'message_id' => $message_id ) );
 	do_action( 'flurfunk_message_deleted', $t, $message_id );
 	return (int) $t->id;
 }
@@ -592,9 +595,9 @@ function edit_thread( int $thread_id, array $args ) {
 	if ( '' === $title && '' === $body ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The conversation is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
-	$wpdb->update( table( 'threads' ), array( 'title' => $title, 'body' => $body ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->update( table( 'threads' ), array( 'title' => $title, 'body' => $body ), array( 'id' => $thread_id ) );
 	bump();
-	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => $thread_id, 'message_id' => 0 ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'mentions' ), array( 'thread_id' => $thread_id, 'message_id' => 0 ) );
 	save_mentions( $t, 0, mentions_in( $body, $t ) );
 	return true;
 }
@@ -610,7 +613,7 @@ function edit_thread( int $thread_id, array $args ) {
 function set_follow( int $thread_id, int $user_id, int $mode ): void {
 	global $wpdb;
 	$mode = max( -1, min( 1, $mode ) );
-	$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen, follow) VALUES (%d, %d, 0, %s, %d) ON DUPLICATE KEY UPDATE follow = VALUES(follow)', $user_id, $thread_id, now(), $mode ) ); // phpcs:ignore WordPress.DB
+	$wpdb->query( $wpdb->prepare( 'INSERT INTO %i (user_id, thread_id, last_message_id, seen, follow) VALUES (%d, %d, 0, %s, %d) ON DUPLICATE KEY UPDATE follow = VALUES(follow)', table( 'reads' ), $user_id, $thread_id, now(), $mode ) );
 }
 
 /**
@@ -653,10 +656,10 @@ function remind_time( string $when, int $user_id ) {
 function set_reminder( int $thread_id, int $user_id, ?string $at ): void {
 	global $wpdb;
 	if ( null === $at ) {
-		$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'reads' ) . ' SET remind_at = NULL WHERE user_id = %d AND thread_id = %d', $user_id, $thread_id ) ); // phpcs:ignore WordPress.DB
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET remind_at = NULL WHERE user_id = %d AND thread_id = %d', table( 'reads' ), $user_id, $thread_id ) );
 		return;
 	}
-	$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen, remind_at) VALUES (%d, %d, 0, %s, %s) ON DUPLICATE KEY UPDATE remind_at = VALUES(remind_at)', $user_id, $thread_id, now(), $at ) ); // phpcs:ignore WordPress.DB
+	$wpdb->query( $wpdb->prepare( 'INSERT INTO %i (user_id, thread_id, last_message_id, seen, remind_at) VALUES (%d, %d, 0, %s, %s) ON DUPLICATE KEY UPDATE remind_at = VALUES(remind_at)', table( 'reads' ), $user_id, $thread_id, now(), $at ) );
 }
 
 /**
@@ -667,7 +670,7 @@ function set_reminder( int $thread_id, int $user_id, ?string $at ): void {
  */
 function reminder( int $thread_id, int $user_id ): ?string {
 	global $wpdb;
-	return $wpdb->get_var( $wpdb->prepare( 'SELECT remind_at FROM ' . table( 'reads' ) . ' WHERE user_id = %d AND thread_id = %d', $user_id, $thread_id ) ) ?: null; // phpcs:ignore WordPress.DB
+	return $wpdb->get_var( $wpdb->prepare( 'SELECT remind_at FROM %i WHERE user_id = %d AND thread_id = %d', table( 'reads' ), $user_id, $thread_id ) ) ?: null;
 }
 
 /**
@@ -679,7 +682,7 @@ function reminder( int $thread_id, int $user_id ): ?string {
 function follows( int $thread_id ): array {
 	global $wpdb;
 	$out = array();
-	foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT user_id, follow FROM ' . table( 'reads' ) . ' WHERE thread_id = %d AND follow <> 0', $thread_id ) ) as $r ) { // phpcs:ignore WordPress.DB
+	foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT user_id, follow FROM %i WHERE thread_id = %d AND follow <> 0', table( 'reads' ), $thread_id ) ) as $r ) {
 		$out[ (int) $r->user_id ] = (int) $r->follow;
 	}
 	return $out;
@@ -697,17 +700,20 @@ function mark_all_read( int $user_id, string $channel = '' ): int {
 	$where = Access\where( $user_id );
 	if ( '' !== $channel ) {
 		$c      = channel_by_slug( $channel );
-		$where .= ' AND t.channel_id = ' . ( $c ? (int) $c->id : 0 );
+		$where .= $wpdb->prepare( ' AND t.channel_id = %d', $c ? (int) $c->id : 0 );
 	}
 	// One statement for all threads (thousands of threads stay fast).
-	$n = (int) $wpdb->query( // phpcs:ignore WordPress.DB
+	$n = (int) $wpdb->query( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
 		$wpdb->prepare(
-			'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen)
-			SELECT %d, t.id, COALESCE( MAX(m.id), 0 ), %s FROM ' . table( 'threads' ) . ' t LEFT JOIN ' . table( 'messages' ) . " m ON m.thread_id = t.id
-			WHERE $where GROUP BY t.id
-			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(" . table( 'reads' ) . '.last_message_id, VALUES(last_message_id)), seen = VALUES(seen)',
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
+			"INSERT INTO %i (user_id, thread_id, last_message_id, seen) SELECT %d, t.id, COALESCE( MAX(m.id), 0 ), %s FROM %i t LEFT JOIN %i m ON m.thread_id = t.id WHERE {$where} GROUP BY t.id
+			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(%i.last_message_id, VALUES(last_message_id)), seen = VALUES(seen)",
+			table( 'reads' ),
 			$user_id,
-			now()
+			now(),
+			table( 'threads' ),
+			table( 'messages' ),
+			table( 'reads' )
 		)
 	);
 	update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
@@ -741,12 +747,13 @@ function bump(): void {
 function mark_read( int $thread_id, int $user_id, ?int $message_id = null ): void {
 	global $wpdb;
 	if ( null === $message_id ) {
-		$message_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(id) FROM ' . table( 'messages' ) . ' WHERE thread_id = %d', $thread_id ) ); // phpcs:ignore WordPress.DB
+		$message_id = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(id) FROM %i WHERE thread_id = %d', table( 'messages' ), $thread_id ) );
 	}
-	$wpdb->query( // phpcs:ignore WordPress.DB
+	$wpdb->query(
 		$wpdb->prepare(
-			'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen) VALUES (%d, %d, %d, %s)
+			'INSERT INTO %i (user_id, thread_id, last_message_id, seen) VALUES (%d, %d, %d, %s)
 			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(last_message_id, VALUES(last_message_id)), seen = VALUES(seen)',
+			table( 'reads' ),
 			$user_id,
 			$thread_id,
 			$message_id,
@@ -766,7 +773,7 @@ function mark_read( int $thread_id, int $user_id, ?int $message_id = null ): voi
 function save_mentions( object $thread, int $message_id, array $users ): void {
 	global $wpdb;
 	foreach ( array_unique( $users ) as $u ) {
-		$wpdb->replace( // phpcs:ignore WordPress.DB
+		$wpdb->replace(
 			table( 'mentions' ),
 			array(
 				'thread_id'  => (int) $thread->id,
@@ -799,7 +806,7 @@ function save_attachments( object $thread, int $message_id, array $list, int $us
 		} else {
 			$snapshot = is_array( $a['snapshot'] ?? null ) ? $a['snapshot'] : array();
 		}
-		$wpdb->insert( // phpcs:ignore WordPress.DB
+		$wpdb->insert(
 			table( 'attachments' ),
 			array(
 				'thread_id'  => (int) $thread->id,
@@ -824,7 +831,7 @@ function save_attachments( object $thread, int $message_id, array $list, int $us
 function refresh_card( int $attachment_id ) {
 	global $wpdb;
 	$user = get_current_user_id();
-	$row  = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'attachments' ) . ' WHERE id = %d', $attachment_id ) ); // phpcs:ignore WordPress.DB
+	$row  = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', table( 'attachments' ), $attachment_id ) );
 	$t    = $row ? thread_row( (int) $row->thread_id ) : null;
 	if ( ! $row || ! $t || ! Access\can_see( $t, $user ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
@@ -833,7 +840,7 @@ function refresh_card( int $attachment_id ) {
 	if ( null === $snap ) {
 		return new \WP_Error( 'flurfunk_card', __( 'This card cannot be updated (any more).', 'flurfunk' ), array( 'status' => 409 ) );
 	}
-	$wpdb->update( table( 'attachments' ), array( 'snapshot' => (string) wp_json_encode( $snap ) ), array( 'id' => $attachment_id ) ); // phpcs:ignore WordPress.DB
+	$wpdb->update( table( 'attachments' ), array( 'snapshot' => (string) wp_json_encode( $snap ) ), array( 'id' => $attachment_id ) );
 	bump();
 	return (int) $t->id;
 }
@@ -930,7 +937,8 @@ function attachments_for( array $thread_ids ): array {
 	if ( ! $thread_ids ) {
 		return array();
 	}
-	$rows = $wpdb->get_results( 'SELECT * FROM ' . table( 'attachments' ) . ' WHERE thread_id IN (' . implode( ',', array_map( 'intval', $thread_ids ) ) . ') ORDER BY id' ); // phpcs:ignore WordPress.DB
+	$ids  = array_map( 'intval', $thread_ids );
+	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE thread_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ') ORDER BY id', array_merge( array( table( 'attachments' ) ), $ids ) ) );
 	$out  = array();
 	foreach ( $rows as $r ) {
 		$out[ (int) $r->thread_id ][ (int) $r->message_id ][] = array(
@@ -954,7 +962,8 @@ function mentions_for( array $thread_ids ): array {
 	if ( ! $thread_ids ) {
 		return array();
 	}
-	$rows = $wpdb->get_results( 'SELECT * FROM ' . table( 'mentions' ) . ' WHERE thread_id IN (' . implode( ',', array_map( 'intval', $thread_ids ) ) . ')' ); // phpcs:ignore WordPress.DB
+	$ids  = array_map( 'intval', $thread_ids );
+	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE thread_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')', array_merge( array( table( 'mentions' ) ), $ids ) ) );
 	$out  = array();
 	foreach ( $rows as $r ) {
 		$out[ (int) $r->thread_id ][ (int) $r->message_id ][] = (int) $r->user_id;
@@ -1025,7 +1034,7 @@ function assignees_for( array $thread_ids, bool $fresh = false ): array {
 		foreach ( $missing as $id ) {
 			$cache[ $id ] = array();
 		}
-		$rows = $wpdb->get_results( 'SELECT thread_id, user_id FROM ' . table( 'assignees' ) . ' WHERE thread_id IN (' . implode( ',', $missing ) . ') ORDER BY created' ); // phpcs:ignore WordPress.DB
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT thread_id, user_id FROM %i WHERE thread_id IN (' . implode( ',', array_fill( 0, count( $missing ), '%d' ) ) . ') ORDER BY created', array_merge( array( table( 'assignees' ) ), $missing ) ) );
 		foreach ( $rows as $r ) {
 			$cache[ (int) $r->thread_id ][] = (int) $r->user_id;
 		}
@@ -1053,14 +1062,14 @@ function set_task( int $thread_id, array $args, bool $check = true ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
 	if ( '' === $t->status ) {
-		$wpdb->update( table( 'threads' ), array( 'status' => 'open' ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+		$wpdb->update( table( 'threads' ), array( 'status' => 'open' ), array( 'id' => $thread_id ) );
 	}
 	$events = array();
 	if ( array_key_exists( 'due', $args ) ) {
 		$due = (string) $args['due'];
 		$due = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $due ) && checkdate( (int) substr( $due, 5, 2 ), (int) substr( $due, 8, 2 ), (int) substr( $due, 0, 4 ) ) ? $due : null;
 		if ( (string) $t->due_date !== (string) $due ) {
-			$wpdb->update( table( 'threads' ), array( 'due_date' => $due ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+			$wpdb->update( table( 'threads' ), array( 'due_date' => $due ), array( 'id' => $thread_id ) );
 			$events[] = array( 'event' => 'due', 'due' => $due );
 		}
 	}
@@ -1076,10 +1085,10 @@ function set_task( int $thread_id, array $args, bool $check = true ) {
 		$added   = array_values( array_diff( $want, $before ) );
 		$removed = array_values( array_diff( $before, $want ) );
 		foreach ( $added as $uid ) {
-			$wpdb->replace( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid, 'assigned_by' => $user, 'created' => now() ) ); // phpcs:ignore WordPress.DB
+			$wpdb->replace( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid, 'assigned_by' => $user, 'created' => now() ) );
 		}
 		foreach ( $removed as $uid ) {
-			$wpdb->delete( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
+			$wpdb->delete( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid ) );
 		}
 		assignees_for( array(), true );
 		if ( $added || $removed ) {
@@ -1090,7 +1099,7 @@ function set_task( int $thread_id, array $args, bool $check = true ) {
 		}
 	}
 	foreach ( $events as $e ) {
-		$wpdb->insert( // phpcs:ignore WordPress.DB
+		$wpdb->insert(
 			table( 'messages' ),
 			array(
 				'thread_id' => $thread_id,
@@ -1104,7 +1113,7 @@ function set_task( int $thread_id, array $args, bool $check = true ) {
 		);
 	}
 	if ( $events ) {
-		$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'threads' ) . ' SET last_activity = %s WHERE id = %d', now(), $thread_id ) ); // phpcs:ignore WordPress.DB
+		$wpdb->query( $wpdb->prepare( 'UPDATE %i SET last_activity = %s WHERE id = %d', table( 'threads' ), now(), $thread_id ) );
 		bump();
 	}
 	return true;
@@ -1122,8 +1131,8 @@ function format_messages( object $t, array $atts, array $ments, int $limit = 0 )
 	global $wpdb;
 	// Very long threads: the newest $limit messages (oldest first); 0 = all (export).
 	$rows = $limit
-		? array_reverse( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE thread_id = %d ORDER BY id DESC LIMIT %d', $t->id, $limit ) ) ) // phpcs:ignore WordPress.DB
-		: (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . table( 'messages' ) . ' WHERE thread_id = %d ORDER BY id', $t->id ) ); // phpcs:ignore WordPress.DB
+		? array_reverse( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE thread_id = %d ORDER BY id DESC LIMIT %d', table( 'messages' ), $t->id, $limit ) ) )
+		: (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE thread_id = %d ORDER BY id', table( 'messages' ), $t->id ) );
 	$out  = array();
 	foreach ( $rows as $m ) {
 		$mid = (int) $m->id;
@@ -1187,7 +1196,7 @@ function full_thread( int $id, int $user_id ) {
 	$limit    = (int) apply_filters( 'flurfunk_thread_limit', 300 );
 	$messages = format_messages( $t, $atts, $ments, $limit );
 	global $wpdb;
-	$total = count( $messages ) < $limit ? count( $messages ) : (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'messages' ) . ' WHERE thread_id = %d', $id ) ); // phpcs:ignore WordPress.DB
+	$total = count( $messages ) < $limit ? count( $messages ) : (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE thread_id = %d', table( 'messages' ), $id ) );
 	return format_thread( $t, $atts, $ments ) + array(
 		'messages' => $messages,
 		'older'    => max( 0, $total - count( $messages ) ),
@@ -1209,7 +1218,8 @@ function read_state( array $thread_ids, int $user_id ): array {
 	global $wpdb;
 	$out = array_fill_keys( $thread_ids, -1 );
 	if ( $thread_ids ) {
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT thread_id, last_message_id FROM ' . table( 'reads' ) . ' WHERE user_id = %d AND thread_id IN (' . implode( ',', array_map( 'intval', $thread_ids ) ) . ')', $user_id ) ); // phpcs:ignore WordPress.DB
+		$ids  = array_map( 'intval', $thread_ids );
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT thread_id, last_message_id FROM %i WHERE user_id = %d AND thread_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')', array_merge( array( table( 'reads' ), $user_id ), $ids ) ) );
 		foreach ( $rows as $r ) {
 			$out[ (int) $r->thread_id ] = (int) $r->last_message_id;
 		}
@@ -1252,12 +1262,11 @@ function audience( object $t ): array {
  */
 function list_threads( int $user_id, array $args = array() ): array {
 	global $wpdb;
-	$t     = table( 'threads' );
 	$where = array( Access\where( $user_id ) );
 	$view  = (string) ( $args['view'] ?? 'all' );
 	if ( ! empty( $args['channel'] ) ) {
 		$c       = channel_by_slug( (string) $args['channel'] );
-		$where[] = 't.channel_id = ' . ( $c ? (int) $c->id : 0 );
+		$where[] = $wpdb->prepare( 't.channel_id = %d', $c ? (int) $c->id : 0 );
 	}
 	if ( ! empty( $args['target'] ) && preg_match( '/^([a-z0-9_-]+):(\d+)$/', (string) $args['target'], $m ) ) {
 		$where[] = $wpdb->prepare( 't.target_type = %s AND t.target_id = %d', $m[1], (int) $m[2] );
@@ -1269,22 +1278,22 @@ function list_threads( int $user_id, array $args = array() ): array {
 		$where[] = "t.status IN ( 'open', 'doing', 'waiting' )";
 	}
 	if ( 'mine' === $view ) {
-		$where[] = $wpdb->prepare( "t.status IN ( 'open', 'doing', 'waiting' ) AND t.id IN ( SELECT thread_id FROM " . table( 'assignees' ) . ' WHERE user_id = %d )', $user_id );
+		$where[] = $wpdb->prepare( "t.status IN ( 'open', 'doing', 'waiting' ) AND t.id IN ( SELECT thread_id FROM %i WHERE user_id = %d )", table( 'assignees' ), $user_id );
 	}
 	$q = trim( (string) ( $args['q'] ?? '' ) );
 	if ( '' !== $q ) {
 		$like    = '%' . $wpdb->esc_like( $q ) . '%';
-		$where[] = $wpdb->prepare( '( t.title LIKE %s OR t.body LIKE %s OR t.id IN ( SELECT thread_id FROM ' . table( 'messages' ) . " WHERE type = 'message' AND body LIKE %s ) )", $like, $like, $like );
+		$where[] = $wpdb->prepare( "( t.title LIKE %s OR t.body LIKE %s OR t.id IN ( SELECT thread_id FROM %i WHERE type = 'message' AND body LIKE %s ) )", $like, $like, table( 'messages' ), $like );
 	}
 	if ( 'mentions' === $view ) {
-		$where[] = $wpdb->prepare( 't.id IN (SELECT thread_id FROM ' . table( 'mentions' ) . ' WHERE user_id = %d)', $user_id );
+		$where[] = $wpdb->prepare( 't.id IN (SELECT thread_id FROM %i WHERE user_id = %d)', table( 'mentions' ), $user_id );
 	}
 	if ( 'board' === $view ) {
 		// Every task, ticked-off ones only from the last two weeks.
 		$where[] = $wpdb->prepare( "( t.status IN ( 'open', 'doing', 'waiting' ) OR ( t.status = 'done' AND t.resolved_at >= %s ) )", gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'flurfunk_board_done_days', 14 ) * DAY_IN_SECONDS ) );
 	}
 	if ( ! empty( $args['person'] ) ) {
-		$where[] = $wpdb->prepare( 't.id IN ( SELECT thread_id FROM ' . table( 'assignees' ) . ' WHERE user_id = %d )', (int) $args['person'] );
+		$where[] = $wpdb->prepare( 't.id IN ( SELECT thread_id FROM %i WHERE user_id = %d )', table( 'assignees' ), (int) $args['person'] );
 	}
 	if ( ! empty( $args['after'] ) ) {
 		$where[] = $wpdb->prepare( 't.id > %d', (int) $args['after'] ); // Paging through order=ref lists.
@@ -1293,8 +1302,11 @@ function list_threads( int $user_id, array $args = array() ): array {
 		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
 	}
 	$limit = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
+	// One of three fixed sort orders.
 	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' );
-	$rows  = $wpdb->get_results( "SELECT t.* FROM $t t WHERE " . implode( ' AND ', $where ) . " ORDER BY $order LIMIT $limit" ); // phpcs:ignore WordPress.DB
+	$where = implode( ' AND ', $where );
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces, $order is one of the fixed orders above.
+	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.* FROM %i t WHERE {$where} ORDER BY {$order} LIMIT %d", table( 'threads' ), $limit ) );
 	return summarize( $rows, $user_id );
 }
 
@@ -1311,19 +1323,18 @@ function summarize( array $rows, int $user_id ): array {
 		return array();
 	}
 	$ids   = array_map( static fn ( $r ) => (int) $r->id, $rows );
-	$in    = implode( ',', $ids );
 	assignees_for( $ids );
 	$m     = table( 'messages' );
 	$read  = read_state( $ids, $user_id );
 	$atts  = attachments_for( $ids );
 	$ments = mentions_for( $ids );
 	$stats = array();
-	foreach ( $wpdb->get_results( "SELECT thread_id, COUNT(*) n, MAX(id) last_id FROM $m WHERE thread_id IN ($in) AND type = 'message' GROUP BY thread_id" ) as $r ) { // phpcs:ignore WordPress.DB
+	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT thread_id, COUNT(*) n, MAX(id) last_id FROM %i WHERE thread_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND type = 'message' GROUP BY thread_id", array_merge( array( $m ), $ids ) ) ) as $r ) {
 		$stats[ (int) $r->thread_id ] = $r;
 	}
 	$last = array();
 	$ppl  = array();
-	foreach ( $wpdb->get_results( "SELECT thread_id, author_id, created, id FROM $m WHERE thread_id IN ($in) AND type = 'message' ORDER BY id" ) as $r ) { // phpcs:ignore WordPress.DB
+	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT thread_id, author_id, created, id FROM %i WHERE thread_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND type = 'message' ORDER BY id", array_merge( array( $m ), $ids ) ) ) as $r ) {
 		$tid          = (int) $r->thread_id;
 		$last[ $tid ] = $r;
 		$ppl[ $tid ][ (int) $r->author_id ] = true;
@@ -1332,12 +1343,13 @@ function summarize( array $rows, int $user_id ): array {
 	$texts    = array();
 	$last_ids = array_filter( array_map( static fn ( $r ) => (int) $r->last_id, $stats ) );
 	if ( $last_ids ) {
-		foreach ( $wpdb->get_results( 'SELECT id, body FROM ' . $m . ' WHERE id IN (' . implode( ',', $last_ids ) . ')' ) as $r ) { // phpcs:ignore WordPress.DB
+		$last_ids = array_values( $last_ids );
+		foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT id, body FROM %i WHERE id IN (' . implode( ',', array_fill( 0, count( $last_ids ), '%d' ) ) . ')', array_merge( array( $m ), $last_ids ) ) ) as $r ) {
 			$texts[ (int) $r->id ] = mb_substr( \Flurfunk\Notify\readable( (string) $r->body ), 0, 160 );
 		}
 	}
 	$unread = array();
-	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT m.thread_id, COUNT(*) n FROM $m m LEFT JOIN " . table( 'reads' ) . " r ON r.thread_id = m.thread_id AND r.user_id = %d WHERE m.thread_id IN ($in) AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) GROUP BY m.thread_id", $user_id, $user_id ) ) as $r ) { // phpcs:ignore WordPress.DB
+	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT m.thread_id, COUNT(*) n FROM %i m LEFT JOIN %i r ON r.thread_id = m.thread_id AND r.user_id = %d WHERE m.thread_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) GROUP BY m.thread_id", array_merge( array( $m, table( 'reads' ), $user_id ), $ids, array( $user_id ) ) ) ) as $r ) {
 		$unread[ (int) $r->thread_id ] = (int) $r->n;
 	}
 	$out = array();
@@ -1373,24 +1385,22 @@ function counts( int $user_id ): array {
 	if ( is_array( $cached ) ) {
 		return $cached;
 	}
-	$t   = table( 'threads' );
-	$m   = table( 'messages' );
-	$r   = table( 'reads' );
-	$mt  = table( 'mentions' );
-	$sql = $wpdb->prepare(
-		"SELECT t.id, t.channel_id, t.target_type, t.target_id, t.status,
-			( SELECT COUNT(*) FROM $m m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) )
-			+ ( r.user_id IS NULL AND t.author_id <> %d ) AS unread,
-			EXISTS ( SELECT 1 FROM $mt x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned,
-			EXISTS ( SELECT 1 FROM " . table( 'assignees' ) . " a WHERE a.thread_id = t.id AND a.user_id = %d ) AS mine,
-			t.due_date
-		FROM $t t LEFT JOIN $r r ON r.thread_id = t.id AND r.user_id = %d
-		WHERE " . Access\where( $user_id ),
-		$user_id,
-		$user_id,
-		$user_id,
-		$user_id,
-		$user_id
+	$where = Access\where( $user_id );
+	$rows  = $wpdb->get_results( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
+			"SELECT t.id, t.channel_id, t.target_type, t.target_id, t.status, ( SELECT COUNT(*) FROM %i m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) ) + ( r.user_id IS NULL AND t.author_id <> %d ) AS unread, EXISTS ( SELECT 1 FROM %i x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned, EXISTS ( SELECT 1 FROM %i a WHERE a.thread_id = t.id AND a.user_id = %d ) AS mine, t.due_date FROM %i t LEFT JOIN %i r ON r.thread_id = t.id AND r.user_id = %d WHERE {$where}",
+			table( 'messages' ),
+			$user_id,
+			$user_id,
+			table( 'mentions' ),
+			$user_id,
+			table( 'assignees' ),
+			$user_id,
+			table( 'threads' ),
+			table( 'reads' ),
+			$user_id
+		)
 	);
 	$today = wp_date( 'Y-m-d' );
 	$out = array(
@@ -1402,7 +1412,7 @@ function counts( int $user_id ): array {
 		'channels' => array(),
 		'targets'  => array(),
 	);
-	foreach ( $wpdb->get_results( $sql ) as $row ) { // phpcs:ignore WordPress.DB
+	foreach ( $rows as $row ) {
 		$n       = (int) $row->unread;
 		$channel = channel( (int) $row->channel_id );
 		$slug    = $channel ? $channel->slug : '';
@@ -1434,7 +1444,9 @@ function counts( int $user_id ): array {
  */
 function recent_targets( int $user_id, int $limit = 15 ): array {
 	global $wpdb;
-	$rows = $wpdb->get_results( 'SELECT t.target_type, t.target_id, MAX(t.last_activity) a FROM ' . table( 'threads' ) . " t WHERE t.target_type <> '' AND " . Access\where( $user_id ) . ' GROUP BY t.target_type, t.target_id ORDER BY a DESC LIMIT ' . (int) $limit ); // phpcs:ignore WordPress.DB
+	$where = Access\where( $user_id );
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_type, t.target_id, MAX(t.last_activity) a FROM %i t WHERE t.target_type <> '' AND {$where} GROUP BY t.target_type, t.target_id ORDER BY a DESC LIMIT %d", table( 'threads' ), $limit ) );
 	return array_map(
 		static fn ( $r ) => array(
 			'type' => $r->target_type,

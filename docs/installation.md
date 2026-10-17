@@ -186,7 +186,7 @@ wp flurfunk bot-create --name="Build bot" --login=build-bot --default
 
 `--default` makes it the author for `wp flurfunk post` when no `--as` is given. The first
 assistant ever created becomes the default automatically. Without options the account is called
-"Assistent" with the login `flurfunk-assistent`. Running the command again for an existing login
+"Assistant" (in the site's language) with the login `flurfunk-assistent`. Running the command again for an existing login
 only marks that user as an assistant.
 
 ### Give it an application password

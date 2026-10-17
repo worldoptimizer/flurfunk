@@ -102,7 +102,7 @@ add_action(
 		}
 		nocache_headers();
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-			define( 'DONOTCACHEPAGE', true );
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the shared constant page caches look for.
 		}
 		$view = isset( $_GET['view'] ) && is_string( $_GET['view'] ) ? sanitize_text_field( wp_unslash( $_GET['view'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		// auth_redirect() checks the wp-admin cookie, which the front end never receives; the login cookie is enough here.
@@ -116,8 +116,8 @@ add_action(
 				esc_html__( 'Flurfunk', 'flurfunk' ),
 				array(
 					'response'  => 403,
-					'link_url'  => admin_url(),
-					'link_text' => __( 'Go to the dashboard', 'flurfunk' ),
+					'link_url'  => esc_url( admin_url() ),
+					'link_text' => esc_html__( 'Go to the dashboard', 'flurfunk' ),
 				)
 			);
 		}
@@ -133,6 +133,8 @@ add_action(
  */
 function render(): void {
 	Admin\enqueue();
+	// The page behind the app while it loads: the sidebar colour.
+	wp_add_inline_style( 'flurfunk', 'html{background:' . Settings\colour( Settings\get()['sidebar'], Settings\defaults()['sidebar'] ) . '}' );
 	$media = current_user_can( 'upload_files' );
 	if ( $media ) {
 		wp_enqueue_media();
@@ -150,7 +152,6 @@ function render(): void {
 <title><?php echo esc_html( $title ); ?></title>
 	<?php
 	head();
-	printf( '<style>html{background:%s}</style>', esc_attr( Settings\get()['sidebar'] ) );
 	wp_styles()->do_items();
 	wp_scripts()->do_head_items();
 	?>

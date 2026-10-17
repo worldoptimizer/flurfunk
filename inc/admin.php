@@ -58,8 +58,8 @@ function config(): array {
  * The admin menu icon: Flurfunk's mark as an SVG WordPress can recolour (filter flurfunk_menu_icon).
  */
 function menu_icon(): string {
-	$svg = (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-menu.svg' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-	return (string) apply_filters( 'flurfunk_menu_icon', 'data:image/svg+xml;base64,' . base64_encode( $svg ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+	$svg = (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-menu.svg' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a file of this plugin.
+	return (string) apply_filters( 'flurfunk_menu_icon', 'data:image/svg+xml;base64,' . base64_encode( $svg ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- add_menu_page() takes SVG icons as a base64 data URI.
 }
 
 /**
@@ -82,7 +82,8 @@ add_action(
 		}
 		$n     = \Flurfunk\Notify\prefs( get_current_user_id() )['badge'] ? Store\counts( get_current_user_id() )['total'] : 0;
 		$badge = $n ? ' <span class="awaiting-mod count-' . $n . '"><span class="pending-count">' . number_format_i18n( $n ) . '</span></span>' : '';
-		$hook  = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', menu_icon(), 3 );
+		// Just below Comments, where conversations belong.
+		$hook = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', menu_icon(), 26 );
 		add_action( 'load-' . $hook, __NAMESPACE__ . '\\load_page' );
 	}
 );
@@ -159,7 +160,9 @@ function column( string $col, int $post_id ): void {
 		$stats = array();
 		$ids   = array_map( 'intval', wp_list_pluck( (array) ( $wp_query->posts ?? array() ), 'ID' ) );
 		if ( $ids ) {
-			$rows = $wpdb->get_results( 'SELECT t.target_id, COUNT(*) n, SUM(t.status IN ( \'open\', \'doing\', \'waiting\' )) open FROM ' . \Flurfunk\Schema\table( 'threads' ) . " t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', $ids ) . ') AND ' . Access\where( get_current_user_id() ) . ' GROUP BY t.target_id' ); // phpcs:ignore WordPress.DB
+			$where = Access\where( get_current_user_id() );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- $where is made of $wpdb->prepare() pieces (Access\where()); our own table, once per list screen.
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_id, COUNT(*) n, SUM(t.status IN ( 'open', 'doing', 'waiting' )) open FROM %i t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND {$where} GROUP BY t.target_id", array_merge( array( \Flurfunk\Schema\table( 'threads' ) ), $ids ) ) );
 			foreach ( $rows as $r ) {
 				$stats[ (int) $r->target_id ] = $r;
 			}
@@ -195,7 +198,7 @@ add_action(
 			'flurfunk_openstation_icon',
 			array(
 				'title'    => __( 'Flurfunk', 'flurfunk' ),
-				'icon_svg' => (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-app-icon.svg' ), // phpcs:ignore WordPress.WP.AlternativeFunctions
+				'icon_svg' => (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-app-icon.svg' ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a file of this plugin.
 				'url'      => url(),
 				'position' => 50,
 			)

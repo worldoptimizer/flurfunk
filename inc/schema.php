@@ -32,7 +32,8 @@ function install(): void {
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 	$c = $wpdb->get_charset_collate();
 
-	// dbDelta wants two spaces after PRIMARY KEY and one column per line.
+	// dbDelta wants two spaces after PRIMARY KEY and one column per line. It takes plain SQL, no
+	// placeholders; the table names come from table() and contain nothing from outside.
 	dbDelta(
 		'CREATE TABLE ' . table( 'channels' ) . " (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -168,17 +169,23 @@ function upgrade( int $from ): void {
 }
 
 /**
- * Activation: tables plus a first channel so the app is never empty.
+ * Activation: tables plus a first channel so the app is never empty. On a fresh site #general
+ * also shows guests (e.g. guest authors) the threads about their own posts, and a short welcome
+ * thread follows on the next request (inc/data.php). Existing channels stay as they are.
  */
 function activate(): void {
+	global $wpdb;
 	install();
+	$fresh = ! get_option( \Flurfunk\Data\WELCOME_THREAD ) && ! (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', table( 'threads' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- our own table, once on activation.
 	\Flurfunk\Store\ensure_channel(
 		'general',
 		array(
-			'name'  => __( 'General', 'flurfunk' ),
-			'topic' => __( 'Anything that concerns everyone', 'flurfunk' ),
+			'name'          => __( 'General', 'flurfunk' ),
+			'topic'         => __( 'Anything that concerns everyone', 'flurfunk' ),
+			'access_guests' => 'own-posts',
 		)
 	);
+	add_option( \Flurfunk\Data\WELCOME_THREAD, $fresh ? array( 'by' => get_current_user_id() ) : 'done', '', false );
 }
 
 // After an update without re-activation (rsync, Git): bring the tables up to date.
@@ -197,7 +204,7 @@ add_action(
 function drop(): void {
 	global $wpdb;
 	foreach ( array( 'channels', 'threads', 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications', 'push' ) as $t ) {
-		$wpdb->query( 'DROP TABLE IF EXISTS ' . table( $t ) ); // phpcs:ignore WordPress.DB
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', table( $t ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing our own tables on uninstall.
 	}
 	delete_option( OPTION );
 }

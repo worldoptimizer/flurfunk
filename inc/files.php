@@ -52,9 +52,9 @@ function store( string $name, string $data ) {
 	require_once ABSPATH . 'wp-admin/includes/file.php';
 	require_once ABSPATH . 'wp-admin/includes/media.php';
 	require_once ABSPATH . 'wp-admin/includes/image.php';
-	$name = sanitize_file_name( wp_basename( $name ) ) ?: 'datei';
+	$name = sanitize_file_name( wp_basename( $name ) ) ?: 'file';
 	$tmp  = wp_tempnam( $name );
-	file_put_contents( $tmp, $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	file_put_contents( $tmp, $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary file from wp_tempnam() for media_handle_sideload().
 	$dir = static function ( array $u ): array {
 		$sub         = '/' . DIR . '/' . gmdate( 'Y/m' ) . '/' . strtolower( wp_generate_password( 12, false ) );
 		$u['subdir'] = $sub;
@@ -162,15 +162,17 @@ add_action( CRON, __NAMESPACE__ . '\\cleanup' );
  */
 function cleanup( int $older = KEEP ): int {
 	global $wpdb;
-	$ids     = $wpdb->get_col( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND CAST(meta_value AS UNSIGNED) < %d", META, time() - $older ) ); // phpcs:ignore WordPress.DB
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- daily cron job; a numeric comparison on the meta value, and our own tables.
+	$ids     = $wpdb->get_col( $wpdb->prepare( 'SELECT post_id FROM %i WHERE meta_key = %s AND CAST(meta_value AS UNSIGNED) < %d', $wpdb->postmeta, META, time() - $older ) );
 	$removed = 0;
 	foreach ( array_map( 'intval', $ids ) as $id ) {
 		$like = array( '%"id":' . $id . ',%', '%"id":' . $id . '}%' );
-		$used = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'messages' ) . " WHERE type = 'message' AND ( files LIKE %s OR files LIKE %s )", $like[0], $like[1] ) ) // phpcs:ignore WordPress.DB
-			|| $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'threads' ) . ' WHERE files LIKE %s OR files LIKE %s', $like[0], $like[1] ) ); // phpcs:ignore WordPress.DB
+		$used = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE type = 'message' AND ( files LIKE %s OR files LIKE %s )", \Flurfunk\Schema\table( 'messages' ), $like[0], $like[1] ) )
+			|| $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE files LIKE %s OR files LIKE %s', \Flurfunk\Schema\table( 'threads' ), $like[0], $like[1] ) );
 		if ( ! $used && wp_delete_attachment( $id, true ) ) {
 			++$removed;
 		}
 	}
+	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	return $removed;
 }

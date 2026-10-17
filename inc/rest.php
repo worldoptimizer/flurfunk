@@ -222,6 +222,7 @@ function bootstrap(): array {
 		'settings'  => Access\can_manage( $uid ) ? admin_url( 'options-general.php?page=' . \Flurfunk\Settings\PAGE ) : '',
 		'push'      => array(
 			'available' => \Flurfunk\Push\available() && is_ssl(),
+			'ssl'       => is_ssl(), // Without HTTPS browsers offer no push; the app says so.
 			'key'       => \Flurfunk\Push\available() ? ( \Flurfunk\Push\vapid()['public'] ?? '' ) : '',
 			'devices'   => count( \Flurfunk\Push\devices( $uid ) ),
 		),
@@ -404,7 +405,7 @@ function delete_message( WP_REST_Request $r ) {
  */
 function upload( WP_REST_Request $r ) {
 	$disposition = (string) $r->get_header( 'content_disposition' );
-	$name        = preg_match( '/filename\*?=(?:UTF-8\'\')?"?([^";]+)"?/i', $disposition, $m ) ? rawurldecode( $m[1] ) : 'datei';
+	$name        = preg_match( '/filename\*?=(?:UTF-8\'\')?"?([^";]+)"?/i', $disposition, $m ) ? rawurldecode( $m[1] ) : 'file';
 	$id          = \Flurfunk\Files\store( $name, (string) $r->get_body() );
 	return is_wp_error( $id ) ? $id : Store\file_view( Store\files( array( $id ), get_current_user_id(), true )[0] ?? array( 'id' => $id ) );
 }

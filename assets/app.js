@@ -481,6 +481,9 @@
 		return reg;
 	};
 	const pushState = async () => {
+		if ( boot.push && false === boot.push.ssl ) {
+			return 'insecure';
+		}
 		if ( ! pushSupported() || ! boot.push || ! boot.push.available ) {
 			return 'unsupported';
 		}
@@ -1292,7 +1295,9 @@
 			const push = [ [ 'mentions', t( 'Mentions, tasks, replies' ) ], [ 'all', t( 'Everything' ) ], [ 'none', t( 'Nothing' ) ] ];
 			const [ qFrom, qTo ] = p.quiet ? p.quiet.split( '-' ) : [ '22:00', '07:00' ];
 			const ps = ui.pushState || 'unknown';
-			const pushBox = 'unsupported' === ps
+			const pushBox = 'insecure' === ps
+				? '<p class="ff-meta">' + esc( t( 'Push notifications need HTTPS. This site does not use it, so push stays off.' ) ) + '</p>'
+				: 'unsupported' === ps
 				? '<p class="ff-meta">' + esc( t( 'Push notifications are not available in this browser or on this server.' ) ) + '</p>'
 				: 'blocked' === ps
 					? '<p class="ff-meta">' + esc( t( 'Notifications are blocked in this browser. Allow them in the site settings of your browser.' ) ) + '</p>'
@@ -1471,7 +1476,7 @@
 			}
 			feed.innerHTML = ui.list.length
 				? ui.list.map( postHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '' )
-				: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
+				: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
 		};
 		const loadList = async ( append ) => {
 			const v = viewInfo();

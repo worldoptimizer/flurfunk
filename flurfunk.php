@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name:       Flurfunk
+ * Plugin URI:        https://worldoptimizer.github.io/flurfunk/
  * Description:       Team conversations inside WordPress: channels, threads and tasks, attachable to posts, with mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and inside the OpenStation desktop.
  * Version:           0.1.0
  * Requires at least: 6.5
@@ -82,7 +83,7 @@ register_activation_hook( __FILE__, static fn () => delete_option( 'flurfunk_rew
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
-		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) { // phpcs:ignore
+		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) {
 			wp_clear_scheduled_hook( $hook );
 		}
 		// WordPress rebuilds the rules on the next request, without the /flurfunk/ address.
@@ -91,6 +92,8 @@ register_deactivation_hook(
 	}
 );
 
+// The German translation ships with the plugin (languages/); language packs from
+// translate.wordpress.org take precedence once they exist.
 add_action(
 	'init',
 	static function (): void {

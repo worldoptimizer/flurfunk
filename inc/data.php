@@ -1,7 +1,7 @@
 <?php
 /**
  * Everything an administrator needs without WP-CLI: export and import under Settings → Flurfunk,
- * and a short welcome after the first activation.
+ * and a short welcome after the first activation (a notice in wp-admin and a thread in #general).
  *
  * Export: one JSON file (flurfunk/1), or a ZIP with the JSON and every file, for moving to another
  * site. Import: the JSON or that ZIP. Both are the same as `wp flurfunk export|import`.
@@ -15,8 +15,9 @@ use Flurfunk\Transfer;
 
 defined( 'ABSPATH' ) || exit;
 
-const WELCOME = 'flurfunk_welcome';
-const RESULT  = 'flurfunk_import_result_';
+const WELCOME        = 'flurfunk_welcome';
+const WELCOME_THREAD = 'flurfunk_welcome_thread'; // { by: user } until written, then 'done'.
+const RESULT         = 'flurfunk_import_result_';
 
 /**
  * Can this server build and read ZIP bundles?
@@ -45,21 +46,18 @@ function remove_dir( string $dir ): void {
 	}
 	$items = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::CHILD_FIRST );
 	foreach ( $items as $item ) {
-		$item->isDir() ? rmdir( $item->getPathname() ) : wp_delete_file( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$item->isDir() ? rmdir( $item->getPathname() ) : wp_delete_file( $item->getPathname() ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- our own temporary folder.
 	}
-	rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- our own temporary folder.
 }
 
 /**
- * Stop unless an administrator sent this form.
- *
- * @param string $action Nonce action.
+ * Stop unless an administrator is asking (the nonce is checked right after, in each handler).
  */
-function check( string $action ): void {
+function check(): void {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		wp_die( esc_html__( 'You cannot change this.', 'flurfunk' ), 403 );
 	}
-	check_admin_referer( $action );
 }
 
 /*
@@ -68,18 +66,19 @@ function check( string $action ): void {
 add_action(
 	'admin_post_flurfunk_export',
 	static function (): void {
-		check( 'flurfunk_export' );
+		check();
+		check_admin_referer( 'flurfunk_export' );
 		$name  = 'flurfunk-' . sanitize_title( wp_parse_url( home_url(), PHP_URL_HOST ) ) . '-' . gmdate( 'Y-m-d' );
 		$flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 		if ( empty( $_POST['files'] ) || ! zip_available() ) {
 			nocache_headers();
 			header( 'Content-Type: application/json; charset=utf-8' );
 			header( 'Content-Disposition: attachment; filename="' . $name . '.json"' );
-			echo wp_json_encode( Transfer\export(), $flags ); // phpcs:ignore WordPress.Security.EscapeOutput
+			echo wp_json_encode( Transfer\export(), $flags ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a JSON download, not HTML.
 			exit;
 		}
 		$dir = temp_dir();
-		file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), $flags ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), $flags ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- our own temporary folder.
 		$zip_file = $dir . '.zip';
 		$zip      = new \ZipArchive();
 		$zip->open( $zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
@@ -93,7 +92,7 @@ add_action(
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . $name . '.zip"' );
 		header( 'Content-Length: ' . filesize( $zip_file ) );
-		readfile( $zip_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		readfile( $zip_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- streams the ZIP we just built.
 		wp_delete_file( $zip_file );
 		exit;
 	}
@@ -105,9 +104,10 @@ add_action(
 add_action(
 	'admin_post_flurfunk_import',
 	static function (): void {
-		check( 'flurfunk_import' );
+		check();
+		check_admin_referer( 'flurfunk_import' );
 		$back = admin_url( 'options-general.php?page=flurfunk-settings#flurfunk-transfer' );
-		$file = $_FILES['file'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$file = $_FILES['file'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- an upload: only its temporary path and name are used, the content is parsed as JSON.
 		if ( ! $file || UPLOAD_ERR_OK !== (int) $file['error'] || ! is_uploaded_file( $file['tmp_name'] ) ) {
 			set_transient( RESULT . get_current_user_id(), array( 'error' => __( 'Please choose an export file.', 'flurfunk' ) ), 300 );
 			wp_safe_redirect( $back );
@@ -133,10 +133,10 @@ add_action(
 			if ( $ok ) {
 				$zip->extractTo( $dir );
 				$zip->close();
-				$json = is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions
+				$json = is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file in our temporary folder.
 			}
 		} else {
-			$json = (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$json = (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- the uploaded file.
 		}
 		$data   = json_decode( $json, true );
 		$result = is_array( $data ) ? Transfer\import( $data, $dir ) : array( 'error' => 'format' );
@@ -216,9 +216,58 @@ add_action(
 add_action(
 	'admin_post_flurfunk_welcome_done',
 	static function (): void {
-		check( 'flurfunk_welcome_done' );
+		check();
+		check_admin_referer( 'flurfunk_welcome_done' );
 		delete_option( WELCOME );
 		wp_safe_redirect( wp_get_referer() ?: admin_url() );
 		exit;
 	}
 );
+
+/**
+ * The welcome thread in #general: what threads, replies, mentions, tasks, cards and
+ * notifications are. Written once, on the first request after a fresh activation (then the
+ * translations are loaded), in the name of the administrator who activated Flurfunk.
+ */
+function welcome_thread(): void {
+	$w = get_option( WELCOME_THREAD );
+	if ( ! is_array( $w ) ) {
+		return;
+	}
+	update_option( WELCOME_THREAD, 'done', false );
+	$by = (int) ( $w['by'] ?? 0 );
+	if ( ! $by || ! get_userdata( $by ) ) {
+		$admins = get_users(
+			array(
+				'role'   => 'administrator',
+				'number' => 1,
+				'fields' => 'ID',
+			)
+		);
+		$by     = (int) ( $admins[0] ?? 0 );
+	}
+	if ( ! $by ) {
+		return;
+	}
+	$lines = array(
+		__( 'This is a thread: a topic with its replies underneath, so a conversation stays in one place.', 'flurfunk' ),
+		'',
+		'- ' . __( 'Reply below to answer in this thread.', 'flurfunk' ),
+		'- ' . __( 'Type @ and a name to mention someone. They get a notification.', 'flurfunk' ),
+		'- ' . __( 'Any thread can be a task: tick "Task", set a due date and who is responsible. The Board shows all tasks by state, "My tasks" your own.', 'flurfunk' ),
+		'- ' . __( 'Type / in a message to insert a card: a post, or whatever other plugins offer.', 'flurfunk' ),
+		'- ' . __( 'Threads can belong to a post. They then show up in the editor\'s Conversations panel and in the posts list.', 'flurfunk' ),
+		'- ' . __( 'The bell collects your notifications. Under your name at the bottom of the sidebar you choose mail, push and quiet hours.', 'flurfunk' ),
+	);
+	\Flurfunk\Store\create_thread(
+		array(
+			'channel' => 'general',
+			'title'   => __( 'Welcome to Flurfunk', 'flurfunk' ),
+			'body'    => implode( "\n", $lines ),
+			'author'  => $by,
+			'ref_key' => 'flurfunk:welcome',
+		),
+		false
+	);
+}
+add_action( 'init', __NAMESPACE__ . '\\welcome_thread', 20 );

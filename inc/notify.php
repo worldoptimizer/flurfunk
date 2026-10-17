@@ -32,6 +32,9 @@ use function Flurfunk\Schema\table;
 
 defined( 'ABSPATH' ) || exit;
 
+// Flurfunk's own tables have no WordPress API to go through. Every query below is prepared.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 const PREFS    = 'flurfunk_prefs';
 const PERSONAL = array( 'mention', 'assigned', 'due', 'remind', 'waiting', 'reply', 'done', 'channel' );
 const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'remind' => 4, 'waiting' => 3, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
@@ -173,13 +176,13 @@ function event( object $thread, int $message_id ): void {
 	$m      = table( 'messages' );
 	$sender = get_current_user_id();
 	if ( $message_id ) {
-		$type = $wpdb->get_var( $wpdb->prepare( "SELECT type FROM $m WHERE id = %d", $message_id ) ); // phpcs:ignore WordPress.DB
+		$type = $wpdb->get_var( $wpdb->prepare( 'SELECT type FROM %i WHERE id = %d', $m, $message_id ) );
 		if ( 'message' !== $type ) {
 			return;
 		}
 	}
-	$mentioned    = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( 'SELECT user_id FROM ' . table( 'mentions' ) . ' WHERE thread_id = %d AND message_id = %d', $thread->id, $message_id ) ) ); // phpcs:ignore WordPress.DB
-	$participants = $message_id ? array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT author_id FROM $m WHERE thread_id = %d AND type = 'message'", $thread->id ) ) ) : array(); // phpcs:ignore WordPress.DB
+	$mentioned    = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( 'SELECT user_id FROM %i WHERE thread_id = %d AND message_id = %d', table( 'mentions' ), $thread->id, $message_id ) ) );
+	$participants = $message_id ? array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT author_id FROM %i WHERE thread_id = %d AND type = 'message'", $m, $thread->id ) ) ) : array();
 	if ( $message_id ) {
 		$participants[] = (int) $thread->author_id;
 		$participants   = array_merge( $participants, Store\assignees( (int) $thread->id ) );
@@ -262,7 +265,7 @@ function deliver(): void {
 	$q = &queue();
 	foreach ( $q as $key => $n ) {
 		unset( $q[ $key ] );
-		$wpdb->insert( // phpcs:ignore WordPress.DB
+		$wpdb->insert(
 			table( 'notifications' ),
 			array(
 				'user_id'    => $n['uid'],
@@ -284,7 +287,7 @@ function deliver(): void {
 			$sent[] = 'push';
 		}
 		if ( $sent && $id ) {
-			$wpdb->update( table( 'notifications' ), array( 'sent' => implode( ',', $sent ) ), array( 'id' => $id ) ); // phpcs:ignore WordPress.DB
+			$wpdb->update( table( 'notifications' ), array( 'sent' => implode( ',', $sent ) ), array( 'id' => $id ) );
 		}
 	}
 }
@@ -310,7 +313,7 @@ function words( array $n ): array {
 	$who   = $n['actor'] ? Store\person( (int) $n['actor'] )['name'] : \Flurfunk\Settings\name();
 	$topic = '' !== $t->title ? $t->title : wp_trim_words( readable( $t->body ), 8, '…' );
 	$text  = $n['message_id']
-		? (string) $wpdb->get_var( $wpdb->prepare( 'SELECT body FROM ' . table( 'messages' ) . ' WHERE id = %d', $n['message_id'] ) ) // phpcs:ignore WordPress.DB
+		? (string) $wpdb->get_var( $wpdb->prepare( 'SELECT body FROM %i WHERE id = %d', table( 'messages' ), $n['message_id'] ) )
 		: trim( $t->title . "\n\n" . $t->body );
 	$due   = ! empty( $t->due_date ) ? wp_date( get_option( 'date_format' ), (int) strtotime( $t->due_date . ' 12:00' ) ) : '';
 	switch ( $n['kind'] ) {
@@ -439,10 +442,10 @@ add_action( DIGEST, __NAMESPACE__ . '\\send_digests' );
 function remind_due( bool $force = false ): int {
 	global $wpdb;
 	$today = wp_date( 'Y-m-d' );
-	$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT t.*, a.user_id assignee FROM ' . table( 'threads' ) . ' t JOIN ' . table( 'assignees' ) . " a ON a.thread_id = t.id WHERE t.status IN ( 'open', 'doing', 'waiting' ) AND t.due_date IS NOT NULL AND t.due_date <= %s", $today ) ); // phpcs:ignore WordPress.DB
+	$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT t.*, a.user_id assignee FROM %i t JOIN %i a ON a.thread_id = t.id WHERE t.status IN ( 'open', 'doing', 'waiting' ) AND t.due_date IS NOT NULL AND t.due_date <= %s", table( 'threads' ), table( 'assignees' ), $today ) );
 	$n     = 0;
 	foreach ( $rows as $r ) {
-		$done = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . " WHERE kind = 'due' AND thread_id = %d AND user_id = %d AND created >= %s", $r->id, $r->assignee, get_gmt_from_date( $today . ' 00:00:00' ) ) ); // phpcs:ignore WordPress.DB
+		$done = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM %i WHERE kind = 'due' AND thread_id = %d AND user_id = %d AND created >= %s", table( 'notifications' ), $r->id, $r->assignee, get_gmt_from_date( $today . ' 00:00:00' ) ) );
 		if ( ! $done && ( $force || is_past_their_hour( (int) $r->assignee ) ) && Access\can_see( $r, (int) $r->assignee ) ) {
 			dispatch( $r, 0, array( (int) $r->assignee => 'due' ), 0 );
 			++$n;
@@ -468,7 +471,7 @@ function send_digests( bool $force = false ): int {
 		}
 		update_user_meta( $uid, 'flurfunk_digest_day', wp_date( 'Y-m-d' ) );
 		$since = (string) get_user_meta( $uid, 'flurfunk_digest_last', true ) ?: gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
-		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT n.*, t.title, t.body, t.channel_id FROM ' . table( 'notifications' ) . ' n JOIN ' . table( 'threads' ) . ' t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s ORDER BY n.id', $uid, $since ) ); // phpcs:ignore WordPress.DB
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT n.*, t.title, t.body, t.channel_id FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s ORDER BY n.id', table( 'notifications' ), table( 'threads' ), $uid, $since ) );
 		update_user_meta( $uid, 'flurfunk_digest_last', Store\now() );
 		if ( ! $rows ) {
 			continue;
@@ -511,13 +514,10 @@ function send_digests( bool $force = false ): int {
  */
 function list_for( int $user_id, int $before = 0, int $limit = 30 ): array {
 	global $wpdb;
-	$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB
-		$wpdb->prepare(
-			'SELECT n.* FROM ' . table( 'notifications' ) . ' n WHERE n.user_id = %d' . ( $before ? ' AND n.id < ' . (int) $before : '' ) . ' ORDER BY n.id DESC LIMIT %d',
-			$user_id,
-			max( 1, min( 100, $limit ) )
-		)
-	);
+	$limit = max( 1, min( 100, $limit ) );
+	$rows  = $before
+		? $wpdb->get_results( $wpdb->prepare( 'SELECT n.* FROM %i n WHERE n.user_id = %d AND n.id < %d ORDER BY n.id DESC LIMIT %d', table( 'notifications' ), $user_id, $before, $limit ) )
+		: $wpdb->get_results( $wpdb->prepare( 'SELECT n.* FROM %i n WHERE n.user_id = %d ORDER BY n.id DESC LIMIT %d', table( 'notifications' ), $user_id, $limit ) );
 	$out = array();
 	foreach ( $rows as $r ) {
 		$t = Store\thread_row( (int) $r->thread_id );
@@ -560,17 +560,18 @@ function list_for( int $user_id, int $before = 0, int $limit = 30 ): array {
  */
 function mark_read( int $user_id, ?array $ids = null, int $thread_id = 0 ): void {
 	global $wpdb;
-	$where = $wpdb->prepare( 'user_id = %d AND read_at IS NULL', $user_id );
+	$table = table( 'notifications' );
 	if ( $thread_id ) {
-		$where .= $wpdb->prepare( ' AND thread_id = %d', $thread_id );
+		$n = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET read_at = %s WHERE user_id = %d AND read_at IS NULL AND thread_id = %d', $table, Store\now(), $user_id, $thread_id ) );
 	} elseif ( null !== $ids ) {
-		$ids = array_filter( array_map( 'intval', $ids ) );
+		$ids = array_values( array_filter( array_map( 'intval', $ids ) ) );
 		if ( ! $ids ) {
 			return;
 		}
-		$where .= ' AND id IN (' . implode( ',', $ids ) . ')';
+		$n = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET read_at = %s WHERE user_id = %d AND read_at IS NULL AND id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')', array_merge( array( $table, Store\now(), $user_id ), $ids ) ) );
+	} else {
+		$n = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET read_at = %s WHERE user_id = %d AND read_at IS NULL', $table, Store\now(), $user_id ) );
 	}
-	$n = $wpdb->query( 'UPDATE ' . table( 'notifications' ) . " SET read_at = '" . esc_sql( Store\now() ) . "' WHERE $where" ); // phpcs:ignore WordPress.DB
 	if ( $n ) {
 		update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
 	}
@@ -583,7 +584,7 @@ function mark_read( int $user_id, ?array $ids = null, int $thread_id = 0 ): void
  */
 function unread( int $user_id ): int {
 	global $wpdb;
-	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . ' WHERE user_id = %d AND read_at IS NULL', $user_id ) ); // phpcs:ignore WordPress.DB
+	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE user_id = %d AND read_at IS NULL', table( 'notifications' ), $user_id ) );
 }
 
 /**
@@ -596,8 +597,8 @@ function prune(): int {
 	global $wpdb;
 	$days = wp_parse_args( (array) apply_filters( 'flurfunk_notification_days', array( 'read' => 90, 'unread' => 180 ) ), array( 'read' => 90, 'unread' => 180 ) );
 	$days = array_map( static fn ( $d ) => max( 1, (int) $d ), $days );
-	$n    = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NOT NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['read'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
-	$n   += (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['unread'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
+	$n    = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE read_at IS NOT NULL AND created < %s', table( 'notifications' ), gmdate( 'Y-m-d H:i:s', time() - (int) $days['read'] * DAY_IN_SECONDS ) ) );
+	$n   += (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE read_at IS NULL AND created < %s', table( 'notifications' ), gmdate( 'Y-m-d H:i:s', time() - (int) $days['unread'] * DAY_IN_SECONDS ) ) );
 	return $n;
 }
 add_action( 'flurfunk_cleanup_files', __NAMESPACE__ . '\\prune' );
@@ -633,14 +634,14 @@ add_action( REMIND, __NAMESPACE__ . '\\send_reminders' );
 function send_reminders(): int {
 	global $wpdb;
 	$r    = table( 'reads' );
-	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.*, r.user_id reminded, r.remind_at FROM $r r JOIN " . table( 'threads' ) . ' t ON t.id = r.thread_id WHERE r.remind_at IS NOT NULL AND r.remind_at <= %s ORDER BY r.remind_at LIMIT 200', Store\now() ) ); // phpcs:ignore WordPress.DB
+	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT t.*, r.user_id reminded, r.remind_at FROM %i r JOIN %i t ON t.id = r.thread_id WHERE r.remind_at IS NOT NULL AND r.remind_at <= %s ORDER BY r.remind_at LIMIT 200', $r, table( 'threads' ), Store\now() ) );
 	$n    = 0;
 	foreach ( $rows as $row ) {
 		if ( is_quiet( (int) $row->reminded ) ) {
 			continue; // Quiet hours or paused: it fires once they end.
 		}
 		// Claim it first, so two overlapping runs never send the same reminder twice.
-		$claimed = $wpdb->query( $wpdb->prepare( "UPDATE $r SET remind_at = NULL WHERE user_id = %d AND thread_id = %d AND remind_at = %s", $row->reminded, $row->id, $row->remind_at ) ); // phpcs:ignore WordPress.DB
+		$claimed = $wpdb->query( $wpdb->prepare( 'UPDATE %i SET remind_at = NULL WHERE user_id = %d AND thread_id = %d AND remind_at = %s', $r, $row->reminded, $row->id, $row->remind_at ) );
 		if ( $claimed && Access\can_see( $row, (int) $row->reminded ) ) {
 			dispatch( $row, 0, array( (int) $row->reminded => 'remind' ), 0 );
 			++$n;

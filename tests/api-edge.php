@@ -59,6 +59,8 @@ add_filter(
 	2
 );
 add_filter( 'pre_http_request', fn ( $pre, $args, $url ) => str_contains( (string) $url, 'push.invalid' ) ? new WP_Error( 'blocked', 'test' ) : $pre, 10, 3 );
+// The fake push services below count as known ones; evil.example.test stays unknown.
+add_filter( 'flurfunk_push_hosts', fn ( $hosts ) => array_merge( $hosts, array( 'push.example.test', 'push.invalid' ) ) );
 $mails = array(); // Kept for the import check below.
 
 Store\ensure_channel( 'ff-test', array( 'name' => 'Test', 'access_guests' => 'own-posts' ), true );
@@ -586,7 +588,13 @@ $check( 'nonsense does not pause', '' === Flurfunk\Notify\save_prefs( $team2, ar
 $as( $team2 );
 list( $s ) = $req( 'POST', 'me/push', array( 'subscription' => array( 'endpoint' => 'https://push.invalid/x', 'keys' => array( 'p256dh' => 'abc', 'auth' => 'def' ) ) ) );
 $check( 'invalid push subscriptions are refused', 400 === $s, $s );
-if ( Flurfunk\Push\available() ) {
+$unknown = $fake( 'x' );
+$unknown['endpoint'] = 'https://evil.example.test/x';
+list( $s, $r ) = $req( 'POST', 'me/push', array( 'subscription' => $unknown ) );
+$check( 'subscriptions on unknown push services are refused', 400 === $s && 'flurfunk_push_host' === ( $r['code'] ?? '' ), $r );
+$check( 'known push services: Google, Mozilla, Apple, Microsoft', Flurfunk\Push\allowed_endpoint( 'https://fcm.googleapis.com/fcm/send/a:b' ) && Flurfunk\Push\allowed_endpoint( 'https://updates.push.services.mozilla.com/wpush/v2/x' ) && Flurfunk\Push\allowed_endpoint( 'https://web.push.apple.com/x' ) && Flurfunk\Push\allowed_endpoint( 'https://wns2-par02p.notify.windows.com/w/?token=a%2Bb' ) );
+$check( '… but not look-alikes, http or other ports', ! Flurfunk\Push\allowed_endpoint( 'https://fcm.googleapis.com.evil.test/x' ) && ! Flurfunk\Push\allowed_endpoint( 'https://notapush.apple.com/x' ) && ! Flurfunk\Push\allowed_endpoint( 'http://fcm.googleapis.com/x' ) && ! Flurfunk\Push\allowed_endpoint( 'https://fcm.googleapis.com:8443/x' ) );
+if ( Flurfunk\Push\available() && Flurfunk\Push\new_key() ) { // Some PHP builds (e.g. Playground) cannot make EC keys.
 	$k = Flurfunk\Push\new_key();
 	list( $s, $r ) = $req( 'POST', 'me/push', array( 'subscription' => array( 'endpoint' => 'https://push.invalid/ff-test', 'keys' => array( 'p256dh' => Flurfunk\Push\b64( Flurfunk\Push\raw_public( $k ) ), 'auth' => Flurfunk\Push\b64( random_bytes( 16 ) ) ) ) ) );
 	$check( 'a valid subscription is stored', 200 === $s && $r['devices'] >= 1, $r );

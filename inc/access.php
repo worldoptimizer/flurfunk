@@ -55,11 +55,11 @@ function is_bot( int $user_id ): bool {
 /**
  * Create (or mark) an assistant account: a subscriber without editing rights.
  *
- * @param string $name  Display name.
+ * @param string $name  Display name (empty: "Assistant", translated).
  * @param string $login Login name.
  * @return int|\WP_Error User ID.
  */
-function create_bot( string $name = 'Assistent', string $login = 'flurfunk-assistent' ) {
+function create_bot( string $name = '', string $login = 'flurfunk-assistent' ) {
 	$login = sanitize_user( $login, true ) ?: 'flurfunk-assistent';
 	$user  = get_user_by( 'login', $login );
 	$id    = $user ? $user->ID : wp_insert_user(
@@ -67,7 +67,7 @@ function create_bot( string $name = 'Assistent', string $login = 'flurfunk-assis
 			'user_login'   => $login,
 			'user_pass'    => wp_generate_password( 40 ),
 			'user_email'   => $login . '@invalid.invalid',
-			'display_name' => sanitize_text_field( $name ) ?: 'Assistent',
+			'display_name' => sanitize_text_field( $name ) ?: __( 'Assistant', 'flurfunk' ),
 			'role'         => 'subscriber',
 		)
 	);
@@ -129,15 +129,15 @@ function level( object $channel, int $user_id ): string {
 function owned_post_ids( int $user_id ): array {
 	static $cache = array();
 	if ( ! isset( $cache[ $user_id ] ) ) {
+		// get_posts() leaves out filters by default, so other plugins can't hide posts here.
 		$ids = get_posts(
 			array(
-				'author'           => $user_id,
-				'post_type'        => 'any',
-				'post_status'      => 'any',
-				'fields'           => 'ids',
-				'posts_per_page'   => -1,
-				'no_found_rows'    => true,
-				'suppress_filters' => true,
+				'author'         => $user_id,
+				'post_type'      => 'any',
+				'post_status'    => 'any',
+				'fields'         => 'ids',
+				'posts_per_page' => -1,
+				'no_found_rows'  => true,
 			)
 		);
 		$cache[ $user_id ] = array_values( array_unique( array_map( 'intval', (array) apply_filters( 'flurfunk_owned_post_ids', $ids, $user_id ) ) ) );
@@ -198,6 +198,7 @@ function can_target( string $type, int $id, int $user_id ): bool {
  * @param int $user_id User.
  */
 function where( int $user_id ): string {
+	global $wpdb;
 	$all = array();
 	$own = array();
 	foreach ( \Flurfunk\Store\channels() as $c ) {
@@ -209,12 +210,13 @@ function where( int $user_id ): string {
 		}
 	}
 	$parts = array();
+	// Each piece is prepared on its own; callers put the result into their own prepared query.
 	if ( $all ) {
-		$parts[] = 't.channel_id IN (' . implode( ',', $all ) . ')';
+		$parts[] = $wpdb->prepare( 't.channel_id IN (' . implode( ',', array_fill( 0, count( $all ), '%d' ) ) . ')', $all );
 	}
 	$posts = $own ? owned_post_ids( $user_id ) : array();
 	if ( $posts ) {
-		$parts[] = '(t.channel_id IN (' . implode( ',', $own ) . ") AND t.target_type = 'post' AND t.target_id IN (" . implode( ',', $posts ) . '))';
+		$parts[] = $wpdb->prepare( '(t.channel_id IN (' . implode( ',', array_fill( 0, count( $own ), '%d' ) ) . ") AND t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $posts ), '%d' ) ) . '))', array_merge( $own, $posts ) );
 	}
 	return $parts ? '(' . implode( ' OR ', $parts ) . ')' : '0=1';
 }

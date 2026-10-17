@@ -132,7 +132,27 @@ function post_types(): array {
 add_action(
 	'admin_menu',
 	static function (): void {
-		add_options_page( __( 'Flurfunk', 'flurfunk' ), __( 'Flurfunk', 'flurfunk' ), 'manage_options', PAGE, __NAMESPACE__ . '\\render' );
+		$hook = add_options_page( __( 'Flurfunk', 'flurfunk' ), __( 'Flurfunk', 'flurfunk' ), 'manage_options', PAGE, __NAMESPACE__ . '\\render' );
+		add_action( 'load-' . $hook, static fn () => add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue' ) );
+	}
+);
+
+/**
+ * Scripts of the settings page only: the media library for the logo picker.
+ */
+function enqueue(): void {
+	wp_enqueue_media();
+	wp_enqueue_script( 'flurfunk-settings', FLURFUNK_URL . 'assets/settings.js', array( 'media-editor' ), (string) filemtime( FLURFUNK_DIR . 'assets/settings.js' ), true );
+}
+
+// "Settings" next to Deactivate in the plugins list.
+add_filter(
+	'plugin_action_links_' . plugin_basename( FLURFUNK_FILE ),
+	static function ( array $links ): array {
+		if ( current_user_can( 'manage_options' ) ) {
+			array_unshift( $links, '<a href="' . esc_url( admin_url( 'options-general.php?page=' . PAGE ) ) . '">' . esc_html__( 'Settings', 'flurfunk' ) . '</a>' );
+		}
+		return $links;
 	}
 );
 
@@ -168,7 +188,6 @@ function render(): void {
 	if ( ! Access\can_manage() ) {
 		return;
 	}
-	wp_enqueue_media();
 	$s      = get();
 	$levels = array(
 		'all'       => __( 'Everything', 'flurfunk' ),
@@ -273,6 +292,7 @@ function render(): void {
 					</tr>
 				</tbody>
 			</table>
+			<?php assistants_help(); ?>
 
 			<h2><?php esc_html_e( 'Posts', 'flurfunk' ); ?></h2>
 			<table class="form-table" role="presentation">
@@ -303,22 +323,33 @@ function render(): void {
 		</form>
 		<?php \Flurfunk\Data\render_section(); ?>
 	</div>
-	<script>
-	( function () {
-		var pick = document.getElementById( 'ff-logo-pick' ), clear = document.getElementById( 'ff-logo-clear' );
-		var input = document.getElementById( 'ff-logo' ), img = document.getElementById( 'ff-logo-preview' ), frame;
-		pick.addEventListener( 'click', function () {
-			frame = frame || wp.media( { library: { type: 'image' }, multiple: false } );
-			frame.off( 'select' ).on( 'select', function () {
-				var a = frame.state().get( 'selection' ).first().toJSON();
-				input.value = a.id;
-				img.src = ( a.sizes && a.sizes.thumbnail ? a.sizes.thumbnail.url : a.url );
-				img.style.display = '';
-			} );
-			frame.open();
-		} );
-		clear.addEventListener( 'click', function () { input.value = 0; img.style.display = 'none'; } );
-	} )();
-	</script>
+	<?php
+}
+
+/**
+ * How an agent or script posts as an assistant: application password, then one request.
+ */
+function assistants_help(): void {
+	$bot  = (int) get_option( 'flurfunk_bot_default' );
+	$user = $bot && get_userdata( $bot ) ? get_userdata( $bot )->user_login : 'flurfunk-assistent';
+	$curl = "curl -X POST " . rest_url( 'flurfunk/v1/threads' ) . " \\\n  -u '" . $user . ":xxxx xxxx xxxx xxxx xxxx xxxx' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"channel\":\"general\",\"title\":\"Nightly report\",\"body\":\"All checks passed. <@1> please have a look.\"}'";
+	?>
+	<details style="max-width:46rem;margin-top:12px">
+		<summary><?php esc_html_e( 'How an agent posts as an assistant', 'flurfunk' ); ?></summary>
+		<ol>
+			<li><?php esc_html_e( 'Create an assistant above, then open "Application passwords" next to it and add one. WordPress offers application passwords only on sites with HTTPS.', 'flurfunk' ); ?></li>
+			<li><?php esc_html_e( 'The agent sends the login name and that password with every request to the REST API, for example to start a thread:', 'flurfunk' ); ?></li>
+		</ol>
+		<pre style="white-space:pre-wrap;background:#f6f7f7;padding:8px 12px"><code><?php echo esc_html( $curl ); ?></code></pre>
+		<p class="description">
+			<?php
+			printf(
+				/* translators: %s: link to the developer documentation */
+				esc_html__( 'Fields: channel (short name, required), title, body (mentions as <@user ID>), task, due, assignees, target {type, id}, ref_key. Replies go to /threads/<thread ID>/messages with a body. More in the %s.', 'flurfunk' ),
+				'<a href="https://worldoptimizer.github.io/flurfunk/developers.html#rest-api">' . esc_html__( 'developer documentation', 'flurfunk' ) . '</a>'
+			);
+			?>
+		</p>
+	</details>
 	<?php
 }
