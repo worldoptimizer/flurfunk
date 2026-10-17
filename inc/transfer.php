@@ -147,7 +147,9 @@ function import( array $data, string $bundle = '' ): array {
 	$count  = array( 'threads' => 0, 'messages' => 0, 'skipped' => 0, 'files' => 0 );
 	foreach ( (array) ( $data['threads'] ?? array() ) as $t ) {
 		$ref = (string) ( $t['ref_key'] ?? '' ) ?: 'import:' . substr( $source, 0, 8 ) . ':' . (int) $t['id'];
-		if ( Store\thread_by_ref( $ref ) ) {
+		// The same site importing its own export (a restore): threads that still exist stay as they are.
+		$same = $source === md5( home_url( '/' ) ) ? Store\thread_row( (int) $t['id'] ) : null;
+		if ( Store\thread_by_ref( $ref ) || ( $same && Store\iso( $same->created ) === ( $t['created'] ?? '' ) ) ) {
 			++$count['skipped'];
 			continue;
 		}

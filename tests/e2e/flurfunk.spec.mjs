@@ -615,7 +615,7 @@ test.describe( 'team', () => {
 		expect( data.threads.length ).toBeGreaterThan( 0 );
 		await page.locator( '#flurfunk-import-file' ).setInputFiles( path );
 		await page.locator( 'form:has(input[name=action][value=flurfunk_import]) [type=submit]' ).click();
-		await expect( page.locator( '.notice-success' ) ).toContainText( String( data.threads.length ) ); // All skipped: they are already here.
+		await expect( page.locator( '.notice-success', { hasText: /Imported|Importiert/ } ) ).toContainText( /: 0 /, { timeout: 60_000 } ); // Nothing new: all of it is here already.
 	} );
 
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {

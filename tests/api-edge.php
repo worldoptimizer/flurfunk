@@ -514,6 +514,10 @@ $first = Store\list_threads( $team, array( 'channel' => 'ff-test', 'order' => 'r
 $next  = Store\list_threads( $team, array( 'channel' => 'ff-test', 'order' => 'ref', 'limit' => 2, 'after' => end( $first )['id'] ) );
 $check( 'lists in creation order can be paged with "after"', $next && (int) $next[0]['id'] > (int) end( $first )['id'] );
 
+$before = (int) $GLOBALS['wpdb']->get_var( "SELECT COUNT(*) FROM {$GLOBALS['wpdb']->prefix}flurfunk_threads" );
+$again  = Flurfunk\Transfer\import( json_decode( (string) wp_json_encode( Flurfunk\Transfer\export() ), true ) );
+$check( 'importing the own export again duplicates nothing', 0 === $again['threads'] && $before === (int) $GLOBALS['wpdb']->get_var( "SELECT COUNT(*) FROM {$GLOBALS['wpdb']->prefix}flurfunk_threads" ), $again );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );
