@@ -1,137 +1,165 @@
 {%- assign h = '/assets/hero/' | relative_url -%}
 <div class="hero-demo">
-  <p class="visually-hidden">Illustration: the Flurfunk app in wp-admin. A sidebar with channels, a thread list in the editorial channel, and an open thread where teammates reply, mention each other, share photos and move a new task across the board.</p>
-  <div class="app" aria-hidden="true" data-demo>
-    <div class="app-bar">
-      <span class="app-dots"><i></i><i></i><i></i></span>
-      <span class="app-url">example.com/wp-admin/admin.php?page=flurfunk</span>
+  <p class="visually-hidden">Illustration: Flurfunk in full screen. On the left the sidebar with views, channels and posts; in the middle the threads of the Editorial channel; on the right an open task thread with a photo gallery. While you watch, Jonas Weber replies, the reply count goes up, a photo opens in the lightbox and Ana Klein ticks the task off.</p>
+  <div class="ua" aria-hidden="true" data-demo="hero">
+    <div class="ua-bar">
+      <span class="ua-dots"><i></i><i></i><i></i></span>
+      <span class="ua-url">example.com/flurfunk/</span>
     </div>
-    <div class="app-body">
+    <div class="ua-body">
 
-      <aside class="app-side">
-        <div class="side-ws">
-          <img class="ws-logo" src="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" alt="" width="64" height="64">
-          <b>Flurfunk</b>
-          <span class="side-bell">
+      <aside class="ua-side">
+        <div class="ua-ws">
+          <b>Northline</b>
+          <span class="ua-bell">
             <svg viewBox="0 0 16 16"><path d="M8 1.8a4.2 4.2 0 0 0-4.2 4.2v2.6L2.6 10.8v.9h10.8v-.9l-1.2-2.2V6A4.2 4.2 0 0 0 8 1.8zM6.4 12.6a1.6 1.6 0 0 0 3.2 0z"/></svg>
-            <i class="bell-dot"></i>
+            <em class="swap ua-bell-n"><i class="v0">3</i><i class="v2">4</i></em>
           </span>
         </div>
-        <ul class="side-nav">
-          <li><svg viewBox="0 0 16 16"><path d="M2 3h12v1.6H2zm0 4.2h12v1.6H2zm0 4.2h8v1.6H2z"/></svg>All threads</li>
-          <li><svg viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 3.6 11.9l-.8-1.3A5 5 0 1 1 13 8v.7c0 .8-.5 1.3-1.1 1.3s-1.1-.5-1.1-1.3V5h-1.4v.6A3 3 0 1 0 10 10.3a2.5 2.5 0 0 0 4.5-1.6V8A6.5 6.5 0 0 0 8 1.5zm0 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>Mentions<span class="side-badge badge-mention">1</span></li>
-          <li><svg viewBox="0 0 16 16"><path d="M6.6 11.4 3.2 8l1.1-1.1 2.3 2.3 5.1-5.1 1.1 1.1z"/></svg>My tasks</li>
-          <li><svg viewBox="0 0 16 16"><path d="M2 2.5h3.4v11H2zm4.3 0h3.4v7H6.3zm4.3 0H14v9h-3.4z"/></svg>Board</li>
+        <ul class="ua-nav">
+          <li><span class="ua-ico">&#8801;</span>All threads</li>
+          <li class="is-bold"><span class="ua-ico">@</span>Mentions<em class="swap ua-n"><i class="v0">1</i><i class="v2">2</i></em></li>
+          <li class="is-bold"><span class="ua-ico">&#10003;</span>My tasks<em class="swap ua-n is-red"><i class="v0">2</i><i class="v2">1</i></em></li>
+          <li><span class="ua-ico">&#9633;</span>Open tasks</li>
+          <li><span class="ua-ico">&#9632;</span>Board</li>
         </ul>
-        <p class="side-label">Channels</p>
-        <ul class="side-ch">
-          <li><span class="hash">#</span>general</li>
-          <li class="is-active"><span class="hash">#</span>editorial</li>
-          <li class="ch-tech"><span class="hash">#</span>tech<span class="side-badge badge-tech">3</span></li>
+        <p class="ua-label">Channels</p>
+        <ul class="ua-nav">
+          <li class="is-bold"><span class="ua-ico">#</span>General<em class="ua-n">1</em></li>
+          <li class="is-active"><span class="ua-ico">#</span>Editorial</li>
+          <li><span class="ua-ico">#</span>Photo</li>
+          <li><span class="ua-ico">#</span>Tech</li>
+          <li class="is-bold"><span class="ua-ico">#</span>Authors<em class="ua-n">2</em></li>
         </ul>
-        <div class="side-user">
-          <span class="me"><img src="{{ h }}avatar-mia.webp" alt="" width="96" height="96"><i class="presence"></i></span>
-          <span class="side-user-name"><b>Mia Park</b><small>Editor</small></span>
+        <p class="ua-label">Posts</p>
+        <ul class="ua-nav">
+          <li><span class="ua-ico">&#9632;</span>Autumn issue: cover story</li>
+          <li class="is-bold"><span class="ua-ico">&#9632;</span>Newsletter: November<em class="ua-n">1</em></li>
+          <li class="is-bold"><span class="ua-ico">&#9632;</span>Interview with a light&hellip;<em class="ua-n">1</em></li>
+        </ul>
+        <div class="ua-me">
+          <img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+          <span><b>Ana Klein</b><small>Editor-in-chief</small></span>
+          <span class="ua-sun">&#9788;</span>
         </div>
       </aside>
 
-      <section class="app-main">
-        <header class="main-head">
-          <span class="main-title"><span class="hash">#</span>editorial</span>
-          <span class="main-people">
-            <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
-            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
-            <img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96">
-            <img class="av" src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
-            <img class="av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96">
-          </span>
+      <section class="ua-list">
+        <header class="ua-head">
+          <b class="ua-title">#Editorial</b>
+          <span class="ua-topic">Planning, copy and the issue schedule</span>
+          <span class="ua-tools"><span class="ua-select">Notify: as usual</span><span class="ua-search">Search &hellip;</span></span>
         </header>
-        <ol class="tlist">
-          <li class="trow is-selected">
-            <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
-            <span class="trow-body">
-              <span class="trow-top"><b>Autumn issue: cover story</b><time>9:12</time></span>
-              <span class="trow-text">Draft is in. @Mia Park can you check the intro…</span>
-              <span class="trow-meta">
-                <span class="swap replies"><span class="v0">No replies yet</span><span class="v1">1 reply</span><span class="v2">2 replies</span></span>
-              </span>
-            </span>
-          </li>
-          <li class="trow">
-            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
-            <span class="trow-body">
-              <span class="trow-top"><b>Photo rights for the interview</b><time>8:47</time></span>
-              <span class="trow-text">Agency confirmed print and web.</span>
-              <span class="trow-meta"><span class="meta-files">2 files</span><span class="meta-sep">·</span>4 replies</span>
-            </span>
-            <img class="trow-thumb" src="{{ h }}photo-newsroom-160.webp" alt="" width="160" height="107">
-          </li>
-          <li class="trow trow-new">
-            <img class="av" src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
-            <span class="trow-body">
-              <span class="trow-top"><b>Newsletter goes out Thursday</b><time>9:20</time></span>
-              <span class="trow-text">Task for Tom Berger and Lea Okafor · due Thu</span>
-              <span class="trow-meta">
-                <span class="swap chip"><span class="v0 chip-open">Open</span><span class="v1 chip-doing">In progress</span><span class="v2 chip-done">Done</span></span>
-              </span>
-            </span>
-          </li>
-        </ol>
-        <div class="board">
-          <div class="board-col"><span>Open</span></div>
-          <div class="board-col"><span>In progress</span></div>
-          <div class="board-col"><span>Done</span></div>
-          <div class="board-card">
-            <span>Newsletter</span>
-            <span class="card-meta">
-              <span class="card-people">
-                <img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
-                <img src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
-              </span>
-              <small>Thu</small>
-            </span>
+
+        <article class="ua-card is-sel">
+          <img class="ua-av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+          <div class="ua-card-body">
+            <p class="ua-who"><b>Ana Klein</b> yesterday, 9:33 AM <span class="swap ua-pill"><i class="v0">in progress</i><i class="v2 is-done">done</i></span></p>
+            <p class="ua-card-title">Cover photos: first selection</p>
+            <p class="ua-text">We need the opener for the cover story by Monday, 19 October. <span class="ua-at">@Tom Berger</span> could you share a first selection from the market shoot? An&hellip;</p>
+            <p class="ua-chips"><span class="ua-chip">&#9636; Autumn issue: cover story</span></p>
+            <p class="ua-chips"><span class="ua-due">due Mon, Oct 19</span><img class="ua-av-s" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"></p>
+            <p class="ua-replies">
+              <span class="ua-chev">&rsaquo;</span>
+              <span class="ua-stack"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"><img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96"><img class="ua-stack-new" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96"></span>
+              <span class="swap"><b class="v0">4 replies</b><b class="v2">5 replies</b></span>
+              <span class="swap ua-last"><i class="v0">last: Tom Berger, yesterday, 9:19 PM</i><i class="v2">last: Jonas Weber, today, 1:23 PM</i></span>
+            </p>
           </div>
-        </div>
-        <div class="toast">
-          <img class="av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96">
-          <span><b>Jonas Weber</b> in #tech<br>Staging is updated, please test the new archive.</span>
-        </div>
+        </article>
+
+        <article class="ua-card">
+          <img class="ua-av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+          <div class="ua-card-body">
+            <p class="ua-who"><b>Ana Klein</b> today, 8:23 AM</p>
+            <p class="ua-card-title">Cover story draft is in</p>
+            <p class="ua-text">The draft of the cover story is ready for a first read. <span class="ua-at">@Tom Berger</span> <span class="ua-at">@Jonas Weber</span> comments welcome, especially on the second half.</p>
+            <div class="ua-post">
+              <p class="ua-post-kind"><b>Post</b> /post <u>Update</u></p>
+              <div class="ua-post-row">
+                <img src="{{ h }}photo-autumn-market-240.webp" alt="" width="240" height="160">
+                <span><b>Autumn issue: cover story</b><small>Draft &middot; Ana Klein</small><u>Conversations about this</u></span>
+              </div>
+            </div>
+            <p class="ua-replies">
+              <span class="ua-chev">&rsaquo;</span>
+              <span class="ua-stack"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"><img src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96"></span>
+              <b>2 replies</b><span class="ua-last">last: Tom Berger, today, 11:21 AM</span>
+            </p>
+          </div>
+        </article>
+
+        <article class="ua-card">
+          <img class="ua-av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+          <div class="ua-card-body">
+            <p class="ua-who"><b>Ana Klein</b> Oct 13, 1:18 PM</p>
+            <p class="ua-card-title">Autumn issue: schedule</p>
+            <p class="ua-text">Here is the plan for the autumn issue: copy deadline Friday, 23 October &middot; layout Monday to Wednesday &middot; print&hellip;</p>
+          </div>
+        </article>
+
+        <div class="ua-compose">New thread in #Editorial &hellip; (@name, / for cards)</div>
       </section>
 
-      <section class="app-thread">
-        <header class="thread-head"><b>Autumn issue: cover story</b><small># editorial · task due Fri</small></header>
-        <div class="msg">
-          <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
-          <div><p class="msg-who"><b>Ana Klein</b><time>9:12</time></p>
-          <p>Draft is in. <span class="mention">@Mia Park</span> can you check the intro by Friday?</p></div>
+      <section class="ua-pane">
+        <header class="ua-pane-head">
+          <p><b>Thread</b> #Editorial <span class="ua-x">&times;</span></p>
+          <p class="ua-follow"><u>Follow</u> <u>Mute</u> <span>Remind me &hellip;</span></p>
+        </header>
+
+        <div class="ua-msg ua-root">
+          <img class="ua-av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+          <div>
+            <p class="ua-who"><b>Ana Klein</b> yesterday, 9:33 AM</p>
+            <p class="ua-card-title">Cover photos: first selection</p>
+            <p><span class="ua-at">@Tom Berger</span> could you share a first selection from the market shoot by Monday?</p>
+          </div>
         </div>
-        <div class="slot">
-          <div class="typing typing-1"><img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96"><span class="dots"><i></i><i></i><i></i></span></div>
-          <div class="msg reply-1">
-            <img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96">
-            <div><p class="msg-who"><b>Mia Park</b><time>9:15</time></p>
-            <p>On it. Two photo options for the opener:</p>
-            <span class="thumbs">
-              <img class="thumb-market" src="{{ h }}photo-autumn-market-240.webp" alt="" width="240" height="160">
+
+        <div class="ua-task">
+          <p class="ua-task-row"><span class="ua-k">Responsible</span><img class="ua-av-s" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"><b>Tom Berger</b> <u>Change</u> <span class="ua-k">Due</span><span class="ua-date">10/19/2026</span></p>
+          <p class="ua-task-row ua-task-state">
+            <span class="ua-select swap"><i class="v0">In progress</i><i class="v2">Done</i></span>
+            <span class="ua-check"><i></i>Done</span>
+            <u>Edit</u>
+          </p>
+        </div>
+
+        <p class="ua-sys">&#8635; Tom Berger is working on this &middot; yesterday, 12:34 PM</p>
+
+        <div class="ua-msg">
+          <img class="ua-av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
+          <div>
+            <p class="ua-who"><b>Tom Berger</b> Photo editor &middot; yesterday, 5:33 PM</p>
+            <p>First selection: the harbour market, the forest walk and our newsroom. The market shot is my favourite.</p>
+            <p class="ua-gallery">
+              <img class="ua-pick" src="{{ h }}photo-autumn-market-240.webp" alt="" width="240" height="160">
               <img src="{{ h }}photo-autumn-forest-240.webp" alt="" width="240" height="160">
-            </span></div>
+              <img src="{{ h }}photo-newsroom-160.webp" alt="" width="160" height="107">
+            </p>
           </div>
         </div>
-        <div class="slot">
-          <div class="typing typing-2"><img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"><span class="dots"><i></i><i></i><i></i></span></div>
-          <div class="msg reply-2">
-            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
-            <div><p class="msg-who"><b>Tom Berger</b><time>9:17</time></p>
-            <p>The market one! Rights for both are cleared.</p></div>
+
+        <div class="ua-slot">
+          <div class="ua-typing"><img class="ua-av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96"><span class="ua-dots3"><i></i><i></i><i></i></span><small>Jonas Weber is writing &hellip;</small></div>
+          <div class="ua-msg ua-new">
+            <img class="ua-av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96">
+            <div>
+              <p class="ua-who"><b>Jonas Weber</b> <span class="ua-online"></span>Developer &middot; today, 1:23 PM</p>
+              <p><span class="ua-at">@Ana Klein</span> the cropped market shot is live in the cover preview on staging.</p>
+            </div>
           </div>
         </div>
-        <div class="composer">Reply to the thread…</div>
+
+        <p class="ua-sys ua-sys-done">&#10003; Ana Klein ticked this off &middot; just now</p>
+
+        <div class="ua-compose">Reply &hellip;</div>
       </section>
 
-      <div class="lightbox">
+      <div class="ua-lightbox">
         <figure>
-          <img src="{{ h }}photo-autumn-market-640.webp" alt="" width="640" height="427">
-          <figcaption>autumn-market.jpg <span>1 of 2</span></figcaption>
+          <img src="{{ h }}photo-autumn-market-640.webp" alt="" width="640" height="427" loading="lazy">
+          <figcaption><span>market-cider-stall.jpg</span><span>1 / 3</span></figcaption>
         </figure>
       </div>
 

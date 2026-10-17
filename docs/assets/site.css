@@ -2,59 +2,60 @@
    Plain CSS, no build step. The home page adds home.css. */
 
 /* ---------- Tokens ----------
-   Dark is the default look. Light applies when the system asks for it
-   (unless the visitor picked dark) or when the visitor picked light.
-   The page is neutral; the brand yellow is the accent. Teal belongs to the
-   app itself and only appears inside the app mocks (see home.css). */
+   Light is the default look. Dark applies only when the visitor picks it
+   with the toggle (remembered in localStorage).
+   Warm palette around the brand yellow: honey, brown accent, espresso.
+   The dark values sit on :root; the light ones override them by default. */
 :root {
   color-scheme: dark;
 
   --yellow: #ffc93c;
+  --honey: #e0a526;
+  --brown: #8b5a1b;
+  --espresso: #231b12;
   --ink: #1d1d1f;
-  --paper: #f6f3ee;
-  --teal: #0f6e66;
-  --teal-deep: #0a4a45;
-  --amber: #e8a33d;
+  --paper: #f7f2ea;
+  --amber: #e0a526;
 
-  --bg: #121415;
-  --bg-band: #161819;
-  --surface: #1a1d1e;
-  --surface-2: #212526;
-  --tint: #22272a;
-  --text: #ece9e4;
-  --muted: #a7adab;
-  --border: #2b3031;
-  --border-strong: #3d4446;
+  --bg: #15120e;
+  --bg-band: #1a1611;
+  --surface: #1f1a14;
+  --surface-2: #261f18;
+  --tint: #2d251c;
+  --text: #f1ebe2;
+  --muted: #b5a894;
+  --border: #31291f;
+  --border-strong: #4a3e2f;
 
   --accent: var(--yellow);
   --accent-hover: #ffd666;
   --on-accent: var(--ink);
-  --accent-soft: rgb(255 201 60 / 13%);
-  --link: #ffd25e;
-  --link-deco: rgb(255 201 60 / 45%);
-  --link-hover: #ffe08f;
+  --accent-soft: rgb(255 201 60 / 14%);
+  --link: #f2c46d;
+  --link-deco: rgb(242 196 109 / 45%);
+  --link-hover: #ffe0a3;
   --focus: var(--yellow);
 
   --logo-line: var(--yellow);
   --logo-outline: transparent;
 
-  --code-bg: #0e1011;
-  --code-text: #dcd8cf;
-  --inline-code-bg: #252a2b;
-  --inline-code-text: #ece6da;
+  --code-bg: #100d0a;
+  --code-text: #e6dccd;
+  --inline-code-bg: #2a231b;
+  --inline-code-text: #f1e6d4;
 
-  --hl-comment: #8b9491;
-  --hl-keyword: #7cc7e0;
-  --hl-string: #e8c06f;
+  --hl-comment: #9d907e;
+  --hl-keyword: #f2a65a;
+  --hl-string: #d9c36a;
   --hl-number: #f19a7a;
-  --hl-name: #a6d8e6;
-  --hl-func: #c3a6f0;
+  --hl-name: #f2c46d;
+  --hl-func: #d6b0f0;
   --hl-var: #ef9bbd;
-  --hl-tag: #7cc7e0;
+  --hl-tag: #f2a65a;
   --hl-attr: #e8c17a;
-  --hl-op: #a9b1af;
+  --hl-op: #b8ab99;
   --hl-del-bg: #4a2427;
-  --hl-ins-bg: #1d3d2c;
+  --hl-ins-bg: #2c3a1d;
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
@@ -69,83 +70,44 @@
   --header-h: 3.9rem;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-    --bg: #f6f3ee;
-    --bg-band: #f0ece5;
-    --surface: #fffdf9;
-    --surface-2: #f1ede6;
-    --tint: #ebe5db;
-    --text: #1f2326;
-    --muted: #595f5d;
-    --border: #ddd5c8;
-    --border-strong: #c7bdae;
-    --accent-hover: #ffbf1f;
-    --accent-soft: rgb(255 201 60 / 26%);
-    --link: #1d1d1f;
-    --link-deco: #d9a000;
-    --link-hover: #000000;
-    --focus: #1d1d1f;
-    --logo-line: var(--ink);
-    --logo-outline: var(--ink);
-    --code-bg: #f0ebe3;
-    --code-text: #24292b;
-    --inline-code-bg: #ebe5db;
-    --inline-code-text: #1f2326;
-    --hl-comment: #5a6460;
-    --hl-keyword: #0b5f73;
-    --hl-string: #7a4b06;
-    --hl-number: #9a3b1c;
-    --hl-name: #2b5c8a;
-    --hl-func: #5b3a8c;
-    --hl-var: #8a2f52;
-    --hl-tag: #0b5f73;
-    --hl-attr: #6b4a00;
-    --hl-op: #4c5654;
-    --hl-del-bg: #f6dede;
-    --hl-ins-bg: #dcefe3;
-    --shadow: 0 1px 2px rgb(31 35 38 / 6%), 0 8px 24px -12px rgb(31 35 38 / 18%);
-  }
-}
-
-:root[data-theme="light"] {
+:root:not([data-theme="dark"]) {
   color-scheme: light;
-  --bg: #f6f3ee;
-  --bg-band: #f0ece5;
-  --surface: #fffdf9;
-  --surface-2: #f1ede6;
-  --tint: #ebe5db;
-  --text: #1f2326;
-  --muted: #595f5d;
-  --border: #ddd5c8;
-  --border-strong: #c7bdae;
-  --accent-hover: #ffbf1f;
-  --accent-soft: rgb(255 201 60 / 26%);
-  --link: #1d1d1f;
-  --link-deco: #d9a000;
-  --link-hover: #000000;
-  --focus: #1d1d1f;
+  --bg: #f7f2ea;
+  --bg-band: #f1e9dc;
+  --surface: #fffcf6;
+  --surface-2: #f2eadd;
+  --tint: #ebe0cf;
+  --text: #231b12;
+  --muted: #6b5d4c;
+  --border: #e2d6c3;
+  --border-strong: #cbb9a0;
+  --accent-hover: #ffbb1a;
+  --accent-soft: rgb(224 165 38 / 24%);
+  --link: #8b5a1b;
+  --link-deco: rgb(139 90 27 / 45%);
+  --link-hover: #5e3b0f;
+  --focus: #8b5a1b;
   --logo-line: var(--ink);
   --logo-outline: var(--ink);
-  --code-bg: #f0ebe3;
-  --code-text: #24292b;
-  --inline-code-bg: #ebe5db;
-  --inline-code-text: #1f2326;
-  --hl-comment: #5a6460;
-  --hl-keyword: #0b5f73;
-  --hl-string: #7a4b06;
+  --code-bg: #f2eadd;
+  --code-text: #2a2118;
+  --inline-code-bg: #efe5d6;
+  --inline-code-text: #3a2a17;
+  --hl-comment: #6f6253;
+  --hl-keyword: #93361c;
+  --hl-string: #5c6614;
   --hl-number: #9a3b1c;
-  --hl-name: #2b5c8a;
-  --hl-func: #5b3a8c;
+  --hl-name: #7a4f12;
+  --hl-func: #6a3f8c;
   --hl-var: #8a2f52;
-  --hl-tag: #0b5f73;
+  --hl-tag: #93361c;
   --hl-attr: #6b4a00;
-  --hl-op: #4c5654;
+  --hl-op: #5a4f43;
   --hl-del-bg: #f6dede;
-  --hl-ins-bg: #dcefe3;
-  --shadow: 0 1px 2px rgb(31 35 38 / 6%), 0 8px 24px -12px rgb(31 35 38 / 18%);
+  --hl-ins-bg: #e6efd6;
+  --shadow: 0 1px 2px rgb(35 27 18 / 6%), 0 8px 24px -12px rgb(35 27 18 / 20%);
 }
+
 
 /* ---------- Fonts ----------
    Newsreader (SIL Open Font License 1.1, see fonts/OFL.txt), self-hosted:
@@ -334,14 +296,10 @@ main:focus { outline: none; }
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* Show the icon of the theme you would switch to. */
-.theme-toggle .icon-moon { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
-:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .theme-toggle .icon-sun { display: none; }
-  :root:not([data-theme="dark"]) .theme-toggle .icon-moon { display: block; }
-}
+/* Show the icon of the theme you would switch to: light is the default. */
+.theme-toggle .icon-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 html:not(.js) .theme-toggle { display: none; }
 
 .nav-toggle { display: none; }

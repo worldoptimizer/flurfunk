@@ -60,7 +60,7 @@ defaults:
       path: "index.md"
     values:
       layout: home
-      pitch: Your team’s conversations, right where the work happens. Channels, threads and tasks inside WordPress, with no outside service.
+      pitch: Team conversations inside WordPress. Channels, threads and tasks, right next to your posts.
 
 twitter:
   card: summary_large_image
