@@ -1342,11 +1342,20 @@
 			+ ( th.assignees && th.assignees.length ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' )
 			+ '</article>';
 		const renderBoard = () => {
+			// Redrawing must not take the focus away from the card someone is moving.
+			const focused = document.activeElement && document.activeElement.closest ? document.activeElement.closest( '.ff-tcard' ) : null;
+			const keep = focused && feed.contains( focused ) ? focused.dataset.id : '';
 			const by = Object.fromEntries( LANES.map( ( st ) => [ st, ui.list.filter( ( th ) => th.status === st ) ] ) );
 			feed.innerHTML = '<p id="ff-board-help" class="screen-reader-text">' + esc( t( 'Alt and arrow keys move a card to the next or previous column.' ) ) + '</p><div class="ff-board">'
 				+ LANES.map( ( st ) => '<section class="ff-lane is-' + st + '" data-status="' + st + '" aria-label="' + esc( laneLabel( st ) ) + '"><h2>' + esc( laneLabel( st ) ) + ' <span>' + by[ st ].length + '</span></h2>'
 					+ '<div class="ff-lane-cards">' + ( by[ st ].length ? by[ st ].map( boardCard ).join( '' ) : '<p class="ff-lane-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'Nothing here' ) ) + '</p>' ) + '</div></section>' ).join( '' )
 				+ '</div>';
+			if ( keep ) {
+				const again = feed.querySelector( '.ff-tcard[data-id="' + keep + '"]' );
+				if ( again ) {
+					again.focus();
+				}
+			}
 		};
 		// Move a card: shown at once, saved in the background, put back if that fails.
 		const moveCard = async ( id, status ) => {
