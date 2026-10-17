@@ -474,6 +474,29 @@ test.describe( 'team', () => {
 		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.quiet ).toBe( '' );
 	} );
 
+	test( 'losing the connection shows a notice that goes away again; Ctrl+K searches', async ( { page } ) => {
+		await page.context().setOffline( true );
+		await page.evaluate( () => window.dispatchEvent( new Event( 'offline' ) ) );
+		await expect( page.locator( '.ff-offline' ) ).toBeVisible();
+		await page.context().setOffline( false );
+		await page.evaluate( () => window.dispatchEvent( new Event( 'online' ) ) );
+		await expect( page.locator( '.ff-offline' ) ).toHaveCount( 0, { timeout: 30_000 } );
+		await page.locator( '.ff-head h1' ).click();
+		await page.keyboard.press( 'Control+k' );
+		await expect( page.locator( '.ff-search input' ) ).toBeFocused();
+	} );
+
+	test( 'follow and mute from the thread header', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e folgen ' + Date.now() } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await page.locator( '.ff-follow [data-ff="follow"]' ).first().click();
+		await expect( page.locator( '.ff-follow [aria-pressed="true"]' ) ).toHaveCount( 1 );
+		expect( ( await api( page, 'threads/' + th.id + '?peek=1' ) ).follow ).toBe( 1 );
+		await page.locator( '.ff-follow [data-ff="follow"]' ).nth( 1 ).click();
+		await expect.poll( async () => ( await api( page, 'threads/' + th.id + '?peek=1' ) ).follow ).toBe( -1 );
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];
