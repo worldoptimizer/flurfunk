@@ -197,6 +197,8 @@
 			+ ( s.audio ? '<audio controls preload="none" src="' + esc( s.audio ) + '"></audio>' : '' )
 			+ ( s.meta ? '<span class="ff-card-meta">' + s.meta.map( esc ).join( ' · ' ) + '</span>' : '' )
 			+ ( s.action ? '<a class="ff-card-action" href="' + esc( s.action.url ) + '" target="_top">' + esc( s.action.label ) + '</a>' : '' )
+			// "Conversations about this": inside the app it switches the view, elsewhere it opens the app there.
+			+ ( s.target && s.target.type && s.target.id && cfg.appUrl ? '<a class="ff-card-action ff-card-talk" data-ff="target" data-type="' + esc( s.target.type ) + '" data-id="' + ( +s.target.id ) + '" href="' + esc( cfg.appUrl + '&view=target:' + s.target.type + ':' + ( +s.target.id ) ) + '" target="_top">' + esc( t( 'Conversations about this' ) ) + '</a>' : '' )
 			+ '</div>';
 	};
 	const providerOf = ( id ) => ( boot && boot.providers.find( ( p ) => p.id === id ) ) || { id, label: id, command: '' };
