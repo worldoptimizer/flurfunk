@@ -12,8 +12,22 @@ layout: default
 {%- endfor -%}
 <div class="wrap doc-shell">
   <main id="main" class="doc-main" tabindex="-1">
+    {%- comment -%} Screenshots: lazy loading, and their size so the page does not jump. {%- endcomment -%}
+    {%- assign body = content | replace: '<img src="', '<img loading="lazy" decoding="async" src="' -%}
+    {%- for shot in site.data.screenshots -%}
+      {%- if shot.raw -%}
+        {%- capture find -%}src="{{ shot.raw }}"{%- endcapture -%}
+        {%- capture with_size -%}src="{{ shot.raw }}" height="{{ shot.height }}"{%- endcapture -%}
+        {%- assign body = body | replace: find, with_size -%}
+        {%- continue -%}
+      {%- endif -%}
+      {%- assign url = shot.src | relative_url -%}
+      {%- capture find -%}src="{{ url }}"{%- endcapture -%}
+      {%- capture with_size -%}src="{{ url }}" width="{{ shot.width }}" height="{{ shot.height }}"{%- endcapture -%}
+      {%- assign body = body | replace: find, with_size -%}
+    {%- endfor %}
     <article class="prose">
-      {{ content }}
+      {{ body }}
     </article>
     {%- if prev or next %}
     <ul class="doc-pager">

@@ -156,6 +156,17 @@
       if (bar.children.length) { block.appendChild(bar); }
     });
 
+    // Screenshots open at full size (useful on phones).
+    each('.prose img', function (img) {
+      if (img.closest('a')) { return; }
+      var a = document.createElement('a');
+      a.href = img.currentSrc || img.src;
+      a.className = 'img-link';
+      a.setAttribute('aria-label', 'Open the image at full size: ' + (img.alt || ''));
+      img.parentNode.insertBefore(a, img);
+      a.appendChild(img);
+    });
+
     // Hide screenshots that are referenced but not (yet) in the repository.
     each('.prose img', function (img) {
       var hide = function () { img.classList.add('is-missing'); };

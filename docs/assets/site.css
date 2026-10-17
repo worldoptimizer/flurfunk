@@ -559,6 +559,8 @@ html:not(.js) .theme-toggle { display: none; }
   margin-block: 1.75rem;
 }
 .prose img.is-missing { display: none; }
+.prose .img-link { display: block; cursor: zoom-in; }
+.prose .img-link:focus-visible { outline-offset: 4px; border-radius: var(--radius); }
 
 .heading-anchor {
   margin-left: 0.4em;
