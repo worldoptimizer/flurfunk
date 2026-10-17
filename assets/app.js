@@ -1368,10 +1368,46 @@
 				if ( ! head.contains( document.activeElement ) ) {
 					renderHead();
 				}
-				await loadList();
+				if ( boot.counts.notifications > before ) {
+					announce( t( 'Notifications (%s new)', boot.counts.notifications ) );
+				}
+				if ( ! document.hidden ) {
+					await loadList();
+				}
 				updateBadge( boot.counts.total );
-			} catch ( e ) {}
+				offline( false );
+			} catch ( e ) {
+				// Network gone (not logged out – that has its own message): say so, keep trying.
+				if ( ! /session|Anmeldung/i.test( e.message ) ) {
+					offline( true );
+				}
+			}
 		};
+		// Screen readers hear about new notifications without moving the focus.
+		const live = document.createElement( 'div' );
+		live.className = 'screen-reader-text';
+		live.setAttribute( 'aria-live', 'polite' );
+		root.append( live );
+		const announce = ( text ) => {
+			live.textContent = '';
+			setTimeout( () => {
+				live.textContent = text;
+			}, 50 );
+		};
+		const offline = ( on ) => {
+			let bar = $( '.ff-offline', root );
+			if ( on && ! bar ) {
+				bar = document.createElement( 'div' );
+				bar.className = 'ff-offline';
+				bar.setAttribute( 'role', 'status' );
+				bar.textContent = t( 'No connection – trying again …' );
+				app.prepend( bar );
+			} else if ( ! on && bar ) {
+				bar.remove();
+			}
+		};
+		window.addEventListener( 'online', () => refresh() );
+		window.addEventListener( 'offline', () => offline( true ) );
 		// New notifications as system notifications while the window is in the background (only when
 		// this browser gets no push, which would show them already).
 		let shownNote = 0;
@@ -1624,12 +1660,35 @@
 		if ( ui.thread ) {
 			openThread( ui.thread );
 		}
+		// Every 30 s while visible; in the background only for system notifications, every 60 s.
+		let ticks = 0;
 		setInterval( () => {
+			ticks++;
+			if ( 'visible' === document.visibilityState ) {
+				refresh();
+				pollPane().catch( () => {} );
+			} else if ( browserNotesOn() && 'on' !== ui.pushState && 0 === ticks % 2 ) {
+				refresh();
+			}
+		}, 30000 );
+		// Back to the tab: show what happened right away.
+		document.addEventListener( 'visibilitychange', () => {
 			if ( 'visible' === document.visibilityState ) {
 				refresh();
 				pollPane().catch( () => {} );
 			}
-		}, 30000 );
+		} );
+		// Ctrl/Cmd+K: search.
+		document.addEventListener( 'keydown', ( e ) => {
+			if ( ( e.metaKey || e.ctrlKey ) && 'k' === e.key.toLowerCase() ) {
+				const box = $( '.ff-search input', head );
+				if ( box ) {
+					e.preventDefault();
+					box.focus();
+					box.select();
+				}
+			}
+		} );
 	};
 
 	/* Badge on the admin menu item (OpenStation's dock reads the same markup). */

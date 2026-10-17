@@ -391,3 +391,6 @@
 .ff-follow { display: inline-flex; gap: 10px; margin-left: auto; margin-right: 6px; }
 .ff-follow [aria-pressed="true"] { color: var(--ff-ink); text-decoration: underline; text-underline-offset: 3px; }
 .ff-root .ff-hour select { min-height: 28px; padding: 0 22px 0 6px; border: 1px solid var(--ff-line); border-radius: 6px; background-color: var(--ff-paper); color: var(--ff-ink); }
+.ff-offline { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 50; padding: 6px 14px; border-radius: 999px; background: var(--ff-ink); color: var(--ff-paper); font-size: 13px; font-weight: 600; box-shadow: 0 8px 20px rgb(0 0 0 / .2); }
+.ff-app { position: relative; }
+.os-chromeless.flurfunk-page .ff-app { position: fixed; }

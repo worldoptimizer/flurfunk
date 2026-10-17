@@ -146,6 +146,7 @@ return array(
 		'New thread in #%s … (@name, / for cards)' => 'Neuer Thread in #%s … (@Name, / für Karten)',
 		'New thread … (@name, / for cards)' => 'Neuer Thread … (@Name, / für Karten)',
 		'Newsletter' => 'Newsletter',
+		'No connection – trying again …' => 'Keine Verbindung – versuche es weiter …',
 		'No conversations about this post yet.' => 'Zu diesem Artikel gibt es noch keine Gespräche.',
 		'No guests' => 'Keine Gäste',
 		'No notifications yet.' => 'Noch keine Benachrichtigungen.',

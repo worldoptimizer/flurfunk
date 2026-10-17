@@ -163,6 +163,7 @@ function all(): array {
 		'Close thread' => __( 'Close thread', 'flurfunk' ),
 		'Make it a task' => __( 'Make it a task', 'flurfunk' ),
 		'Reply' => __( 'Reply', 'flurfunk' ),
+		'No connection – trying again …' => __( 'No connection – trying again …', 'flurfunk' ),
 		'Sent – it should appear shortly' => __( 'Sent – it should appear shortly', 'flurfunk' ),
 		'Could not send' => __( 'Could not send', 'flurfunk' ),
 		'No conversations about this post yet.' => __( 'No conversations about this post yet.', 'flurfunk' ),
