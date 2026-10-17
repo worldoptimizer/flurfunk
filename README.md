@@ -151,6 +151,8 @@ Optional cards for other plugins live in `integrations/` and load only when that
 - `tests/push/run.sh`: Web Push crypto checked against Node.
 - `node tests/format.test.cjs`: the text formatter.
 - `wp eval-file tests/load.php`: 2000 threads / 20000 messages, timings, cleans up.
+- `wp eval-file tests/demo/seed.php`: demo content (a fictional editorial team with conversations,
+  tasks and files) for screenshots and trying things out; see the developer guide.
 - `tools/strings.py` collects the JavaScript strings into `inc/strings.php`; `tools/l10n.py`
   builds `languages/*.l10n.php` from `tools/translations/*.json`; `tools/build-zip.sh` builds a
   release zip.

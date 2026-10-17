@@ -4,6 +4,7 @@
 .DS_Store
 dist
 tests
+tests/demo
 tools
 node_modules
 README.md

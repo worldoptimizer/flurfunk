@@ -915,3 +915,26 @@ themselves.
 
 To change the schema, bump `DB_VERSION` in `inc/schema.php`. `dbDelta` adds columns and indexes;
 anything else (renames, data rewrites) goes into `upgrade()` as a step.
+
+### Demo content
+
+`tests/demo/seed.php` fills a test site with a small fictional editorial team, "Northline
+Magazine": five people (editors as team, two authors as guests) and an assistant, the channels
+#general, #editorial, #photo, #tech and #authors, four posts, and about a dozen conversations
+over the last days, with mentions, tasks in every state and with due dates (one overdue, one due
+today), an image gallery, a transcript file, `/post` cards and notifications for Ana Klein, the
+editor-in-chief. The screenshots in these docs were taken with it.
+
+```bash
+wp eval-file wp-content/plugins/flurfunk/tests/demo/seed.php        # add reset-passwords for new ones
+cp wp-content/plugins/flurfunk/tests/demo/demo-avatars.php wp-content/mu-plugins/  # pictures, job titles
+```
+
+Without WP-CLI, open the file's address in the browser while logged in as an administrator
+(inside the plugin, or copied into the WordPress root) and confirm; or define
+`FLURFUNK_DEMO_SECRET` (16+ characters) in `wp-config.php` and add `?secret=…` once. Running it
+again adds nothing twice (people by login, posts by a meta key, threads by `ref_key`
+`northline-demo:…`). New accounts get random passwords, printed once. Times are relative to the
+moment it runs. Only for test and demo sites: it sets the Flurfunk name (if none is set), changes the five
+channels' access and creates users with `@northline.example` addresses. The folder is not part of
+release zips.
