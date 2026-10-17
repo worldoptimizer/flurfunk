@@ -378,6 +378,9 @@
 .ff-ws > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ff-bell { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; color: var(--ff-side-ink); cursor: pointer; }
 .ff-bell:hover, .ff-bell[aria-current="true"] { background: rgb(255 255 255 / .14); }
+/* The bell shares data-ff="nav" with the list rows; keep it a square, not a full-width row. */
+.ff-nav button.ff-bell[data-ff="nav"] { display: grid; width: 34px; padding: 0; margin-left: auto; color: var(--ff-side-ink); font-weight: 400; }
+.ff-nav button.ff-bell[aria-current="true"] { background: rgb(255 255 255 / .16); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
 .ff-bell svg { width: 20px; height: 20px; }
 .ff-bell b { position: absolute; top: 1px; right: 0; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--ff-accent); color: #fff; font-size: 10px; line-height: 17px; box-shadow: 0 0 0 2px var(--ff-side); }
 .ff-nav button b.is-over { background: #b42318; }
