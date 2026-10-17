@@ -52,16 +52,19 @@ One dispatcher, several channels. What counts:
 | due | a task of yours is due today or overdue (daily, once) |
 | reply | new message in a thread you started, wrote in, are responsible for or follow |
 | done | a task you started or are responsible for was ticked off |
+| channel | a new post in a channel set to "every post" |
 | message | anything else you can see – only if you chose "everything" |
 
-Every notification lands in the list behind the bell. Each person decides per channel, under
-their name at the bottom of the sidebar:
+Every notification lands in the list behind the bell (read ones are cleared after 90 days,
+unread ones after 180; filter `flurfunk_notification_days`). Each person decides, under their
+name at the bottom of the sidebar:
 
 - **Mail**: right away (mentions, tasks, replies), once a day as a summary, everything, never.
 - **Push** to this device (browser or phone, also when Flurfunk is closed): mentions/tasks/
   replies, everything, nothing – with quiet hours.
 - **System notifications while Flurfunk is open in the background** (without push).
 - **Hour** for the daily summary and due reminders.
+- Per channel, in the channel header: **every post**, **only mentions** or as usual.
 - Per thread: **follow** (every reply) or **mute** (only mentions and tasks).
 
 Push needs HTTPS and PHP's OpenSSL extension (standard); keys (VAPID) are created
@@ -78,8 +81,8 @@ never see internal conversations about their text unless a channel allows it.
 
 ## Data
 
-Own tables (`{prefix}flurfunk_*`): channels, threads, messages, mentions, reads, attachments.
-Personal settings live in the user meta `flurfunk_prefs`. Import and export use one JSON
+Own tables (`{prefix}flurfunk_*`): channels, threads, messages, mentions, reads, attachments,
+assignees, notifications, push. Personal settings live in user meta (`flurfunk_prefs_<key>`). Import and export use one JSON
 format, `flurfunk/1`:
 
 ```bash
