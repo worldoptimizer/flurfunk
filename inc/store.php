@@ -631,12 +631,19 @@ function mark_all_read( int $user_id, string $channel = '' ): int {
 		$c      = channel_by_slug( $channel );
 		$where .= ' AND t.channel_id = ' . ( $c ? (int) $c->id : 0 );
 	}
-	$rows = $wpdb->get_results( 'SELECT t.id, ( SELECT COALESCE( MAX(m.id), 0 ) FROM ' . table( 'messages' ) . ' m WHERE m.thread_id = t.id ) last FROM ' . table( 'threads' ) . " t WHERE $where" ); // phpcs:ignore WordPress.DB
-	foreach ( $rows as $r ) {
-		$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen) VALUES (%d, %d, %d, %s) ON DUPLICATE KEY UPDATE last_message_id = GREATEST(last_message_id, VALUES(last_message_id)), seen = VALUES(seen)', $user_id, (int) $r->id, (int) $r->last, now() ) ); // phpcs:ignore WordPress.DB
-	}
+	// One statement for all threads (thousands of threads stay fast).
+	$n = (int) $wpdb->query( // phpcs:ignore WordPress.DB
+		$wpdb->prepare(
+			'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen)
+			SELECT %d, t.id, COALESCE( MAX(m.id), 0 ), %s FROM ' . table( 'threads' ) . ' t LEFT JOIN ' . table( 'messages' ) . " m ON m.thread_id = t.id
+			WHERE $where GROUP BY t.id
+			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(" . table( 'reads' ) . '.last_message_id, VALUES(last_message_id)), seen = VALUES(seen)',
+			$user_id,
+			now()
+		)
+	);
 	update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
-	return count( $rows );
+	return $n;
 }
 
 /**
