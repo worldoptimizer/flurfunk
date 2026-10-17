@@ -1,5 +1,6 @@
+{%- assign h = '/assets/hero/' | relative_url -%}
 <div class="hero-demo">
-  <p class="visually-hidden">Illustration: the Flurfunk app in wp-admin. A sidebar with channels, a thread list in the editorial channel, and an open thread where teammates reply, mention each other and move a new task across the board.</p>
+  <p class="visually-hidden">Illustration: the Flurfunk app in wp-admin. A sidebar with channels, a thread list in the editorial channel, and an open thread where teammates reply, mention each other, share photos and move a new task across the board.</p>
   <div class="app" aria-hidden="true" data-demo>
     <div class="app-bar">
       <span class="app-dots"><i></i><i></i><i></i></span>
@@ -29,7 +30,7 @@
           <li class="ch-tech"><span class="hash">#</span>tech<span class="side-badge badge-tech">3</span></li>
         </ul>
         <div class="side-user">
-          <span class="av av-mp">MP<i class="presence"></i></span>
+          <span class="me"><img src="{{ h }}avatar-mia.webp" alt="" width="96" height="96"><i class="presence"></i></span>
           <span class="side-user-name"><b>Mia Park</b><small>Editor</small></span>
         </div>
       </aside>
@@ -37,32 +38,39 @@
       <section class="app-main">
         <header class="main-head">
           <span class="main-title"><span class="hash">#</span>editorial</span>
-          <span class="main-people"><span class="av av-ak">AK</span><span class="av av-tb">TB</span><span class="av av-mp">MP</span></span>
+          <span class="main-people">
+            <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
+            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
+            <img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96">
+            <img class="av" src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
+            <img class="av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96">
+          </span>
         </header>
         <ol class="tlist">
           <li class="trow is-selected">
-            <span class="av av-ak">AK</span>
+            <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
             <span class="trow-body">
               <span class="trow-top"><b>Autumn issue: cover story</b><time>9:12</time></span>
-              <span class="trow-text">Draft is in. @Mia Park can you check…</span>
+              <span class="trow-text">Draft is in. @Mia Park can you check the intro…</span>
               <span class="trow-meta">
                 <span class="swap replies"><span class="v0">No replies yet</span><span class="v1">1 reply</span><span class="v2">2 replies</span></span>
               </span>
             </span>
           </li>
           <li class="trow">
-            <span class="av av-tb">TB</span>
+            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
             <span class="trow-body">
               <span class="trow-top"><b>Photo rights for the interview</b><time>8:47</time></span>
               <span class="trow-text">Agency confirmed print and web.</span>
               <span class="trow-meta"><span class="meta-files">2 files</span><span class="meta-sep">·</span>4 replies</span>
             </span>
+            <img class="trow-thumb" src="{{ h }}photo-newsroom-160.webp" alt="" width="160" height="107">
           </li>
           <li class="trow trow-new">
-            <span class="av av-ak">AK</span>
+            <img class="av" src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
             <span class="trow-body">
               <span class="trow-top"><b>Newsletter goes out Thursday</b><time>9:20</time></span>
-              <span class="trow-text">Task for Tom Berger · due Thu</span>
+              <span class="trow-text">Task for Tom Berger and Lea Okafor · due Thu</span>
               <span class="trow-meta">
                 <span class="swap chip"><span class="v0 chip-open">Open</span><span class="v1 chip-doing">In progress</span><span class="v2 chip-done">Done</span></span>
               </span>
@@ -73,36 +81,59 @@
           <div class="board-col"><span>Open</span></div>
           <div class="board-col"><span>In progress</span></div>
           <div class="board-col"><span>Done</span></div>
-          <div class="board-card">Newsletter Thursday</div>
+          <div class="board-card">
+            <span>Newsletter</span>
+            <span class="card-meta">
+              <span class="card-people">
+                <img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
+                <img src="{{ h }}avatar-lea.webp" alt="" width="96" height="96">
+              </span>
+              <small>Thu</small>
+            </span>
+          </div>
+        </div>
+        <div class="toast">
+          <img class="av" src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96">
+          <span><b>Jonas Weber</b> in #tech<br>Staging is updated, please test the new archive.</span>
         </div>
       </section>
 
       <section class="app-thread">
         <header class="thread-head"><b>Autumn issue: cover story</b><small># editorial · task due Fri</small></header>
         <div class="msg">
-          <span class="av av-ak">AK</span>
+          <img class="av" src="{{ h }}avatar-ana.webp" alt="" width="96" height="96">
           <div><p class="msg-who"><b>Ana Klein</b><time>9:12</time></p>
           <p>Draft is in. <span class="mention">@Mia Park</span> can you check the intro by Friday?</p></div>
         </div>
         <div class="slot">
-          <div class="typing typing-1"><span class="av av-mp">MP</span><span class="dots"><i></i><i></i><i></i></span></div>
+          <div class="typing typing-1"><img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96"><span class="dots"><i></i><i></i><i></i></span></div>
           <div class="msg reply-1">
-            <span class="av av-mp">MP</span>
+            <img class="av" src="{{ h }}avatar-mia.webp" alt="" width="96" height="96">
             <div><p class="msg-who"><b>Mia Park</b><time>9:15</time></p>
             <p>On it. Two photo options for the opener:</p>
-            <span class="thumbs"><i></i><i></i></span></div>
+            <span class="thumbs">
+              <img class="thumb-market" src="{{ h }}photo-autumn-market-240.webp" alt="" width="240" height="160">
+              <img src="{{ h }}photo-autumn-forest-240.webp" alt="" width="240" height="160">
+            </span></div>
           </div>
         </div>
         <div class="slot">
-          <div class="typing typing-2"><span class="av av-tb">TB</span><span class="dots"><i></i><i></i><i></i></span></div>
+          <div class="typing typing-2"><img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96"><span class="dots"><i></i><i></i><i></i></span></div>
           <div class="msg reply-2">
-            <span class="av av-tb">TB</span>
+            <img class="av" src="{{ h }}avatar-tom.webp" alt="" width="96" height="96">
             <div><p class="msg-who"><b>Tom Berger</b><time>9:17</time></p>
-            <p>Rights for both are cleared.</p></div>
+            <p>The market one! Rights for both are cleared.</p></div>
           </div>
         </div>
         <div class="composer">Reply to the thread…</div>
       </section>
+
+      <div class="lightbox">
+        <figure>
+          <img src="{{ h }}photo-autumn-market-640.webp" alt="" width="640" height="427">
+          <figcaption>autumn-market.jpg <span>1 of 2</span></figcaption>
+        </figure>
+      </div>
 
     </div>
   </div>

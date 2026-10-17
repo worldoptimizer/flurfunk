@@ -504,15 +504,18 @@ html:not(.js) .theme-toggle { display: none; }
   .hero-actions .button { flex: 1 1 auto; }
 }
 
-/* ---------- Hero demo: a small drawn Flurfunk app ----------
-   Everything inside .app is sized in em, so the whole app scales with the
-   font size, which follows the width of its container. */
-.hero-demo { container-type: inline-size; min-width: 0; }
+/* ---------- Hero demo: a drawn Flurfunk app ----------
+   Everything inside .app is sized in em. The font size follows the viewport,
+   and the app is wider than its column, so it runs off the right edge of the
+   page like a window partly out of frame ("im Anschnitt"). The hero clips it,
+   so the page never scrolls sideways. */
+.hero-demo { min-width: 0; }
 
 .app {
-  --u: clamp(7px, 1.85cqi, 13px);
-  font-size: var(--u);
-  height: 33em;
+  font-size: clamp(11px, 1vw, 17px);
+  width: 68em;
+  height: 37em;
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -527,6 +530,7 @@ html:not(.js) .theme-toggle { display: none; }
 }
 .app p { margin: 0; }
 .app ul, .app ol { margin: 0; padding: 0; list-style: none; }
+.app img { display: block; max-width: none; object-fit: cover; }
 
 .app-bar {
   display: flex;
@@ -553,17 +557,18 @@ html:not(.js) .theme-toggle { display: none; }
 }
 
 .app-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 12.5em minmax(0, 1fr) 17.5em;
+  grid-template-columns: 13em 31em minmax(0, 1fr);
 }
 
 /* Sidebar */
 .app-side {
   display: flex;
   flex-direction: column;
-  padding: 1em 0.7em 0.8em;
+  padding: 1em 0.75em 0.9em;
   background: var(--app-side);
   color: var(--app-side-text);
 }
@@ -586,7 +591,7 @@ html:not(.js) .theme-toggle { display: none; }
   display: flex;
   align-items: center;
   gap: 0.55em;
-  padding: 0.38em 0.5em;
+  padding: 0.4em 0.5em;
   border-radius: 0.45em;
   color: var(--app-side-text);
   white-space: nowrap;
@@ -611,32 +616,17 @@ html:not(.js) .theme-toggle { display: none; }
 .side-user {
   display: flex;
   align-items: center;
-  gap: 0.6em;
+  gap: 0.65em;
   margin-top: auto;
-  padding: 0.6em 0.5em 0;
+  padding: 0.7em 0.5em 0;
   border-top: 1px solid rgb(255 255 255 / 8%);
 }
+/* The own-user tile is the one rounded square (like the real app: 7px at 32px). */
+.me { position: relative; flex: none; width: 2.5em; height: 2.5em; }
+.me img { width: 100%; height: 100%; border-radius: 0.55em; }
 .side-user-name { display: flex; flex-direction: column; line-height: 1.2; }
 .side-user-name b { color: #fff; }
 .side-user-name small { color: var(--app-side-muted); font-size: 0.85em; }
-
-/* Avatars */
-.av {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 2.3em;
-  height: 2.3em;
-  border-radius: 0.6em;
-  color: #fff;
-  font-size: 0.82em;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-.av-ak { background: var(--teal); }
-.av-tb { background: var(--amber); color: var(--ink); }
-.av-mp { background: #4f6f8f; }
 .presence {
   position: absolute;
   right: -0.2em;
@@ -648,13 +638,22 @@ html:not(.js) .theme-toggle { display: none; }
   box-shadow: 0 0 0 0.18em var(--app-side);
 }
 
+/* Avatars: round, like .ff-ava in the app. */
+.app .av {
+  flex: none;
+  width: 2.3em;
+  height: 2.3em;
+  border-radius: 50%;
+  background: var(--app-line);
+}
+
 /* Main column */
-.app-main { display: flex; flex-direction: column; min-width: 0; background: var(--app-main); }
+.app-main { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--app-main); }
 .main-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 3.3em;
+  height: 3.4em;
   padding: 0 1.1em;
   border-bottom: 1px solid var(--app-line);
   flex: none;
@@ -662,26 +661,27 @@ html:not(.js) .theme-toggle { display: none; }
 .main-title { font-weight: 700; font-size: 1.12em; }
 .main-title .hash { margin-right: 0.15em; color: var(--app-muted); }
 .main-people { display: flex; }
-.main-people .av { width: 2.7em; height: 2.7em; border-radius: 50%; font-size: 0.68em; box-shadow: 0 0 0 0.25em var(--app-main); }
-.main-people .av + .av { margin-left: -0.55em; }
+.main-people .av { width: 1.8em; height: 1.8em; box-shadow: 0 0 0 0.16em var(--app-main); }
+.main-people .av + .av { margin-left: -0.4em; }
 
-.tlist { flex: 1; min-height: 0; padding: 0.5em !important; }
+.tlist { flex: 1; min-height: 0; padding: 0.55em !important; }
 .trow {
   display: flex;
+  align-items: flex-start;
   gap: 0.75em;
-  padding: 0.65em 0.6em;
+  padding: 0.7em 0.65em;
   border-radius: 0.6em;
 }
 .trow + .trow { margin-top: 0.15em; }
 .trow.is-selected { background: var(--app-select); }
-.trow .av { width: 2.4em; height: 2.4em; }
+.trow .av { width: 2.5em; height: 2.5em; }
 .trow-body { display: flex; flex-direction: column; gap: 0.12em; min-width: 0; flex: 1; }
 .trow-top { display: flex; justify-content: space-between; gap: 0.6em; }
 .trow-top b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trow-top time { color: var(--app-muted); font-size: 0.85em; flex: none; }
 .trow-text { color: var(--app-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .trow-meta { display: flex; align-items: center; gap: 0.4em; color: var(--app-muted); font-size: 0.88em; }
-.meta-files { color: var(--app-muted); }
+.trow-thumb { flex: none; width: 4.2em; height: 2.9em; border-radius: 0.4em; align-self: center; }
 .trow-new .trow-top b::before {
   content: "";
   display: inline-block;
@@ -693,8 +693,7 @@ html:not(.js) .theme-toggle { display: none; }
   vertical-align: 0.12em;
 }
 
-/* Values that change in place: all variants share one grid cell, so the
-   width never jumps. */
+/* Values that change in place share one grid cell, so nothing jumps. */
 .swap { display: inline-grid; }
 .swap > * { grid-area: 1 / 1; transition: opacity 0.35s ease; }
 .swap > :not(.v2) { opacity: 0; }
@@ -723,7 +722,7 @@ html:not(.js) .theme-toggle { display: none; }
   flex: none;
 }
 .board-col {
-  height: 6.3em;
+  height: 6.6em;
   padding: 0.45em 0.6em;
   border-radius: 0.55em;
   background: var(--app-pane);
@@ -734,30 +733,59 @@ html:not(.js) .theme-toggle { display: none; }
   position: absolute;
   left: 0;
   top: 2.55em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
   width: calc((100% - 2 * var(--gap)) / 3);
-  padding: 0.45em 0.6em;
+  padding: 0.5em 0.65em;
   border-radius: 0.5em;
-  background: var(--app-main);
-  border: 1px solid var(--app-line);
+  border: 1px solid color-mix(in srgb, var(--teal) 70%, transparent);
+  background: color-mix(in srgb, var(--teal) 22%, var(--app-main));
   box-shadow: 0 0.2em 0.6em rgb(0 0 0 / 18%);
   font-weight: 600;
   line-height: 1.25;
+  white-space: nowrap;
   overflow: hidden;
   transform: translateX(calc(200% + 2 * var(--gap)));
   transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.4s ease, background-color 0.4s ease, border-color 0.4s ease;
 }
-.board-card {
-  /* End state: done. */
-  border-color: color-mix(in srgb, var(--teal) 70%, transparent);
-  background: color-mix(in srgb, var(--teal) 22%, var(--app-main));
+.board-card > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.card-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.4em; }
+.card-meta small { color: var(--app-muted); font-size: 0.85em; font-weight: 600; }
+.card-people { display: flex; }
+.card-people img { width: 1.5em; height: 1.5em; border-radius: 50%; box-shadow: 0 0 0 0.14em var(--app-main); }
+.card-people img + img { margin-left: -0.35em; }
+
+/* A notification from another channel. */
+.toast {
+  position: absolute;
+  right: 1em;
+  bottom: 9.4em;
+  display: flex;
+  align-items: center;
+  gap: 0.65em;
+  width: 22em;
+  padding: 0.65em 0.8em;
+  border-radius: 0.7em;
+  background: var(--teal-deep);
+  color: rgb(255 255 255 / 85%);
+  box-shadow: 0 0.6em 1.6em rgb(0 0 0 / 35%);
+  font-size: 0.92em;
+  line-height: 1.3;
+  opacity: 0;
+  transform: translateY(0.6em);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
 }
+.toast b { color: #fff; }
+.toast .av { box-shadow: 0 0 0 0.15em rgb(255 255 255 / 25%); }
 
 /* Thread pane */
 .app-thread {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 0 1em 1em;
+  padding: 0 1.1em 1em;
   background: var(--app-pane);
   border-left: 1px solid var(--app-line);
 }
@@ -765,16 +793,17 @@ html:not(.js) .theme-toggle { display: none; }
   display: flex;
   flex-direction: column;
   justify-content: center;
-  height: 3.3em;
-  margin: 0 -1em 0.8em;
-  padding: 0 1em;
+  height: 3.4em;
+  margin: 0 -1.1em 0.9em;
+  padding: 0 1.1em;
   border-bottom: 1px solid var(--app-line);
   flex: none;
 }
 .thread-head b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .thread-head small { color: var(--app-muted); font-size: 0.82em; }
-.msg { display: flex; gap: 0.65em; transition: opacity 0.45s ease, transform 0.45s ease; }
-.msg + .slot, .slot + .slot { margin-top: 0.9em; }
+.msg { display: flex; gap: 0.7em; transition: opacity 0.45s ease, transform 0.45s ease; }
+.msg .av { width: 2.4em; height: 2.4em; }
+.msg + .slot, .slot + .slot { margin-top: 1em; }
 .msg-who { display: flex; gap: 0.5em; align-items: baseline; }
 .msg-who time { color: var(--app-muted); font-size: 0.82em; }
 .mention {
@@ -785,20 +814,21 @@ html:not(.js) .theme-toggle { display: none; }
   font-weight: 700;
   transition: background-color 0.5s ease;
 }
-.thumbs { display: flex; gap: 0.45em; margin-top: 0.45em; }
-.thumbs i {
-  width: 4.6em;
-  height: 3.3em;
+.thumbs { display: flex; gap: 0.45em; margin-top: 0.5em; }
+.thumbs img {
+  width: 7.2em;
+  height: 4.8em;
   border-radius: 0.45em;
-  background: linear-gradient(140deg, #3fc4b1, #0f6e66 70%);
+  outline: 0.18em solid transparent;
+  outline-offset: 0.12em;
+  transition: outline-color 0.3s ease;
 }
-.thumbs i + i { background: linear-gradient(140deg, #f1c27a, #c97f1f 75%); }
 .slot { display: grid; }
 .slot > * { grid-area: 1 / 1; }
 .typing {
   display: flex;
   align-items: center;
-  gap: 0.65em;
+  gap: 0.7em;
   align-self: start;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -814,17 +844,46 @@ html:not(.js) .theme-toggle { display: none; }
   color: var(--app-muted);
 }
 
-/* Narrow: drop the thread pane, keep sidebar, list and board. */
-@container (max-width: 34rem) {
-  .app { --u: clamp(7px, 2.9cqi, 12px); height: 32em; }
-  .app-body { grid-template-columns: 11em minmax(0, 1fr); }
-  .app-thread { display: none; }
+/* Lightbox moment over the whole app body. */
+.lightbox {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: rgb(6 14 13 / 86%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s ease, visibility 0s linear 0.35s;
+}
+.lightbox figure { margin: 0; transform: scale(0.94); transition: transform 0.4s ease; }
+.lightbox img { width: 30em; height: 20em; border-radius: 0.5em; box-shadow: 0 1em 3em rgb(0 0 0 / 50%); }
+.lightbox figcaption { display: flex; justify-content: space-between; margin-top: 0.6em; color: rgb(255 255 255 / 80%); font-size: 0.9em; }
+.lightbox figcaption span { color: rgb(255 255 255 / 55%); }
+
+/* Large screens can afford a little more room for the text. */
+@media (min-width: 60.01rem) {
+  .hero-inner { grid-template-columns: minmax(0, 24rem) minmax(0, 1fr); }
+}
+
+/* Stacked (tablet): the app sits below the text and still runs off the edge. */
+@media (max-width: 60rem) {
+  .app { font-size: clamp(10px, 1.6vw, 13px); }
+}
+
+/* Phones: a narrower app (sidebar + list), the thread pane only peeks in. */
+@media (max-width: 34rem) {
+  .app { font-size: clamp(9.5px, 2.75vw, 11.5px); width: 54em; height: 34em; }
+  .app-body { grid-template-columns: 11.5em 23.5em minmax(0, 1fr); }
   .app-url { display: none; }
+  .toast { right: auto; left: 1em; width: 21em; }
+  .lightbox { right: auto; width: 35em; }
 }
 
 /* ---------- Hero demo: animation ----------
    Without JS, or with reduced motion, the app shows its end state.
-   The script adds .is-playing and then the step classes one by one. */
+   The script adds .is-playing and then the step classes one by one.
+   Passing moments (lightbox, toast) only appear while playing. */
 .app.is-playing:not(.s-mention) .mention { background-color: transparent; }
 .app.is-playing:not(.s-mention) .badge-mention { opacity: 0; transform: scale(0.6); }
 .app.is-playing:not(.s-tech) .badge-tech,
@@ -837,12 +896,16 @@ html:not(.js) .theme-toggle { display: none; }
 .app.is-playing.s-typing1:not(.s-reply1) .typing-1,
 .app.is-playing.s-typing2:not(.s-reply2) .typing-2 { opacity: 1; }
 
-/* Reply counter in the list: 0, then 1, then 2. */
 .app.is-playing:not(.s-reply1) .replies .v0 { opacity: 1; }
 .app.is-playing.s-reply1:not(.s-reply2) .replies .v1 { opacity: 1; }
 .app.is-playing:not(.s-reply2) .replies .v2 { opacity: 0; }
 
-/* New task thread and its card on the board. */
+.app.is-playing.s-pick:not(.s-lbclose) .thumb-market { outline-color: var(--amber); }
+.app.is-playing.s-lightbox:not(.s-lbclose) .lightbox { opacity: 1; visibility: visible; transition: opacity 0.35s ease; }
+.app.is-playing.s-lightbox:not(.s-lbclose) .lightbox figure { transform: none; }
+
+.app.is-playing.s-tech:not(.s-toastoff) .toast { opacity: 1; transform: none; }
+
 .trow-new { transition: opacity 0.45s ease, transform 0.45s ease, background-color 1.2s ease; }
 .app.is-playing:not(.s-newthread) .trow-new { opacity: 0; transform: translateY(-0.4em); }
 .app.is-playing.s-newthread:not(.s-progress) .trow-new { background: rgb(232 163 61 / 14%); }

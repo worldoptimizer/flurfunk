@@ -30,6 +30,8 @@
         themeBtn.setAttribute('title', 'Switch to ' + next + ' theme');
       };
       label();
+      var sys = media('(prefers-color-scheme: light)');
+      if (sys.addEventListener) { sys.addEventListener('change', label); }
       themeBtn.addEventListener('click', function () {
         var next = currentTheme() === 'dark' ? 'light' : 'dark';
         root.setAttribute('data-theme', next);
@@ -83,15 +85,19 @@
     var steps = [
       [700, 's-mention'],
       [1900, 's-typing1'],
-      [3600, 's-reply1'],
-      [4900, 's-typing2'],
-      [6500, 's-reply2'],
-      [8000, 's-newthread'],
-      [9300, 's-tech'],
-      [11000, 's-progress'],
-      [13400, 's-done']
+      [3500, 's-reply1'],
+      [4500, 's-pick'],
+      [5000, 's-lightbox'],
+      [6900, 's-lbclose'],
+      [7500, 's-typing2'],
+      [8900, 's-reply2'],
+      [10100, 's-newthread'],
+      [11300, 's-tech'],
+      [12200, 's-progress'],
+      [14400, 's-toastoff'],
+      [14800, 's-done']
     ];
-    var LOOP = 20000;
+    var LOOP = 21000;
     var timers = [];
     var reduce = media('(prefers-reduced-motion: reduce)');
     var visible = true;
