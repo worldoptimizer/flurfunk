@@ -605,6 +605,19 @@ test.describe( 'team', () => {
 		expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth + 1 ) ).toBe( true );
 	} );
 
+	test( 'export and import from the settings page, without WP-CLI', async ( { page } ) => {
+		await page.goto( '/wp-admin/options-general.php?page=flurfunk-settings' + Q );
+		const [ download ] = await Promise.all( [ page.waitForEvent( 'download' ), page.locator( 'form:has(input[name=action][value=flurfunk_export]) [type=submit]' ).click() ] );
+		const path = await download.path();
+		const fs = await import( 'node:fs' );
+		const data = JSON.parse( fs.readFileSync( path, 'utf8' ) );
+		expect( data.format ).toBe( 'flurfunk/1' );
+		expect( data.threads.length ).toBeGreaterThan( 0 );
+		await page.locator( '#flurfunk-import-file' ).setInputFiles( path );
+		await page.locator( 'form:has(input[name=action][value=flurfunk_import]) [type=submit]' ).click();
+		await expect( page.locator( '.notice-success' ) ).toContainText( String( data.threads.length ) ); // All skipped: they are already here.
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];

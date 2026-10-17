@@ -26,6 +26,7 @@
  *   inc/admin.php      overview app, editor panel, posts list column, OpenStation bits
  *   inc/standalone.php full-screen app outside wp-admin (/flurfunk/), web app manifest
  *   inc/transfer.php   JSON export and import
+ *   inc/data.php       export/import in the settings, welcome after the first activation
  *   inc/cli.php        wp flurfunk …
  *   integrations/      optional cards for other plugins (MailerPress), loaded only when present
  *
@@ -57,6 +58,7 @@ require_once FLURFUNK_DIR . 'inc/rest.php';
 require_once FLURFUNK_DIR . 'inc/admin.php';
 require_once FLURFUNK_DIR . 'inc/standalone.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
+require_once FLURFUNK_DIR . 'inc/data.php';
 
 // Optional integrations with other plugins, each only when that plugin is active.
 add_action(
@@ -72,6 +74,8 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once FLURFUNK_DIR . 'inc/cli.php';
 }
 
+// A fresh install (no settings yet) gets a short welcome in wp-admin.
+register_activation_hook( __FILE__, static fn () => false === get_option( 'flurfunk_settings' ) && add_option( 'flurfunk_welcome', 1, '', false ) );
 register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
 // The next request flushes the rewrite rules, once ours are registered (inc/standalone.php).
 register_activation_hook( __FILE__, static fn () => delete_option( 'flurfunk_rewrite' ) );

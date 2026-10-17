@@ -24,8 +24,8 @@ function defaults(): array {
 	return array(
 		'name'          => '',
 		'logo_id'       => 0,
-		'accent'        => '#0f6e66',
-		'sidebar'       => '#1f2a2e',
+		'accent'        => '#8b5a1b',
+		'sidebar'       => '#231b12',
 		'team_cap'      => 'edit_others_posts',
 		'guest_cap'     => 'edit_posts',
 		'post_types'    => array( 'post' ),
@@ -296,11 +296,12 @@ function render(): void {
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Uninstall', 'flurfunk' ); ?></th>
 					<td><label><input type="checkbox" name="flurfunk[keep_data]" value="1" <?php checked( $s['keep_data'] ); ?>> <?php esc_html_e( 'Keep conversations when the plugin is deleted', 'flurfunk' ); ?></label>
-						<p class="description"><?php esc_html_e( 'Export and import as JSON: wp flurfunk export / wp flurfunk import.', 'flurfunk' ); ?></p></td>
+						<p class="description"><?php esc_html_e( 'Export and import are below; on the command line: wp flurfunk export / wp flurfunk import.', 'flurfunk' ); ?></p></td>
 				</tr>
 			</table>
 			<?php submit_button(); ?>
 		</form>
+		<?php \Flurfunk\Data\render_section(); ?>
 	</div>
 	<script>
 	( function () {

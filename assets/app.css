@@ -4,9 +4,9 @@
  * Structure comes from surfaces and hairlines, not from coloured edge stripes.
  */
 .ff-root {
-	--ff-accent: #0f6e66;
+	--ff-accent: #8b5a1b;
 	--ff-accent-text: var(--ff-accent); /* accent as text colour; lighter in dark mode for contrast */
-	--ff-side: #1f2a2e;
+	--ff-side: #231b12;
 	--ff-paper: #ffffff;
 	--ff-ink: #161616;
 	--ff-muted: #5f5c5a;
