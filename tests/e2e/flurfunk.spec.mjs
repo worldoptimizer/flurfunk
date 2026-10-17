@@ -549,6 +549,67 @@ test.describe( 'team', () => {
 	} );
 } );
 
+test.describe( 'full screen', () => {
+	test( 'logged out it asks for the login and comes back to the same view', async ( { page } ) => {
+		await page.goto( '/?flurfunk_app=1&view=mentions' );
+		await expect( page ).toHaveURL( /wp-login\.php\?.*redirect_to=/ );
+		expect( decodeURIComponent( decodeURIComponent( page.url() ) ) ).toContain( 'view=mentions' );
+	} );
+
+	test( 'runs without wp-admin, installs as web app, fits a phone', async ( { page } ) => {
+		await login( page, process.env.FF_TEAM, process.env.FF_TEAM_PASS );
+		await openApp( page );
+		const cfg = await page.evaluate( () => window.flurfunkConfig );
+		expect( cfg.standalone ).toBe( false );
+		await page.locator( '.ff-me-tile' ).click();
+		const open = page.locator( '.ff-settings a', { hasText: /Vollbild|full screen/i } );
+		expect( await open.getAttribute( 'href' ) ).toContain( cfg.fullUrl.split( '?' )[ 0 ] );
+		await open.click();
+		await page.waitForSelector( '.ff-app .ff-me-tile' );
+		expect( page.url().startsWith( cfg.fullUrl.split( '?' )[ 0 ] ) ).toBe( true );
+		expect( await page.locator( '#wpadminbar, #adminmenu, #wpfooter' ).count() ).toBe( 0 );
+		expect( await page.evaluate( () => window.flurfunkConfig.standalone ) ).toBe( true );
+
+		// Fills the window.
+		const h = await page.locator( '.ff-app' ).evaluate( ( e ) => e.getBoundingClientRect().height );
+		expect( Math.abs( h - page.viewportSize().height ) ).toBeLessThanOrEqual( 1 );
+
+		// Web app: manifest (fetched without cookies, like browsers do) and home screen tags.
+		const m = await page.evaluate( async () => ( await fetch( document.querySelector( 'link[rel="manifest"]' ).href, { credentials: 'omit' } ) ).json() );
+		expect( m.start_url ).toBe( cfg.fullUrl );
+		expect( m.display ).toBe( 'standalone' );
+		expect( m.start_url.startsWith( m.scope ) ).toBe( true );
+		for ( const size of [ '192x192', '512x512' ] ) {
+			expect( m.icons.some( ( i ) => i.sizes === size ), size ).toBe( true );
+		}
+		await expect( page.locator( 'link[rel="apple-touch-icon"]' ) ).toHaveCount( 1 );
+		await expect( page.locator( 'meta[name="viewport"]' ) ).toHaveAttribute( 'content', /viewport-fit=cover/ );
+
+		// Works: a new thread.
+		const text = 'e2e Vollbild ' + Date.now();
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		await ta.pressSequentially( text );
+		await ta.press( 'Control+Enter' );
+		await expect( page.locator( '.ff-pane .ff-root-msg' ) ).toContainText( text );
+
+		// Phone width: one column, no sideways scrolling.
+		await page.setViewportSize( { width: 390, height: 844 } );
+		await page.reload();
+		await page.waitForSelector( '.ff-app .ff-me-tile' );
+		expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth ) ).toBe( true );
+		await page.locator( '.ff-post' ).first().click();
+		await expect( page.locator( '.ff-pane textarea' ) ).toBeVisible();
+		expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth ) ).toBe( true );
+		await page.locator( '.ff-back' ).click();
+
+		// The way back to wp-admin.
+		await page.locator( '.ff-me-tile' ).click();
+		await expect( page.locator( '.ff-settings a', { hasText: /Vollbild|full screen/i } ) ).toHaveCount( 0 );
+		await expect( page.locator( '.ff-settings a', { hasText: /Zurück zu WordPress|Back to WordPress/ } ) ).toHaveAttribute( 'href', cfg.appUrl );
+	} );
+} );
+
 test.describe( 'guest', () => {
 	test( 'sees only allowed channels and commands', async ( { page } ) => {
 		test.skip( ! process.env.FF_GUEST, 'no guest account' );
