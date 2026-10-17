@@ -160,3 +160,90 @@ function flurfunk_url( string $view = '' ): string {
 function flurfunk_app_url( string $view = '' ): string {
 	return Flurfunk\Standalone\url( $view );
 }
+
+/**
+ * Run code as another person (for posting from PHP), then switch back.
+ *
+ * @param int      $user_id User; 0 = the default assistant (created if needed).
+ * @param callable $fn      Work.
+ * @return mixed What $fn returns.
+ */
+function flurfunk_as( int $user_id, callable $fn ) {
+	if ( ! $user_id ) {
+		$user_id = (int) get_option( 'flurfunk_bot_default' );
+		if ( ! $user_id || ! get_userdata( $user_id ) ) {
+			$made    = Flurfunk\Access\create_bot();
+			$user_id = is_wp_error( $made ) ? 0 : (int) $made;
+		}
+	}
+	$before = get_current_user_id();
+	wp_set_current_user( $user_id );
+	try {
+		return $fn();
+	} finally {
+		wp_set_current_user( $before );
+	}
+}
+
+/**
+ * Start a thread from PHP, e.g. when something happens on the site. Posts as the default
+ * assistant unless `author` names someone; mentions, tasks and notifications work as in the app.
+ * With a `ref_key` the call is idempotent: the existing thread's ID comes back.
+ *
+ * @param array $args channel (slug, required), title, body, target ['type','id'], task (bool),
+ *                    due (Y-m-d), assignees (user IDs), files (attachment IDs), attachments
+ *                    (cards: provider, ref), ref_key, author (user ID).
+ * @return int|WP_Error Thread ID.
+ */
+function flurfunk_post( array $args ) {
+	$ref = (string) ( $args['ref_key'] ?? '' );
+	if ( '' !== $ref ) {
+		$found = Flurfunk\Store\thread_by_ref( $ref );
+		if ( $found ) {
+			return (int) $found->id;
+		}
+	}
+	return flurfunk_as(
+		(int) ( $args['author'] ?? 0 ),
+		static function () use ( $args ) {
+			$args['task'] = ! empty( $args['task'] ) || ! empty( $args['due'] ) || ! empty( $args['assignees'] );
+			unset( $args['author'] );
+			return Flurfunk\Store\create_thread( $args );
+		}
+	);
+}
+
+/**
+ * Reply to a thread from PHP (thread ID or the ref_key it was created with).
+ *
+ * @param int|string $thread Thread ID or ref_key.
+ * @param string     $body   Text (mentions as <@ID>).
+ * @param array      $args   files, attachments, author (user ID; default: the assistant).
+ * @return int|WP_Error Message ID.
+ */
+function flurfunk_reply( $thread, string $body, array $args = array() ) {
+	$row = is_int( $thread ) ? Flurfunk\Store\thread_row( $thread ) : Flurfunk\Store\thread_by_ref( (string) $thread );
+	if ( ! $row ) {
+		return new WP_Error( 'flurfunk_thread', __( 'This conversation does not exist.', 'flurfunk' ) );
+	}
+	return flurfunk_as(
+		(int) ( $args['author'] ?? 0 ),
+		static fn () => Flurfunk\Store\add_message( (int) $row->id, array( 'body' => $body ) + array_intersect_key( $args, array_flip( array( 'files', 'attachments' ) ) ) )
+	);
+}
+
+/**
+ * Set a thread's task state from PHP: open, doing, waiting, done, or '' (no task).
+ *
+ * @param int|string $thread Thread ID or ref_key.
+ * @param string     $status State.
+ * @param int        $author Who changes it (default: the assistant).
+ * @return true|WP_Error
+ */
+function flurfunk_set_status( $thread, string $status, int $author = 0 ) {
+	$row = is_int( $thread ) ? Flurfunk\Store\thread_row( $thread ) : Flurfunk\Store\thread_by_ref( (string) $thread );
+	if ( ! $row ) {
+		return new WP_Error( 'flurfunk_thread', __( 'This conversation does not exist.', 'flurfunk' ) );
+	}
+	return flurfunk_as( $author, static fn () => Flurfunk\Store\set_status( (int) $row->id, $status ) );
+}

@@ -520,6 +520,17 @@ $before = (int) $GLOBALS['wpdb']->get_var( "SELECT COUNT(*) FROM {$GLOBALS['wpdb
 $again  = Flurfunk\Transfer\import( json_decode( (string) wp_json_encode( Flurfunk\Transfer\export() ), true ) );
 $check( 'importing the own export again duplicates nothing', 0 === $again['threads'] && $before === (int) $GLOBALS['wpdb']->get_var( "SELECT COUNT(*) FROM {$GLOBALS['wpdb']->prefix}flurfunk_threads" ), $again );
 
+WP_CLI::log( 'Posting from PHP' );
+$ref = 'ff-test-php:' . wp_generate_password( 6, false );
+$pid = flurfunk_post( array( 'channel' => 'ff-test', 'title' => 'Aus PHP', 'body' => "Für <@$team2>", 'target' => array( 'type' => 'post', 'id' => $guest_post ), 'task' => true, 'assignees' => array( $team2 ), 'ref_key' => $ref ) );
+$row = is_int( $pid ) ? Store\thread_row( $pid ) : null;
+$check( 'flurfunk_post() creates a task thread as the assistant', $row && Flurfunk\Access\is_bot( (int) $row->author_id ) && 'open' === $row->status, is_wp_error( $pid ) ? $pid->get_error_message() : $pid );
+$check( '… and is idempotent with a ref_key', $pid === flurfunk_post( array( 'channel' => 'ff-test', 'body' => 'egal', 'ref_key' => $ref ) ) );
+$check( 'flurfunk_reply() answers by ref_key', is_int( flurfunk_reply( $ref, 'Antwort aus PHP' ) ) );
+$check( 'flurfunk_set_status() changes the state', true === flurfunk_set_status( $ref, 'done' ) && 'done' === Store\thread_row( $pid )->status );
+$check( 'the current user is restored afterwards', get_current_user_id() === $team || get_current_user_id() === $team2 || get_current_user_id() === $guest );
+Flurfunk\Notify\deliver();
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );
