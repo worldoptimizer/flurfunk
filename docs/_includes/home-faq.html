@@ -1,0 +1,35 @@
+<section class="section section-band" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-wrap">
+    <header class="section-head">
+      <p class="kicker">FAQ</p>
+      <h2 id="faq-title">Questions people ask first.</h2>
+    </header>
+
+    <div class="faq">
+      <details>
+        <summary>Is it free?</summary>
+        <p>Yes. Flurfunk is free software under the GPL-2.0-or-later. The source is on <a href="{{ site.github_url }}">GitHub</a>.</p>
+      </details>
+      <details>
+        <summary>Does it need an external service?</summary>
+        <p>No. Flurfunk keeps everything in its own tables in your WordPress database and needs no external service, library or API key. Mail goes through <code>wp_mail()</code>. Web Push is encrypted by the plugin itself and sent directly to the browsers&rsquo; push services, which needs HTTPS and PHP&rsquo;s OpenSSL extension.</p>
+      </details>
+      <details>
+        <summary>Does it work with OpenStation?</summary>
+        <p>Yes. When the OpenStation plugin is active, Flurfunk adds a desktop icon and OpenStation&rsquo;s dock shows the same unread badge as the menu item. Without OpenStation it works just the same in plain wp-admin. The <code>flurfunk_openstation_icon</code> filter moves or removes the icon.</p>
+      </details>
+      <details>
+        <summary>Can guests see internal threads?</summary>
+        <p>Not unless a channel allows it. Every channel has one level for the team and one for guests: <code>all</code>, <code>own-posts</code> or <code>none</code>. An internal channel is set to <code>none</code> for guests. In an <code>own-posts</code> channel each guest only sees the threads about their own posts, and the team sees a hint on threads guests can read.</p>
+      </details>
+      <details>
+        <summary>What about privacy?</summary>
+        <p>The data stays in your database. Flurfunk takes part in WordPress&rsquo;s <em>Export Personal Data</em> and <em>Erase Personal Data</em> tools: erasing replaces a person&rsquo;s messages with a note and removes their read state, mentions, task assignments, notifications, push subscriptions and preferences, so conversations stay readable for everyone else. When a user is deleted, their personal data is removed as well. <a href="{{ '/installation.html#privacy' | relative_url }}">Privacy in detail</a></p>
+      </details>
+      <details>
+        <summary>Can I move it to another site?</summary>
+        <p>Yes. <code>wp flurfunk export bundle/ --files</code> writes everything, files included, in the <code>flurfunk/1</code> format; <code>wp flurfunk import bundle/</code> reads it on the other site. <a href="{{ '/installation.html#moving-a-site-backups' | relative_url }}">Moving a site</a></p>
+      </details>
+    </div>
+  </div>
+</section>

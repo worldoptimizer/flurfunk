@@ -9,4 +9,5 @@ tools
 node_modules
 README.md
 docs
+.github
 assets/brand/flurfunk-app-icon-1024.png

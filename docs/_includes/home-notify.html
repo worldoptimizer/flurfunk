@@ -1,0 +1,53 @@
+{%- assign h = '/assets/hero/' | relative_url -%}
+<section class="section" id="notifications" aria-labelledby="notify-title">
+  <div class="wrap split split-reverse">
+    <header class="section-head">
+      <p class="kicker">Notifications</p>
+      <h2 id="notify-title">Told about what concerns you. Left alone otherwise.</h2>
+      <p class="lead">Mentions, tasks, due dates and replies in your threads reach you in the app, by mail and by Web Push. Each person decides how much.</p>
+      <ul class="checks">
+        <li>Mail right away, as one daily summary, for everything, or never.</li>
+        <li>Web Push to desktop browsers, Android, and iPhone home screen apps.</li>
+        <li>Quiet hours, a pause button, and per channel: as usual, every new post, or only mentions.</li>
+        <li>Follow, mute or &ldquo;remind me&rdquo; on any thread.</li>
+      </ul>
+      <p><a href="{{ '/user-guide.html#notifications' | relative_url }}">Notifications in the user guide</a></p>
+    </header>
+
+    <div class="showcase nt-stage">
+      <p class="visually-hidden">Illustration: a phone lock screen receives a push notification from Flurfunk that Ana Klein mentioned you, next to the notification settings with a daily mail summary, push on and quiet hours from 22:00 to 07:00.</p>
+      <div class="ntf" aria-hidden="true" data-demo="notify">
+        <div class="mock nt-settings">
+          <b class="nt-title">Your settings</b>
+          <div class="nt-row nt-row-col">
+            <span>Email me</span>
+            <span class="nt-seg"><i>Right away</i><i class="is-on">Once a day</i><i>Everything</i><i>Never</i></span>
+          </div>
+          <div class="nt-row"><span>Daily summary at</span><span class="nt-pill">7:00</span></div>
+          <div class="nt-row"><span>Push on this device</span><span class="nt-switch nt-push"><i></i></span></div>
+          <div class="nt-row"><span>Quiet hours</span><span class="nt-pill">22:00&ndash;07:00</span></div>
+          <div class="nt-row"><span>Pause</span><span class="nt-seg nt-seg-small"><i>1 hour</i><i>3 hours</i><i>Until tomorrow</i></span></div>
+          <div class="nt-row"><span># tech</span><span class="nt-pill">only mentions</span></div>
+        </div>
+
+        <div class="nt-phone">
+          <div class="nt-screen">
+            <img class="nt-wall" src="{{ h }}photo-autumn-forest-240.webp" alt="" width="240" height="160" loading="lazy">
+            <span class="nt-clock">9:41</span>
+            <span class="nt-date">Thursday, 15 October</span>
+            <div class="nt-push-card nt-push-1">
+              <span class="nt-push-app"><img src="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" alt="" width="64" height="64" loading="lazy">Flurfunk<small>now</small></span>
+              <b>Ana Klein mentioned you</b>
+              <span>Autumn issue: cover story &mdash; @Mia Park can you check the intro by Friday?</span>
+            </div>
+            <div class="nt-push-card nt-push-2">
+              <span class="nt-push-app"><img src="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" alt="" width="64" height="64" loading="lazy">Flurfunk<small>9:12</small></span>
+              <b>Due today</b>
+              <span>Newsletter goes out Thursday</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

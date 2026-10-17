@@ -1,0 +1,145 @@
+{%- assign h = '/assets/hero/' | relative_url -%}
+<section class="section" id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <header class="section-head">
+      <p class="kicker">What it does</p>
+      <h2 id="features-title">Conversations next to the work, not in another tool.</h2>
+      <p class="lead">Flurfunk lives in wp-admin. Threads sit next to the posts they are about, tasks have a board, and everyone gets told what concerns them.</p>
+    </header>
+
+    <ul class="tiles" role="list">
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-channels">
+            <div class="mk-side">
+              <b>Channels</b>
+              <span><i>#</i>general</span>
+              <span class="is-on"><i>#</i>editorial</span>
+              <span class="is-unread"><i>#</i>tech<em>3</em></span>
+            </div>
+            <div class="mk-list">
+              <div class="mk-row is-sel"><img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96" loading="lazy"><span><b>Autumn issue: cover story</b><small>2 replies &middot; Post: &ldquo;Autumn issue&rdquo;</small></span></div>
+              <div class="mk-row"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96" loading="lazy"><span><b>Photo rights for the interview</b><small>4 replies &middot; 2 files</small></span></div>
+              <div class="mk-row"><img src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96" loading="lazy"><span><b>New archive on staging</b><small>1 reply</small></span></div>
+            </div>
+          </div>
+        </div>
+        <h3>Channels and threads</h3>
+        <p>A thread has a title, replies, files and cards. Attach it to a post and it shows up in the block editor&rsquo;s Conversations panel and the posts list.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-lanes">
+            <div><b>Open</b><span class="mk-card">Newsletter<small>Thu</small></span></div>
+            <div><b>In progress</b><span class="mk-card">Cover story<small>Fri</small></span></div>
+            <div><b>Question</b><span class="mk-card is-q">Photo credits?<small>today</small></span></div>
+            <div><b>Done</b><span class="mk-card is-done">Interview<small>Mon</small></span></div>
+          </div>
+        </div>
+        <h3>Tasks and a board</h3>
+        <p>Any thread can be a task: Open, In progress, Question or Done, with a due date and up to 20 responsible people. Move cards by drag and drop or with Alt+Arrow keys.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-files">
+            <div class="mk-gallery">
+              <img src="{{ h }}photo-autumn-market-240.webp" alt="" width="240" height="160" loading="lazy">
+              <img src="{{ h }}photo-autumn-forest-240.webp" alt="" width="240" height="160" loading="lazy">
+              <img src="{{ h }}photo-newsroom-160.webp" alt="" width="160" height="107" loading="lazy">
+            </div>
+            <span class="mk-file"><i>PDF</i>brief-autumn.pdf<small>240 KB</small></span>
+          </div>
+        </div>
+        <h3>Files, media library, gallery</h3>
+        <p>Up to 50 files per message, uploaded or picked from the media library. Images become a gallery with a lightbox; uploads only enter the media library when someone adds them.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-bell">
+            <div class="mk-bell-head"><b>Notifications</b><span>Mark all as read</span></div>
+            <div class="mk-note is-new"><img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96" loading="lazy"><span><b>Ana Klein</b> mentioned you<small>Autumn issue: cover story</small></span></div>
+            <div class="mk-note"><span class="mk-due">!</span><span><b>Due today</b><small>Newsletter goes out Thursday</small></span></div>
+            <div class="mk-note"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96" loading="lazy"><span><b>Tom Berger</b> replied<small>Photo rights for the interview</small></span></div>
+          </div>
+        </div>
+        <h3>Notifications that fit</h3>
+        <p>Everything lands behind the bell. Mail right away or as a daily summary, Web Push to browsers and phones, quiet hours, pause, levels per channel and &ldquo;remind me&rdquo;.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-slash">
+            <div class="mk-menu">
+              <span class="is-sel"><b>/post</b> Insert a post as a card</span>
+              <span><b>/newsletter</b> A MailerPress campaign</span>
+              <span><b>/report</b> From your own plugin</span>
+            </div>
+            <div class="mk-compose">/po<i class="mk-caret"></i></div>
+          </div>
+        </div>
+        <h3>Cards from other plugins</h3>
+        <p>Type <code>/</code> for commands. <code>/post</code> inserts a post as a card, plugins add their own. A card keeps a snapshot of its data and can be refreshed on request.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-phone">
+            <div class="mk-screen">
+              <span class="mk-time">9:41</span>
+              <div class="mk-icons">
+                <i></i><i></i><i></i>
+                <span class="mk-app"><img src="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" alt="" width="64" height="64" loading="lazy"><em>3</em></span>
+                <i></i><i></i><i></i><i></i>
+              </div>
+              <small>Flurfunk</small>
+            </div>
+          </div>
+        </div>
+        <h3>A full-screen web app</h3>
+        <p><code>/flurfunk/</code> shows the app without admin bar or menu. Add it to the home screen on iPhone or Android, and push opens the thread right there.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-guests">
+            <div class="mk-col">
+              <b>Team sees</b>
+              <span>Budget for the winter issue</span>
+              <span>Interview: final read</span>
+              <span>Freelancer rates</span>
+            </div>
+            <div class="mk-col is-guest">
+              <b>Guest author sees</b>
+              <span class="is-hidden"></span>
+              <span>Interview: final read<small>about your post</small></span>
+              <span class="is-hidden"></span>
+            </div>
+          </div>
+        </div>
+        <h3>Team and guests</h3>
+        <p>Each channel says what the team and what guests see: everything, only threads about their own posts, or nothing. Guest authors talk about their texts without seeing internal discussions.</p>
+      </li>
+
+      <li class="tile">
+        <div class="tile-visual" aria-hidden="true">
+          <div class="mock mk-data">
+<pre>{
+  <b>"format"</b>: "flurfunk/1",
+  <b>"channels"</b>: [&hellip;],
+  <b>"people"</b>: [&hellip;],
+  <b>"threads"</b>: [&hellip;]
+}</pre>
+            <div class="mk-tags"><span>wp flurfunk export</span><span>Export Personal Data</span></div>
+          </div>
+        </div>
+        <h3>Your data, your tables</h3>
+        <p>Own database tables, no external service. One JSON format, <code>flurfunk/1</code>, for export and import with or without files. Works with WordPress&rsquo;s privacy export and erase tools.</p>
+      </li>
+
+    </ul>
+  </div>
+</section>

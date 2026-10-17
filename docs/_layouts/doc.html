@@ -1,0 +1,43 @@
+---
+layout: default
+---
+{%- assign pages_in_nav = site.nav | where_exp: "item", "item.url != '/'" -%}
+{%- assign prev = nil -%}{%- assign next = nil -%}
+{%- for item in pages_in_nav -%}
+  {%- if item.url == page.url -%}
+    {%- assign i = forloop.index0 -%}
+    {%- if i > 0 -%}{%- assign pi = i | minus: 1 -%}{%- assign prev = pages_in_nav[pi] -%}{%- endif -%}
+    {%- assign ni = i | plus: 1 -%}{%- assign next = pages_in_nav[ni] -%}
+  {%- endif -%}
+{%- endfor -%}
+<div class="wrap doc-shell">
+  <main id="main" class="doc-main" tabindex="-1">
+    {%- comment -%} Screenshots: lazy loading, and their size so the page does not jump. {%- endcomment -%}
+    {%- assign body = content | replace: '<img src="', '<img loading="lazy" decoding="async" src="' -%}
+    {%- for shot in site.data.screenshots -%}
+      {%- if shot.raw -%}
+        {%- capture find -%}src="{{ shot.raw }}"{%- endcapture -%}
+        {%- capture with_size -%}src="{{ shot.raw }}" height="{{ shot.height }}"{%- endcapture -%}
+        {%- assign body = body | replace: find, with_size -%}
+        {%- continue -%}
+      {%- endif -%}
+      {%- assign url = shot.src | relative_url -%}
+      {%- capture find -%}src="{{ url }}"{%- endcapture -%}
+      {%- capture with_size -%}src="{{ url }}" width="{{ shot.width }}" height="{{ shot.height }}"{%- endcapture -%}
+      {%- assign body = body | replace: find, with_size -%}
+    {%- endfor %}
+    <article class="prose">
+      {{ body }}
+    </article>
+    {%- if prev or next %}
+    <ul class="doc-pager">
+      {%- if prev %}<li><a class="prev" href="{{ prev.url | relative_url }}"><small>Previous</small><b>{{ prev.title }}</b></a></li>{% else %}<li></li>{% endif %}
+      {%- if next %}<li><a class="next" href="{{ next.url | relative_url }}"><small>Next</small><b>{{ next.title }}</b></a></li>{% endif %}
+    </ul>
+    {%- endif %}
+  </main>
+  <nav class="doc-toc" aria-label="On this page" hidden>
+    <h2>On this page</h2>
+    <ol></ol>
+  </nav>
+</div>

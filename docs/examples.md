@@ -452,6 +452,8 @@ repository secrets: `FLURFUNK_SITE` (`https://example.com`) and `FLURFUNK_AUTH`
 
 `.github/workflows/deploy.yml` (the relevant step):
 
+<!-- {% raw %} -->
+
 ```yaml
 name: Deploy
 on:
@@ -490,6 +492,7 @@ jobs:
           curl -fsS -u "$FLURFUNK_AUTH" -H 'Content-Type: application/json' \
             -d "$message" "$api/threads/$tid/messages" > /dev/null
 ```
+<!-- {% endraw %} -->
 
 To ping someone on failures, add a mention to the body, for example
 `(if $status == "failure" then " <@7>" else "" end)` in the jq expression (7 is the user ID).
