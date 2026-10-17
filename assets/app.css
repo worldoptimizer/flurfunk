@@ -457,3 +457,13 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 	.ff-board { grid-template-columns: repeat(4, 82vw); scroll-snap-type: x mandatory; }
 	.ff-lane { scroll-snap-align: start; }
 }
+
+/* On the board a thread opens as a drawer over the columns instead of squeezing them. */
+.ff-app.is-board { position: relative; }
+.ff-app.is-board.has-pane { grid-template-columns: var(--ff-nav-w) minmax(0, 1fr); }
+.ff-app.is-board.has-pane .ff-main { border-right: 0; }
+.ff-app.is-board .ff-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(var(--ff-pane-w), 92%); z-index: 6; background: var(--ff-paper); border-left: 1px solid var(--ff-line); box-shadow: -12px 0 32px rgb(0 0 0 / .18); }
+.ff-tcard.is-current { border-color: var(--ff-accent); box-shadow: 0 0 0 1px var(--ff-accent); }
+.ff-tcard-last { margin: 0; color: var(--ff-muted); font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ff-tcard-last b { color: var(--ff-ink); font-weight: 600; }
+@media (max-width: 700px) { .ff-app.is-board .ff-pane { position: static; width: auto; box-shadow: none; border-left: 0; } }

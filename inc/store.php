@@ -1325,6 +1325,14 @@ function summarize( array $rows, int $user_id ): array {
 		$last[ $tid ] = $r;
 		$ppl[ $tid ][ (int) $r->author_id ] = true;
 	}
+	// Text of each thread's latest reply, for a one-line preview.
+	$texts    = array();
+	$last_ids = array_filter( array_map( static fn ( $r ) => (int) $r->last_id, $stats ) );
+	if ( $last_ids ) {
+		foreach ( $wpdb->get_results( 'SELECT id, body FROM ' . $m . ' WHERE id IN (' . implode( ',', $last_ids ) . ')' ) as $r ) { // phpcs:ignore WordPress.DB
+			$texts[ (int) $r->id ] = mb_substr( \Flurfunk\Notify\readable( (string) $r->body ), 0, 160 );
+		}
+	}
 	$unread = array();
 	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT m.thread_id, COUNT(*) n FROM $m m LEFT JOIN " . table( 'reads' ) . " r ON r.thread_id = m.thread_id AND r.user_id = %d WHERE m.thread_id IN ($in) AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) GROUP BY m.thread_id", $user_id, $user_id ) ) as $r ) { // phpcs:ignore WordPress.DB
 		$unread[ (int) $r->thread_id ] = (int) $r->n;
@@ -1339,6 +1347,7 @@ function summarize( array $rows, int $user_id ): array {
 			'last'         => $l ? array(
 				'author'  => (int) $l->author_id,
 				'created' => iso( $l->created ),
+				'text'    => $texts[ (int) $l->id ] ?? '',
 			) : null,
 			'activity'     => iso( $r->last_activity ),
 			'unread'       => ( $unread[ $tid ] ?? 0 ) + ( -1 === $read[ $tid ] && (int) $r->author_id !== $user_id ? 1 : 0 ),
