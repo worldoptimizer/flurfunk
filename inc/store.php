@@ -828,6 +828,18 @@ function refresh_card( int $attachment_id ) {
 }
 
 /**
+ * May this person refer to a media library file in a message? Their own files and files they
+ * can edit; assistants (which usually have no role) any file in the library.
+ *
+ * @param \WP_Post $post    Attachment.
+ * @param int      $user_id User.
+ */
+function can_attach( \WP_Post $post, int $user_id ): bool {
+	$ok = (int) $post->post_author === $user_id || user_can( $user_id, 'edit_post', $post->ID ) || ( \Flurfunk\Access\is_bot( $user_id ) && 'private' !== get_post_status( $post ) );
+	return (bool) apply_filters( 'flurfunk_can_attach', $ok, $post, $user_id );
+}
+
+/**
  * Validate and describe files from the media library.
  *
  * @param array $ids     Media library IDs (or ready descriptions on import).
@@ -844,7 +856,7 @@ function files( array $ids, int $user_id, bool $check ): array {
 		}
 		$id   = (int) ( is_array( $f ) ? ( $f['id'] ?? 0 ) : $f );
 		$post = get_post( $id );
-		if ( ! $post || 'attachment' !== $post->post_type || ( $check && ! user_can( $user_id, 'edit_post', $id ) && (int) $post->post_author !== $user_id ) ) {
+		if ( ! $post || 'attachment' !== $post->post_type || ( $check && ! can_attach( $post, $user_id ) ) ) {
 			continue;
 		}
 		$path  = get_attached_file( $id );

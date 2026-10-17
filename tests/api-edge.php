@@ -472,6 +472,17 @@ $young = (int) $wpdb->insert_id;
 Flurfunk\Notify\prune();
 $check( 'old read notifications are pruned, unread ones kept longer', ! $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $old" ) && $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $young" ) );
 
+WP_CLI::log( 'Media library references' );
+$lib = wp_insert_attachment( array( 'post_title' => 'ff-test-bibliothek', 'post_mime_type' => 'image/png', 'post_status' => 'inherit', 'post_author' => $team ), false );
+$check( 'a guest cannot refer to someone else\'s library file', array() === Store\files( array( $lib ), $guest, true ) );
+$check( 'the team can', 1 === count( Store\files( array( $lib ), $team2, true ) ) );
+$bot_id = (int) ( get_users( array( 'meta_key' => 'flurfunk_bot', 'fields' => 'ID', 'number' => 1 ) )[0] ?? 0 );
+if ( $bot_id ) {
+	$check( 'an assistant can', 1 === count( Store\files( array( $lib ), $bot_id, true ) ) );
+}
+$check( 'up to 50 files per message', 50 === count( Store\files( array_fill( 0, 60, $lib ), $team2, true ) ) );
+wp_delete_attachment( $lib, true );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );
