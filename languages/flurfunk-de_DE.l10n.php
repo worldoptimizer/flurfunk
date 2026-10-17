@@ -83,6 +83,7 @@ return array(
 		'Contributors and up (edit_posts)' => 'Mitarbeiter:innen und höher (edit_posts)',
 		'Conversations' => 'Gespräche',
 		'Conversations about' => 'Gespräche zu',
+		'Conversations about this' => 'Gespräche dazu',
 		'Conversations about this post' => 'Gespräche zu diesem Artikel',
 		'Conversations panel in the editor' => 'Leiste „Gespräche“ im Editor',
 		'Could not save the conversation.' => 'Das Gespräch konnte nicht gespeichert werden.',

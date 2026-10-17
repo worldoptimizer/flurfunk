@@ -60,6 +60,8 @@ from the media library (up to 50 per message). Images show as previews or a gall
 a lightbox; audio and video show as players. Uploaded files stay out of the media library until
 someone adds them, without being copied or moved.
 
+![An image from a message in the lightbox](assets/screenshot-lightbox.png)
+
 ### Slash commands and cards
 
 Typing `/` opens a menu of commands. `/post` inserts a post as a card. Other plugins register
@@ -75,6 +77,8 @@ Every notification lands in the in-app list behind the bell. Each person chooses
 them by mail (right away, a daily summary, everything, never) and by Web Push to browsers and
 phones. There are quiet hours, a pause button, per-channel levels, and per-thread follow, mute
 and "remind me".
+
+![The notifications behind the bell](assets/screenshot-notifications.png)
 
 ### Team and guests
 

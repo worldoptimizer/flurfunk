@@ -89,7 +89,7 @@
 		}
 		const d = new Date( iso );
 		const now = new Date();
-		const time = d.toLocaleTimeString( locale(), { hour: '2-digit', minute: '2-digit' } );
+		const time = d.toLocaleTimeString( locale(), { hour: 'numeric', minute: '2-digit' } );
 		const days = Math.round( ( new Date( now.toDateString() ) - new Date( d.toDateString() ) ) / 864e5 );
 		if ( now - d < 60e3 ) {
 			return t( 'just now' );
@@ -197,6 +197,8 @@
 			+ ( s.audio ? '<audio controls preload="none" src="' + esc( s.audio ) + '"></audio>' : '' )
 			+ ( s.meta ? '<span class="ff-card-meta">' + s.meta.map( esc ).join( ' · ' ) + '</span>' : '' )
 			+ ( s.action ? '<a class="ff-card-action" href="' + esc( s.action.url ) + '" target="_top">' + esc( s.action.label ) + '</a>' : '' )
+			// "Conversations about this": inside the app it switches the view, elsewhere it opens the app there.
+			+ ( s.target && s.target.type && s.target.id && cfg.appUrl ? '<a class="ff-card-action ff-card-talk" data-ff="target" data-type="' + esc( s.target.type ) + '" data-id="' + ( +s.target.id ) + '" href="' + esc( cfg.appUrl + '&view=target:' + s.target.type + ':' + ( +s.target.id ) ) + '" target="_top">' + esc( t( 'Conversations about this' ) ) + '</a>' : '' )
 			+ '</div>';
 	};
 	const providerOf = ( id ) => ( boot && boot.providers.find( ( p ) => p.id === id ) ) || { id, label: id, command: '' };

@@ -524,7 +524,7 @@ $check( '"monday" lies in the future on a Monday', strtotime( Store\remind_time(
 Store\set_reminder( $t2['id'], $team2, gmdate( 'Y-m-d H:i:s', time() - 60 ) );
 $as( $team );
 $hq = (int) wp_date( 'G' );
-Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59', $hq, $hq ) ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59', ( $hq + 23 ) % 24, ( $hq + 1 ) % 24 ) ) );
 list( $notes ) = $flush( fn () => Flurfunk\Notify\send_reminders() );
 $check( 'reminders wait during quiet hours', ! isset( $notes[ $team2 ] ) && null !== Store\reminder( $t2['id'], $team2 ), $notes );
 Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => '' ) );
@@ -564,7 +564,7 @@ Flurfunk\Notify\send_digests( true );
 $check( '… and not again for the same notifications', ! in_array( $team2, $mailed, true ) );
 $now = wp_date( 'H:i' );
 $h   = (int) substr( $now, 0, 2 );
-Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59', $h, $h ) ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59', ( $h + 23 ) % 24, ( $h + 1 ) % 24 ) ) );
 $check( 'quiet hours are recognised', Flurfunk\Notify\is_quiet( $team2 ) );
 Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:00', ( $h + 2 ) % 24, ( $h + 3 ) % 24 ) ) );
 $check( '… and outside them push is allowed', ! Flurfunk\Notify\is_quiet( $team2 ) );

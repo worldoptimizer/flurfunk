@@ -53,6 +53,15 @@ to reset it. Flurfunk remembers the widths in your browser.
 Flurfunk updates itself every 30 seconds while it is visible, and right away when you come back
 to the tab.
 
+### Full screen
+
+**Open full screen** in your settings (click your name) opens Flurfunk on a page of its own, at
+`/flurfunk/` on your site: no admin bar, no admin menu, just the app. **Back to WordPress** returns.
+On a phone the same address can be added to the home screen and then works like an app (see
+[Push on phones and tablets](#push-on-phones-and-tablets)).
+
+![Flurfunk in full screen, with a task thread open next to the list](assets/screenshot-fullscreen.png)
+
 ## Threads and replies
 
 ### Start a thread
@@ -156,6 +165,8 @@ How files show:
 - Other files show as a download link with name and size. Long lists show the first six files;
   the rest fold away under "… more files".
 
+![An image opened in the lightbox, with arrows to the other images of the message](assets/screenshot-lightbox.png)
+
 Files you upload in Flurfunk do not appear in the media library. If a file should be used
 elsewhere, click **Add to media library** next to it. The file keeps its place and address, so
 the message still works. Files nobody refers to any more are deleted after 30 days. A file
@@ -217,6 +228,8 @@ the channel, the due date, the number of replies and the responsible people.
 - Click a card (or press Enter) to open the thread next to the board.
 - The two menus in the header filter by channel and by responsible person ("Me" for your own).
 
+![A card opened from the board: the thread slides in over the columns](assets/screenshot-board-drawer.png)
+
 A move shows at once and is saved in the background. If saving fails, the card goes back.
 
 ## Conversations about posts
@@ -274,6 +287,8 @@ Every notification lands in the list behind the bell at the top of the sidebar, 
 chose for mail and push. Opening a thread marks its notifications as read. **Mark all as read**
 clears the list. Read notifications are removed after 90 days, unread ones after 180.
 
+![The notifications behind the bell: an overdue task, replies, a mention and a question](assets/screenshot-notifications.png)
+
 ### Per channel
 
 The header of each channel has a "Notify" menu:
@@ -287,6 +302,8 @@ The header of each channel has a "Notify" menu:
 ## Your settings
 
 Click your name at the bottom of the sidebar.
+
+<img src="assets/screenshot-settings.png" alt="The settings, opened from your name at the bottom of the sidebar" width="316">
 
 | Setting | Choices |
 | --- | --- |
@@ -311,6 +328,15 @@ only works when Flurfunk is installed as a web app:
 4. Open your settings and turn push on.
 
 Push is set per device. Turn it on in each browser and on each phone you use.
+
+<img src="assets/screenshot-mobile.png" alt="Flurfunk on a phone: a thread with an image gallery" width="390">
+
+### Dark appearance
+
+With **Dark** (or **Automatic** while your system is dark) the whole app switches colours; the
+sidebar keeps your site's colour.
+
+![The overview in the dark appearance](assets/screenshot-overview-dark.png)
 
 ## Keyboard shortcuts
 
