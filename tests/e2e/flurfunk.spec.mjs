@@ -420,6 +420,60 @@ test.describe( 'team', () => {
 		expect( await li.evaluate( ( e ) => getComputedStyle( e.parentElement ).listStyleType ) ).toBe( 'disc' );
 	} );
 
+	test( 'a task with due date and responsible person, shown in "My tasks"', async ( { page, browser } ) => {
+		test.skip( ! process.env.FF_TEAM2, 'needs a second team account' );
+		const boot = await api( page, 'bootstrap' );
+		const other = boot.people.find( ( p ) => p.id !== boot.me.id && 'team' === p.kind );
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		const title = 'e2e Aufgabe ' + Date.now();
+		await ta.fill( title );
+		await page.locator( '.ff-new-thread input[name=task]' ).check();
+		await page.locator( '.ff-new-thread input[name=due]' ).fill( '2031-05-04' );
+		await page.locator( '.ff-new-thread [data-ff="new-assign"]' ).click();
+		await page.locator( '.ff-people-pop .ff-pick-q' ).fill( other.name.split( ' ' )[ 0 ] );
+		await page.locator( '.ff-people-pop label', { hasText: other.name } ).first().locator( 'input' ).check();
+		await page.locator( '.ff-people-pop [data-pp="done"]' ).click();
+		await expect( page.locator( '.ff-new-thread [data-ff="new-assign"]' ) ).toContainText( other.name.split( ' ' )[ 0 ] );
+		await ta.press( 'Control+Enter' );
+		const task = page.locator( '.ff-pane .ff-task' );
+		await expect( task ).toContainText( other.name );
+		await expect( task.locator( 'input[type=date]' ) ).toHaveValue( '2031-05-04' );
+		await task.locator( 'input[type=date]' ).fill( '2020-01-01' );
+		await task.locator( 'input[type=date]' ).dispatchEvent( 'change' );
+		await expect( page.locator( '.ff-pane .ff-due.is-over' ) ).toBeVisible();
+		await expect( page.locator( '.ff-pane .ff-event', { hasText: '2020' } ).or( page.locator( '.ff-pane .ff-event' ).last() ) ).toBeVisible();
+		const second = await ( await browser.newContext() ).newPage();
+		await login( second, process.env.FF_TEAM2, process.env.FF_TEAM2_PASS );
+		await second.goto( APP + '&view=mine', { waitUntil: 'domcontentloaded' } );
+		await expect( second.locator( '.ff-post', { hasText: title } ) ).toBeVisible( { timeout: 60_000 } );
+		await expect( second.locator( '.ff-nav button[data-view="mine"] b.is-over' ) ).toBeVisible();
+		await expect( second.locator( '.ff-bell b' ) ).toBeVisible();
+		await second.locator( '.ff-bell' ).click();
+		const note = second.locator( '.ff-note-item', { hasText: title } ).first();
+		await expect( note ).toBeVisible();
+		await note.click();
+		await expect( second.locator( '.ff-pane .ff-root-msg' ) ).toContainText( title );
+		await second.context().close();
+	} );
+
+	test( 'settings: notifications section, quiet hours, browser notifications', async ( { page } ) => {
+		await page.context().grantPermissions( [ 'notifications' ] );
+		await openApp( page );
+		await page.locator( '.ff-me-tile' ).click();
+		const box = page.locator( '.ff-settings' );
+		await expect( box ).toContainText( /Push/ );
+		await box.locator( 'input[type=radio][value=digest]' ).check();
+		await box.locator( '[data-ff="quiet-on"]' ).check();
+		await expect( box.locator( '[data-part="from"]' ) ).toBeEnabled();
+		await box.locator( '[data-ff="browser-notes"]' ).check();
+		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.quiet ).toMatch( /^\d\d:\d\d-\d\d:\d\d$/ );
+		expect( ( await api( page, 'bootstrap' ) ).me.prefs.mail ).toBe( 'digest' );
+		await box.locator( 'input[type=radio][value=mentions]' ).check();
+		await box.locator( '[data-ff="quiet-on"]' ).uncheck();
+		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.quiet ).toBe( '' );
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];
