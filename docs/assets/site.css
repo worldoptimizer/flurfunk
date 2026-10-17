@@ -12,15 +12,15 @@
   --paper: #f6f3ee;
   --amber: #e8a33d;
 
-  --bg: #0f1716;
-  --surface: #152120;
-  --surface-2: #1a2a28;
-  --tint: #11332f;          /* teal wash */
-  --tint-amber: #3a2c15;
-  --text: #ece8e0;
-  --muted: #a2b3ae;
-  --border: #233532;
-  --border-strong: #335350;
+  --bg: #121415;
+  --surface: #181b1c;
+  --surface-2: #1e2223;
+  --tint: #1f2425;          /* teal wash */
+  --tint-amber: #33291a;
+  --text: #ece9e4;
+  --muted: #a7adab;
+  --border: #2a2f30;
+  --border-strong: #3b4143;
   --link: #4fd1bd;
   --link-hover: #8ee6d8;
   --accent: #0f6e66;        /* filled teal: buttons, active nav */
@@ -30,22 +30,21 @@
   --focus: var(--amber);
   --mark: var(--amber);
 
-  --code-bg: #0b1211;
+  --code-bg: #0e1011;
   --code-text: #dcd8cf;
-  --inline-code-bg: #133430;
-  --inline-code-text: #a6eadf;
+  --inline-code-bg: #23292a;
+  --inline-code-text: #e6e1d8;
 
   /* Hero band */
-  --hero-bg:
-    radial-gradient(70rem 34rem at 90% -20%, rgb(15 110 102 / 75%), transparent 65%),
-    radial-gradient(40rem 26rem at -5% 120%, rgb(232 163 61 / 14%), transparent 70%),
-    linear-gradient(180deg, #0c2725 0%, #0f1716 100%);
-  --hero-text: #f6f3ee;
-  --hero-muted: rgb(246 243 238 / 72%);
-  --hero-btn-bg: #3fc4b1;
-  --hero-btn-hover: #6fd8c8;
-  --hero-btn-text: #06201d;
-  --hero-quiet-border: rgb(246 243 238 / 35%);
+  --hero-bg: 
+    radial-gradient(46rem 30rem at 80% 50%, rgb(15 110 102 / 14%), transparent 70%),
+    #121415;
+  --hero-text: #f3f0ea;
+  --hero-muted: rgb(243 240 234 / 70%);
+  --hero-btn-bg: #0f6e66;
+  --hero-btn-hover: #138277;
+  --hero-btn-text: #ffffff;
+  --hero-quiet-border: rgb(255 255 255 / 22%);
 
   /* Demo app */
   --app-side: #0b201e;
@@ -92,7 +91,7 @@
     --bg: #f6f3ee;
     --surface: #fffdf9;
     --surface-2: #efeae2;
-    --tint: #dcebe7;
+    --tint: #ece6dc;
     --tint-amber: #f8e8cc;
     --text: #1f2a2e;
     --muted: #56645f;
@@ -107,15 +106,17 @@
     --focus: #0f6e66;
     --code-bg: #f0ebe3;
     --code-text: #24302f;
-    --inline-code-bg: #dcebe7;
-    --inline-code-text: #0a4a45;
-    --hero-bg:
-      radial-gradient(60rem 30rem at 95% -10%, rgb(63 196 177 / 35%), transparent 65%),
-      radial-gradient(40rem 26rem at -5% 120%, rgb(232 163 61 / 22%), transparent 70%),
-      linear-gradient(160deg, #0f6e66 0%, #0b5550 55%, #0a4541 100%);
-    --hero-btn-bg: #f6f3ee;
-    --hero-btn-hover: #ffffff;
-    --hero-btn-text: #0a4a45;
+    --inline-code-bg: #ebe5db;
+    --inline-code-text: #1f2a2e;
+    --hero-bg: 
+  radial-gradient(46rem 30rem at 80% 50%, rgb(15 110 102 / 9%), transparent 70%),
+  #f6f3ee;
+    --hero-btn-bg: #0f6e66;
+    --hero-btn-hover: #0a4a45;
+    --hero-btn-text: #ffffff;
+    --hero-quiet-border: rgb(31 42 46 / 25%);
+    --hero-muted: rgb(31 42 46 / 70%);
+    --hero-text: #1f2a2e;
     --app-main: #ffffff;
     --app-pane: #f8f6f2;
     --app-text: #1f2a2e;
@@ -145,7 +146,7 @@
   --bg: #f6f3ee;
   --surface: #fffdf9;
   --surface-2: #efeae2;
-  --tint: #dcebe7;
+  --tint: #ece6dc;
   --tint-amber: #f8e8cc;
   --text: #1f2a2e;
   --muted: #56645f;
@@ -160,15 +161,17 @@
   --focus: #0f6e66;
   --code-bg: #f0ebe3;
   --code-text: #24302f;
-  --inline-code-bg: #dcebe7;
-  --inline-code-text: #0a4a45;
-  --hero-bg:
-    radial-gradient(60rem 30rem at 95% -10%, rgb(63 196 177 / 35%), transparent 65%),
-    radial-gradient(40rem 26rem at -5% 120%, rgb(232 163 61 / 22%), transparent 70%),
-    linear-gradient(160deg, #0f6e66 0%, #0b5550 55%, #0a4541 100%);
-  --hero-btn-bg: #f6f3ee;
-  --hero-btn-hover: #ffffff;
-  --hero-btn-text: #0a4a45;
+  --inline-code-bg: #ebe5db;
+  --inline-code-text: #1f2a2e;
+  --hero-bg: 
+  radial-gradient(46rem 30rem at 80% 50%, rgb(15 110 102 / 9%), transparent 70%),
+  #f6f3ee;
+  --hero-btn-bg: #0f6e66;
+  --hero-btn-hover: #0a4a45;
+  --hero-btn-text: #ffffff;
+  --hero-quiet-border: rgb(31 42 46 / 25%);
+  --hero-muted: rgb(31 42 46 / 70%);
+  --hero-text: #1f2a2e;
   --app-main: #ffffff;
   --app-pane: #f8f6f2;
   --app-text: #1f2a2e;
@@ -429,7 +432,7 @@ html:not(.js) .theme-toggle { display: none; }
 
 .eyebrow {
   margin: 0 0 1rem;
-  color: var(--amber);
+  color: var(--hero-muted);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -486,7 +489,7 @@ html:not(.js) .theme-toggle { display: none; }
 .hero .button-primary:hover { background: var(--hero-btn-hover); color: var(--hero-btn-text); }
 .hero .button-quiet { border-color: var(--hero-quiet-border); color: var(--hero-text); }
 .hero .button-quiet:hover { border-color: var(--hero-text); color: var(--hero-text); }
-.hero :focus-visible { outline-color: var(--amber); }
+.hero :focus-visible { outline-color: var(--focus); }
 
 .hero-cover { margin: 0; }
 .hero-cover img {
@@ -982,7 +985,7 @@ html:not(.js) .theme-toggle { display: none; }
 .prose ul, .prose ol { padding-left: 1.4rem; }
 .prose li + li { margin-top: 0.3rem; }
 .prose li > ul, .prose li > ol { margin-top: 0.3rem; margin-bottom: 0; }
-.prose li::marker { color: var(--accent-text); }
+.prose li::marker { color: var(--muted); }
 
 .prose strong { font-weight: 650; }
 
@@ -1033,7 +1036,7 @@ html:not(.js) .theme-toggle { display: none; }
   padding: 1.1rem 1.35rem 1.1rem 1.35rem;
   list-style: none;
   background: var(--tint);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   font-size: 0.95rem;
 }
@@ -1041,7 +1044,7 @@ html:not(.js) .theme-toggle { display: none; }
   content: "On this page";
   display: block;
   margin-bottom: 0.5rem;
-  color: var(--accent-text);
+  color: var(--muted);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
