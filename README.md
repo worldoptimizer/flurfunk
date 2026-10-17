@@ -50,6 +50,7 @@ One dispatcher, several channels. What counts:
 | mention | someone wrote @you |
 | assigned | you were made responsible for a task |
 | due | a task of yours is due today or overdue (daily, once) |
+| remind | the reminder you set on a thread |
 | reply | new message in a thread you started, wrote in, are responsible for or follow |
 | done | a task you started or are responsible for was ticked off |
 | channel | a new post in a channel set to "every post" |
