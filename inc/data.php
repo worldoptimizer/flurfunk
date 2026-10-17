@@ -1,7 +1,7 @@
 <?php
 /**
  * Everything an administrator needs without WP-CLI: export and import under Settings → Flurfunk,
- * and a short welcome after the first activation.
+ * and a short welcome after the first activation (a notice in wp-admin and a thread in #general).
  *
  * Export: one JSON file (flurfunk/1), or a ZIP with the JSON and every file, for moving to another
  * site. Import: the JSON or that ZIP. Both are the same as `wp flurfunk export|import`.
@@ -15,8 +15,9 @@ use Flurfunk\Transfer;
 
 defined( 'ABSPATH' ) || exit;
 
-const WELCOME = 'flurfunk_welcome';
-const RESULT  = 'flurfunk_import_result_';
+const WELCOME        = 'flurfunk_welcome';
+const WELCOME_THREAD = 'flurfunk_welcome_thread'; // { by: user } until written, then 'done'.
+const RESULT         = 'flurfunk_import_result_';
 
 /**
  * Can this server build and read ZIP bundles?
@@ -215,9 +216,58 @@ add_action(
 add_action(
 	'admin_post_flurfunk_welcome_done',
 	static function (): void {
-		check( 'flurfunk_welcome_done' );
+		check();
+		check_admin_referer( 'flurfunk_welcome_done' );
 		delete_option( WELCOME );
 		wp_safe_redirect( wp_get_referer() ?: admin_url() );
 		exit;
 	}
 );
+
+/**
+ * The welcome thread in #general: what threads, replies, mentions, tasks, cards and
+ * notifications are. Written once, on the first request after a fresh activation (then the
+ * translations are loaded), in the name of the administrator who activated Flurfunk.
+ */
+function welcome_thread(): void {
+	$w = get_option( WELCOME_THREAD );
+	if ( ! is_array( $w ) ) {
+		return;
+	}
+	update_option( WELCOME_THREAD, 'done', false );
+	$by = (int) ( $w['by'] ?? 0 );
+	if ( ! $by || ! get_userdata( $by ) ) {
+		$admins = get_users(
+			array(
+				'role'   => 'administrator',
+				'number' => 1,
+				'fields' => 'ID',
+			)
+		);
+		$by     = (int) ( $admins[0] ?? 0 );
+	}
+	if ( ! $by ) {
+		return;
+	}
+	$lines = array(
+		__( 'This is a thread: a topic with its replies underneath, so a conversation stays in one place.', 'flurfunk' ),
+		'',
+		'- ' . __( 'Reply below to answer in this thread.', 'flurfunk' ),
+		'- ' . __( 'Type @ and a name to mention someone. They get a notification.', 'flurfunk' ),
+		'- ' . __( 'Any thread can be a task: tick "Task", set a due date and who is responsible. The Board shows all tasks by state, "My tasks" your own.', 'flurfunk' ),
+		'- ' . __( 'Type / in a message to insert a card: a post, or whatever other plugins offer.', 'flurfunk' ),
+		'- ' . __( 'Threads can belong to a post. They then show up in the editor\'s Conversations panel and in the posts list.', 'flurfunk' ),
+		'- ' . __( 'The bell collects your notifications. Under your name at the bottom of the sidebar you choose mail, push and quiet hours.', 'flurfunk' ),
+	);
+	\Flurfunk\Store\create_thread(
+		array(
+			'channel' => 'general',
+			'title'   => __( 'Welcome to Flurfunk', 'flurfunk' ),
+			'body'    => implode( "\n", $lines ),
+			'author'  => $by,
+			'ref_key' => 'flurfunk:welcome',
+		),
+		false
+	);
+}
+add_action( 'init', __NAMESPACE__ . '\\welcome_thread', 20 );

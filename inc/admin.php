@@ -82,7 +82,8 @@ add_action(
 		}
 		$n     = \Flurfunk\Notify\prefs( get_current_user_id() )['badge'] ? Store\counts( get_current_user_id() )['total'] : 0;
 		$badge = $n ? ' <span class="awaiting-mod count-' . $n . '"><span class="pending-count">' . number_format_i18n( $n ) . '</span></span>' : '';
-		$hook  = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', menu_icon(), 3 );
+		// Just below Comments, where conversations belong.
+		$hook = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', menu_icon(), 26 );
 		add_action( 'load-' . $hook, __NAMESPACE__ . '\\load_page' );
 	}
 );

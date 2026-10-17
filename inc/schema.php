@@ -169,17 +169,23 @@ function upgrade( int $from ): void {
 }
 
 /**
- * Activation: tables plus a first channel so the app is never empty.
+ * Activation: tables plus a first channel so the app is never empty. On a fresh site #general
+ * also shows guests (e.g. guest authors) the threads about their own posts, and a short welcome
+ * thread follows on the next request (inc/data.php). Existing channels stay as they are.
  */
 function activate(): void {
+	global $wpdb;
 	install();
+	$fresh = ! get_option( \Flurfunk\Data\WELCOME_THREAD ) && ! (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', table( 'threads' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- our own table, once on activation.
 	\Flurfunk\Store\ensure_channel(
 		'general',
 		array(
-			'name'  => __( 'General', 'flurfunk' ),
-			'topic' => __( 'Anything that concerns everyone', 'flurfunk' ),
+			'name'          => __( 'General', 'flurfunk' ),
+			'topic'         => __( 'Anything that concerns everyone', 'flurfunk' ),
+			'access_guests' => 'own-posts',
 		)
 	);
+	add_option( \Flurfunk\Data\WELCOME_THREAD, $fresh ? array( 'by' => get_current_user_id() ) : 'done', '', false );
 }
 
 // After an update without re-activation (rsync, Git): bring the tables up to date.

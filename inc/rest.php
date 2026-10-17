@@ -222,6 +222,7 @@ function bootstrap(): array {
 		'settings'  => Access\can_manage( $uid ) ? admin_url( 'options-general.php?page=' . \Flurfunk\Settings\PAGE ) : '',
 		'push'      => array(
 			'available' => \Flurfunk\Push\available() && is_ssl(),
+			'ssl'       => is_ssl(), // Without HTTPS browsers offer no push; the app says so.
 			'key'       => \Flurfunk\Push\available() ? ( \Flurfunk\Push\vapid()['public'] ?? '' ) : '',
 			'devices'   => count( \Flurfunk\Push\devices( $uid ) ),
 		),
