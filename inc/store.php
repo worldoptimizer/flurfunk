@@ -1286,6 +1286,9 @@ function list_threads( int $user_id, array $args = array() ): array {
 	if ( ! empty( $args['person'] ) ) {
 		$where[] = $wpdb->prepare( 't.id IN ( SELECT thread_id FROM ' . table( 'assignees' ) . ' WHERE user_id = %d )', (int) $args['person'] );
 	}
+	if ( ! empty( $args['after'] ) ) {
+		$where[] = $wpdb->prepare( 't.id > %d', (int) $args['after'] ); // Paging through order=ref lists.
+	}
 	if ( ! empty( $args['before'] ) && mysql( (string) $args['before'] ) ) {
 		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
 	}

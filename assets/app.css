@@ -190,6 +190,7 @@
 .ff-card-spark i { width: 10px; background: var(--ff-ink); opacity: .7; border-radius: 2px 2px 0 0; }
 .ff-card audio { width: 100%; max-width: 22rem; height: 32px; margin-top: 4px; }
 .ff-card-action { justify-self: start; margin-top: 4px; font-weight: 600; }
+.ff-root .ff-card-action { color: var(--ff-accent-text); } /* wp-admin's link colour would win otherwise */
 .ff-card-x { position: absolute; top: 2px; right: 2px; }
 
 /* composer */

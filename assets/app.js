@@ -801,6 +801,20 @@
 	 *
 	 * @param {Object} o key, label, placeholder, submitLabel, extra (HTML for the row), onSubmit(payload, el).
 	 */
+	// Every thread of a checklist in creation order, page by page (a checklist can outgrow one page).
+	const allInOrder = async ( params ) => {
+		let out = [];
+		for ( let page = 0; page < 20; page++ ) {
+			const after = out.length ? out[ out.length - 1 ].id : 0;
+			const list = await api( 'threads?' + query( Object.assign( { limit: 200, order: 'ref', after: after || undefined }, params ) ) );
+			out = out.concat( list );
+			if ( list.length < 200 ) {
+				break;
+			}
+		}
+		return out;
+	};
+
 	/* ------------------------------------------------------------------ lightbox */
 
 	// Is a lightbox or WordPress's media dialog open? Then Escape belongs to it.
@@ -2097,7 +2111,7 @@
 		const byRef = {};
 		const fulls = {};
 		const load = async () => {
-			const list = await api( 'threads?' + query( { ref_prefix: opts.prefix || '', limit: 200, order: 'ref' } ) );
+			const list = await allInOrder( { ref_prefix: opts.prefix || '' } );
 			list.forEach( ( th ) => {
 				byRef[ th.ref_key ] = th;
 			} );
@@ -2215,7 +2229,7 @@
 			+ ( full || answering.has( th.id ) ? '<div class="ff-reply-slot"></div>' : '' )
 			+ '</div></article>';
 		const draw = async () => {
-			const list = await api( 'threads?' + query( { channel: opts.channel, limit: 200, order: 'ref' } ) );
+			const list = await allInOrder( { channel: opts.channel } );
 			const full = {};
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;

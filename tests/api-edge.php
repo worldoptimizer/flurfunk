@@ -510,6 +510,10 @@ $check( 'a thread can start with only a file', 200 === $s && 1 === count( $ft['f
 wp_delete_attachment( $tf, true );
 $check( 'the people list follows the team and guest capabilities', in_array( $guest, array_map( static fn ( $p ) => (int) $p['id'], Store\people() ), true ) );
 
+$first = Store\list_threads( $team, array( 'channel' => 'ff-test', 'order' => 'ref', 'limit' => 2 ) );
+$next  = Store\list_threads( $team, array( 'channel' => 'ff-test', 'order' => 'ref', 'limit' => 2, 'after' => end( $first )['id'] ) );
+$check( 'lists in creation order can be paged with "after"', $next && (int) $next[0]['id'] > (int) end( $first )['id'] );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );
