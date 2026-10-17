@@ -335,7 +335,7 @@ function payload( array $n ): array {
 	return (array) apply_filters(
 		'flurfunk_push_payload',
 		array(
-			'title' => $w['headline'],
+			'title' => mb_substr( $w['headline'], 0, 120 ),
 			'body'  => mb_substr( $w['topic'] . ( $w['text'] && $w['text'] !== $w['topic'] ? ': ' . $w['text'] : '' ), 0, 180 ),
 			'url'   => \Flurfunk\Admin\url( 'thread:' . $n['thread']->id ),
 			'tag'   => 'flurfunk-' . $n['thread']->id,

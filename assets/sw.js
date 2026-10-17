@@ -40,3 +40,22 @@ self.addEventListener( 'notificationclick', ( e ) => {
 		} )
 	);
 } );
+
+// The browser replaced the subscription (expired or rotated keys): subscribe again with the same
+// key and hand the new one to the site. The old endpoint proves which subscription it replaces.
+self.addEventListener( 'pushsubscriptionchange', ( e ) => {
+	const ajax = new URL( self.location.href ).searchParams.get( 'ajax' );
+	const old = e.oldSubscription;
+	const key = old && old.options && old.options.applicationServerKey;
+	if ( ! ajax || ! old || ! key ) {
+		return; // The app subscribes again the next time it opens.
+	}
+	e.waitUntil(
+		( e.newSubscription ? Promise.resolve( e.newSubscription ) : self.registration.pushManager.subscribe( { userVisibleOnly: true, applicationServerKey: key } ) )
+			.then( ( sub ) => {
+				const body = new URLSearchParams( { action: 'flurfunk_push_renew', old: old.endpoint, subscription: JSON.stringify( sub.toJSON() ) } );
+				return fetch( ajax, { method: 'POST', body, credentials: 'omit' } );
+			} )
+			.catch( () => {} )
+	);
+} );

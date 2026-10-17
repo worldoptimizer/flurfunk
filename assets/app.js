@@ -431,11 +431,13 @@
 		const s = atob( ( b64 + '='.repeat( ( 4 - b64.length % 4 ) % 4 ) ).replace( /-/g, '+' ).replace( /_/g, '/' ) );
 		return Uint8Array.from( s, ( c ) => c.charCodeAt( 0 ) );
 	};
+	const sameBytes = ( a, b ) => a.length === b.length && a.every( ( v, i ) => v === b[ i ] );
 	const swRegistration = async () => {
 		if ( ! pushSupported() || ! cfg.swUrl ) {
 			return null;
 		}
-		const reg = ( await navigator.serviceWorker.getRegistration( cfg.swUrl ) ) || ( await navigator.serviceWorker.register( cfg.swUrl ) );
+		// register() is idempotent and picks up a changed worker address.
+		const reg = await navigator.serviceWorker.register( cfg.swUrl );
 		if ( ! reg.active ) {
 			// The worker controls no page, so "ready" would never resolve: wait for it to activate.
 			await new Promise( ( resolve ) => {
@@ -488,8 +490,14 @@
 	const pushResync = async () => {
 		try {
 			if ( 'on' === ( await pushState() ) ) {
-				const reg = await navigator.serviceWorker.getRegistration( cfg.swUrl );
-				const sub = await reg.pushManager.getSubscription();
+				const reg = await swRegistration();
+				let sub = await reg.pushManager.getSubscription();
+				// The site's key changed (moved or restored site): the old subscription can no longer be used.
+				const key = sub.options && sub.options.applicationServerKey;
+				if ( key && boot.push.key && ! sameBytes( new Uint8Array( key ), keyBytes( boot.push.key ) ) ) {
+					await sub.unsubscribe();
+					sub = await reg.pushManager.subscribe( { userVisibleOnly: true, applicationServerKey: keyBytes( boot.push.key ) } );
+				}
 				await api( 'me/push', { method: 'POST', body: { subscription: sub.toJSON(), label: deviceLabel() } } );
 			}
 		} catch ( e ) {}

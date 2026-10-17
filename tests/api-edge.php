@@ -458,6 +458,12 @@ Flurfunk\Notify\prune();
 $check( 'old read notifications are pruned, unread ones kept longer', ! $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $old" ) && $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $young" ) );
 
 WP_CLI::log( 'Digest, quiet hours, push' );
+$fake = static fn ( $n ) => array( 'endpoint' => 'https://push.example.test/' . $n, 'keys' => array( 'p256dh' => Flurfunk\Push\b64( "\x04" . random_bytes( 64 ) ), 'auth' => Flurfunk\Push\b64( random_bytes( 16 ) ) ) );
+Flurfunk\Push\subscribe( $team2, $fake( 'renew-old' ), 'Test' );
+$check( 'renewal with an unknown endpoint is refused', ! Flurfunk\Push\renew( 'https://push.example.test/nobody', $fake( 'x' ) ) );
+$check( 'renewal replaces the old subscription', Flurfunk\Push\renew( 'https://push.example.test/renew-old', $fake( 'renew-new' ) ) && 1 === count( array_filter( Flurfunk\Push\devices( $team2 ), static fn ( $d ) => str_contains( $d->endpoint, 'renew-' ) ) ) && array_filter( Flurfunk\Push\devices( $team2 ), static fn ( $d ) => str_ends_with( $d->endpoint, 'renew-new' ) && 'Test' === $d->label ) );
+Flurfunk\Push\unsubscribe( $team2, 'https://push.example.test/renew-new' );
+
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'digest' ) );
 delete_user_meta( $team2, 'flurfunk_digest_last' );
 $as( $team );

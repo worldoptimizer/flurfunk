@@ -301,3 +301,40 @@ function send( int $user_id, array $payload ): bool {
 	}
 	return $ok;
 }
+
+/**
+ * Replace a subscription the browser renewed by itself (service worker, no login cookie). The old
+ * endpoint is an unguessable address only that browser knew, so it identifies the person.
+ *
+ * @param string $old_endpoint Previous endpoint.
+ * @param array  $sub          New subscription.
+ * @return bool
+ */
+function renew( string $old_endpoint, array $sub ): bool {
+	global $wpdb;
+	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT user_id, label FROM ' . table( 'push' ) . ' WHERE endpoint_hash = %s', hash( 'sha256', $old_endpoint ) ) ); // phpcs:ignore WordPress.DB
+	if ( ! $row ) {
+		return false;
+	}
+	if ( true !== subscribe( (int) $row->user_id, $sub, (string) $row->label ) ) {
+		return false;
+	}
+	if ( ( $sub['endpoint'] ?? '' ) !== $old_endpoint ) {
+		unsubscribe( (int) $row->user_id, $old_endpoint );
+	}
+	return true;
+}
+
+$flurfunk_renew = static function (): void {
+	// phpcs:disable WordPress.Security.NonceVerification -- authenticated by the old endpoint.
+	$old = esc_url_raw( wp_unslash( (string) ( $_POST['old'] ?? '' ) ), array( 'https' ) );
+	$sub = json_decode( wp_unslash( (string) ( $_POST['subscription'] ?? '' ) ), true );
+	// phpcs:enable
+	if ( '' === $old || ! is_array( $sub ) || ! renew( $old, $sub ) ) {
+		wp_send_json_error( null, 400 );
+	}
+	wp_send_json_success();
+};
+add_action( 'wp_ajax_flurfunk_push_renew', $flurfunk_renew );
+add_action( 'wp_ajax_nopriv_flurfunk_push_renew', $flurfunk_renew );
+unset( $flurfunk_renew );
