@@ -16,25 +16,26 @@
     })();
   </script>
   {% seo %}
+  <link rel="icon" href="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" type="image/svg+xml">
+  <link rel="icon" href="{{ '/assets/brand/favicon-32.png' | relative_url }}" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ '/assets/brand/apple-touch-icon.png' | relative_url }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
   <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f6e66'/%3E%3Cpath d='M9 11h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-7l-4 3v-3h-3a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z' fill='%23f6f3ee'/%3E%3Ccircle cx='22.5' cy='10.5' r='3.5' fill='%23e8a33d'/%3E%3C/svg%3E">
+  {%- if page.layout == 'home' %}
+  <link rel="stylesheet" href="{{ '/assets/home.css' | relative_url }}">
+  {%- endif %}
   <script src="{{ '/assets/site.js' | relative_url }}" defer></script>
 </head>
-<body{% if page.hero %} class="is-home"{% endif %}>
+<body class="layout-{{ page.layout | default: 'doc' }}">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="brand" href="{{ '/' | relative_url }}"{% if page.url == '/' %} aria-current="page"{% endif %}>
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <rect width="32" height="32" rx="8" class="brand-mark-bg"/>
-          <path d="M9 11h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-7l-4 3v-3h-3a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z" class="brand-mark-fg"/>
-          <circle cx="22.5" cy="10.5" r="3.5" class="brand-mark-dot"/>
-        </svg>
-        <span>{{ site.title }}</span>
+      <a class="brand logo" href="{{ '/' | relative_url }}"{% if page.url == '/' %} aria-current="page"{% endif %}>
+        {% include logo-mark.html %}
+        <span class="logo-word">{{ site.title }}</span>
       </a>
 
       <button class="theme-toggle" type="button" aria-label="Switch colour theme" title="Switch colour theme">
@@ -47,7 +48,7 @@
         <span class="nav-toggle-label">Menu</span>
       </button>
 
-      <nav id="site-nav" class="site-nav" aria-label="Documentation">
+      <nav id="site-nav" class="site-nav" aria-label="Main">
         <ul>
           {% for item in site.nav %}
           <li><a href="{{ item.url | relative_url }}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.title }}</a></li>
@@ -58,52 +59,37 @@
     </div>
   </header>
 
-  {% if page.hero %}
-  <section class="hero" aria-labelledby="hero-title">
-    <div class="wrap hero-inner{% if page.cover %} has-cover{% endif %}">
-      <div class="hero-text">
-        <p class="eyebrow">WordPress plugin &middot; GPL-2.0-or-later</p>
-        <h1 id="hero-title">{{ page.title | default: site.title }}</h1>
-        <p class="pitch">{{ page.pitch | default: site.description }}</p>
-        <p class="hero-actions">
-          <a class="button button-primary" href="{{ '/installation.html' | relative_url }}">Get started</a>
-          <a class="button button-quiet" href="{{ site.github_url }}">GitHub</a>
-        </p>
-      </div>
-      {% if page.cover %}
-      <figure class="hero-cover">
-        <img src="{{ page.cover | relative_url }}" alt="{{ page.cover_alt | default: '' }}" width="1600" height="1000" decoding="async">
-      </figure>
-      {% else %}
-      {% include hero-app.html %}
-      {% endif %}
-    </div>
-  </section>
-  {% endif %}
-
-  <main id="main" class="wrap main" tabindex="-1">
-    <article class="prose">
-      {% assign body = content %}
-      {% if page.hero %}
-        {% assign trimmed = content | strip %}
-        {% assign head = trimmed | slice: 0, 3 %}
-        {% if head == '<h1' %}
-          {% assign first_h1 = trimmed | split: '</h1>' | first | append: '</h1>' %}
-          {% assign body = trimmed | remove_first: first_h1 %}
-        {% endif %}
-      {% endif %}
-      {{ body }}
-    </article>
-  </main>
+  {{ content }}
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <p class="footer-brand"><strong>{{ site.title }}</strong> is free software under the <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" class="nowrap">GPL-2.0-or-later</a>.</p>
-      <p class="footer-links">
-        <a href="{{ site.github_url }}">Source on GitHub</a>
-        <span aria-hidden="true">&middot;</span>
-        <span>Made by Max Ziebell</span>
-      </p>
+      <div class="footer-about">
+        <a class="footer-brand logo" href="{{ '/' | relative_url }}">
+          {% include logo-mark.html %}
+          <span class="logo-word">{{ site.title }}</span>
+        </a>
+        <p>Team conversations inside WordPress. Free software under the <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" class="nowrap">GPL-2.0-or-later</a>.</p>
+      </div>
+      <div class="footer-col">
+        <h2>Documentation</h2>
+        <ul>
+          {% for item in site.nav offset: 1 %}
+          <li><a href="{{ item.url | relative_url }}">{{ item.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="{{ site.github_url }}">Source on GitHub</a></li>
+          <li><a href="{{ site.github_url }}/issues">Issues</a></li>
+          <li><a href="{{ site.github_url }}/blob/main/LICENSE">License</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <p>Made by Max Ziebell</p>
+      <p>GPL-2.0-or-later</p>
     </div>
   </footer>
 </body>

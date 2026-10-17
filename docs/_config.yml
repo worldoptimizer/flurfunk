@@ -54,15 +54,16 @@ defaults:
   - scope:
       path: ""
     values:
-      layout: default
+      layout: doc
+      image: /assets/og.png
   - scope:
       path: "index.md"
     values:
-      hero: true
+      layout: home
       pitch: Your team’s conversations, right where the work happens. Channels, threads and tasks inside WordPress, with no outside service.
-      # Set to assets/cover.png once that image exists; the hero only shows it when set.
-      cover:
-      cover_alt: The Flurfunk overview in wp-admin
+
+twitter:
+  card: summary_large_image
 
 exclude:
   - Gemfile
@@ -74,3 +75,4 @@ exclude:
   - "*.log"
   - "_drafts"
   - "_internal"
+  - "_og"
