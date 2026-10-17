@@ -13,6 +13,7 @@ wp_clear_scheduled_hook( 'flurfunk_cleanup_files' );
 wp_clear_scheduled_hook( 'flurfunk_due' );
 wp_clear_scheduled_hook( 'flurfunk_digest' );
 wp_clear_scheduled_hook( 'flurfunk_remind' );
+delete_option( 'flurfunk_rewrite' );
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	delete_option( 'flurfunk_vapid' ); // Kept with the data, so push subscriptions keep working after a reinstall.
 	global $wpdb;

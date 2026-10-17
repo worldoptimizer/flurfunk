@@ -7,6 +7,8 @@ inside the OpenStation desktop.
 - **Overview** (`wp-admin/admin.php?page=flurfunk`): sidebar with channels, mentions, open
   tasks and posts with conversations; thread list; thread pane. Your name sits at the bottom of
   the sidebar and opens your settings (light/dark, which mails you get, push, unread badge).
+- **Full screen** (`/flurfunk/`): the same app without the admin bar and menu, installable as an
+  app on a phone's home screen (see below).
 - **Editor panel** "Conversations" for the configured post types.
 - **Posts list column** with the number of conversations and open tasks.
 - **Tasks** with due dates, responsible people, "My tasks" and reminders.
@@ -41,6 +43,28 @@ wp plugin activate flurfunk
 
 Then open *Settings → Flurfunk* (name, logo, colours, who is team or guest, channels) and
 *Flurfunk* in the admin menu.
+
+## Full screen and home screen app
+
+`https://example.com/flurfunk/` shows Flurfunk on its own page: no theme, no admin bar, no admin
+menu, the app fills the screen (also around notches). Logged-out visitors are sent to the login
+and come back; logged-in people without access get a 403. "Open full screen" in your settings
+(click your name) leads there, "Back to WordPress" returns. Without pretty permalinks the
+address is `/?flurfunk_app=1`, which always works. Change the slug with the `flurfunk_app_slug`
+filter; the rewrite rules are flushed once after activation, an update or a new slug.
+
+The page carries a web app manifest (start and scope: that address, standalone display, name
+and sidebar colour from the settings, the site icon or logo – or Flurfunk's own icon – at 192
+and 512 px). To install it:
+
+- **iPhone/iPad** (Safari): open the address, Share → *Add to Home Screen*. Open Flurfunk from
+  the icon, then turn on push in your settings – iOS only delivers push to home screen apps,
+  and that app has its own login.
+- **Android** (Chrome): open the address, menu → *Install app* / *Add to Home screen*.
+
+Once push was turned on in (or the app opened from) the home screen app, tapping a notification
+opens the thread there instead of in wp-admin. Links to WordPress (e.g. "Open post") leave the
+app's scope, so phones show them with a small browser bar on top of the app.
 
 ## Assistants (agents, scripts)
 

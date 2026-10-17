@@ -13,6 +13,7 @@ namespace Flurfunk\Admin;
 
 use Flurfunk\Access;
 use Flurfunk\Settings;
+use Flurfunk\Standalone;
 use Flurfunk\Store;
 
 defined( 'ABSPATH' ) || exit;
@@ -37,9 +38,18 @@ function config(): array {
 		'nonce'         => wp_create_nonce( 'wp_rest' ),
 		'fileEndpoint'  => esc_url_raw( rest_url( 'flurfunk/v1/files' ) ),
 		'appUrl'        => url(),
+		'fullUrl'       => Standalone\url(),
+		'standalone'    => Standalone\is_app(),
 		'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
-		'loginUrl'      => wp_login_url( url() ),
-		'swUrl'         => add_query_arg( array( 'v' => FLURFUNK_VERSION, 'ajax' => rawurlencode( admin_url( 'admin-ajax.php' ) ) ), FLURFUNK_URL . 'assets/sw.js' ),
+		'loginUrl'      => wp_login_url( Standalone\is_app() ? Standalone\url() : url() ),
+		'swUrl'         => add_query_arg(
+			array(
+				'v'    => FLURFUNK_VERSION,
+				'ajax' => rawurlencode( admin_url( 'admin-ajax.php' ) ),
+				'app'  => rawurlencode( Standalone\url() ),
+			),
+			FLURFUNK_URL . 'assets/sw.js'
+		),
 		'i18n'          => \Flurfunk\Strings\all(),
 	);
 }
@@ -75,19 +85,7 @@ add_action(
 function load_page(): void {
 	add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue' );
 	// Installable as a web app (phones can then receive push notifications, iOS needs this).
-	add_action(
-		'admin_head',
-		static function (): void {
-			printf( '<link rel="manifest" href="%s">', esc_url( admin_url( 'admin-ajax.php?action=flurfunk_manifest' ) ) );
-			printf( '<meta name="theme-color" content="%s">', esc_attr( Settings\get()['sidebar'] ) );
-			echo '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">';
-			printf( '<meta name="apple-mobile-web-app-title" content="%s">', esc_attr( Settings\name() ) );
-			$icon = get_site_icon_url( 180 ) ?: Settings\logo();
-			if ( $icon ) {
-				printf( '<link rel="apple-touch-icon" href="%s">', esc_url( $icon ) );
-			}
-		}
-	);
+	add_action( 'admin_head', 'Flurfunk\\Standalone\\head' );
 	add_filter( 'admin_body_class', static fn ( string $c ): string => $c . ' flurfunk-page' );
 	remove_all_actions( 'admin_notices' );
 	remove_all_actions( 'all_admin_notices' );
@@ -199,38 +197,4 @@ add_action(
 		}
 	},
 	25
-);
-
-/*
- * Web app manifest for the Flurfunk page.
- */
-add_action(
-	'wp_ajax_flurfunk_manifest',
-	static function (): void {
-		$icons = array();
-		foreach ( array( 192, 512 ) as $size ) {
-			$src = get_site_icon_url( $size ) ?: Settings\logo();
-			if ( $src ) {
-				$icons[] = array(
-					'src'   => $src,
-					'sizes' => $size . 'x' . $size,
-				);
-			}
-		}
-		header( 'Content-Type: application/manifest+json; charset=utf-8' );
-		echo wp_json_encode(
-			array(
-				'name'             => Settings\name() . ' · ' . __( 'Flurfunk', 'flurfunk' ),
-				'short_name'       => Settings\name(),
-				'start_url'        => url(),
-				'scope'            => admin_url(),
-				'display'          => 'standalone',
-				'background_color' => '#ffffff',
-				'theme_color'      => Settings\get()['sidebar'],
-				'icons'            => $icons,
-			),
-			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-		);
-		exit;
-	}
 );

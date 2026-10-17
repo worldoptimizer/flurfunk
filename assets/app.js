@@ -495,11 +495,18 @@
 		const os = /Mac OS X/.test( ua ) ? 'macOS' : /Windows/.test( ua ) ? 'Windows' : /Android/.test( ua ) ? 'Android' : /iPhone|iPad/.test( ua ) ? 'iOS' : /Linux/.test( ua ) ? 'Linux' : '';
 		return browser + ( os ? ' · ' + os : '' );
 	};
+	// Opened from the home screen: from now on push notifications open this app, not wp-admin.
+	const markInstalled = ( reg ) => {
+		if ( reg && reg.active && cfg.standalone && window.matchMedia( '(display-mode: standalone)' ).matches ) {
+			reg.active.postMessage( { flurfunk: 'installed' } );
+		}
+	};
 	const pushOn = async () => {
 		if ( 'granted' !== ( await Notification.requestPermission() ) ) {
 			throw new Error( t( 'Notifications are blocked in this browser. Allow them in the site settings of your browser.' ) );
 		}
 		const reg = await swRegistration();
+		markInstalled( reg );
 		const sub = ( await reg.pushManager.getSubscription() ) || ( await reg.pushManager.subscribe( { userVisibleOnly: true, applicationServerKey: keyBytes( boot.push.key ) } ) );
 		const r = await api( 'me/push', { method: 'POST', body: { subscription: sub.toJSON(), label: deviceLabel() } } );
 		boot.push.devices = r.devices;
@@ -1291,6 +1298,8 @@
 				+ '<div class="ff-row ff-quiet"><input type="time" data-ff="quiet" data-part="from" value="' + esc( qFrom ) + '" aria-label="' + esc( t( 'From' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '> – <input type="time" data-ff="quiet" data-part="to" value="' + esc( qTo ) + '" aria-label="' + esc( t( 'To' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '></div>'
 				+ ( 'Notification' in window ? '<label><input type="checkbox" data-ff="browser-notes"' + ( browserNotesOn() ? ' checked' : '' ) + '> ' + esc( t( 'Show notifications while Flurfunk is open in the background' ) ) + '</label>' : '' )
 				+ '<h3>' + esc( t( 'Badge' ) ) + '</h3><label><input type="checkbox" data-ff="pref" data-pref="badge"' + ( p.badge ? ' checked' : '' ) + '> ' + esc( t( 'Show the unread number on the menu icon' ) ) + '</label>'
+				+ ( cfg.fullUrl && ! cfg.standalone ? '<a class="ff-link" href="' + esc( cfg.fullUrl + ( cfg.fullUrl.includes( '?' ) ? '&' : '?' ) + 'view=' + encodeURIComponent( ui.thread ? 'thread:' + ui.thread : ui.view ) ) + '" target="_top">' + esc( t( 'Open full screen' ) ) + '</a>' : '' )
+				+ ( cfg.standalone && cfg.appUrl ? '<a class="ff-link" href="' + esc( cfg.appUrl ) + '" target="_top">' + esc( t( 'Back to WordPress' ) ) + '</a>' : '' )
 				+ ( boot.settings ? '<a class="ff-link" href="' + esc( boot.settings ) + '" target="_top">' + esc( t( 'Flurfunk settings for this site' ) ) + '</a>' : '' )
 				+ '</div>';
 		};
@@ -1905,6 +1914,7 @@
 		} ).catch( () => {} );
 		pushResync();
 		if ( pushSupported() ) {
+			navigator.serviceWorker.getRegistration( cfg.swUrl ).then( markInstalled ).catch( () => {} );
 			// A click on a push notification focuses this window: open the thread.
 			navigator.serviceWorker.addEventListener( 'message', ( e ) => {
 				const m = e.data && 'open' === e.data.flurfunk && String( e.data.url || '' ).match( /thread(?::|%3A)(\d+)/ );

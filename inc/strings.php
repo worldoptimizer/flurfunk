@@ -156,6 +156,8 @@ function all(): array {
 		'Show notifications while Flurfunk is open in the background' => __( 'Show notifications while Flurfunk is open in the background', 'flurfunk' ),
 		'Badge' => __( 'Badge', 'flurfunk' ),
 		'Show the unread number on the menu icon' => __( 'Show the unread number on the menu icon', 'flurfunk' ),
+		'Open full screen' => __( 'Open full screen', 'flurfunk' ),
+		'Back to WordPress' => __( 'Back to WordPress', 'flurfunk' ),
 		'Flurfunk settings for this site' => __( 'Flurfunk settings for this site', 'flurfunk' ),
 		'Resume' => __( 'Resume', 'flurfunk' ),
 		'Pause:' => __( 'Pause:', 'flurfunk' ),
