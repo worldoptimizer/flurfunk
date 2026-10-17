@@ -64,6 +64,12 @@ test.describe( 'team', () => {
 			expect( n ).toBe( cols );
 			expect( await page.locator( '.ff-nav' ).isVisible() ).toBe( nav );
 			expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth + 1 ) ).toBe( true );
+			// The header tools stay inside the middle column, also with "Mark all as read" in it.
+			const fits = await page.evaluate( () => {
+				const main = document.querySelector( '.ff-main' ).getBoundingClientRect();
+				return [ ...document.querySelectorAll( '.ff-head-tools > *' ) ].every( ( el ) => el.getBoundingClientRect().right <= main.right + 1 );
+			} );
+			expect( fits ).toBe( true );
 		} );
 	}
 
