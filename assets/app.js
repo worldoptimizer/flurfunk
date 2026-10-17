@@ -89,7 +89,7 @@
 		}
 		const d = new Date( iso );
 		const now = new Date();
-		const time = d.toLocaleTimeString( locale(), { hour: '2-digit', minute: '2-digit' } );
+		const time = d.toLocaleTimeString( locale(), { hour: 'numeric', minute: '2-digit' } );
 		const days = Math.round( ( new Date( now.toDateString() ) - new Date( d.toDateString() ) ) / 864e5 );
 		if ( now - d < 60e3 ) {
 			return t( 'just now' );

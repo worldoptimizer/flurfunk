@@ -393,7 +393,10 @@
 .ff-note-item .ff-ava svg { width: 16px; height: 16px; }
 
 /* Settings: longer now, scroll inside */
-.ff-settings { max-height: min(78vh, 40rem); overflow-y: auto; }
+.ff-settings { max-height: min(calc(100vh - 120px), 52rem); overflow-y: auto; }
+/* Thread header: title and close on the first line, follow/mute/remind on their own line below. */
+.ff-pane-head .ff-follow { order: 3; flex-basis: 100%; justify-content: flex-start; margin: 0; }
+.ff-head-tools .ff-link { white-space: nowrap; }
 .ff-push-row { gap: 10px; }
 .ff-push-state { font-size: 13px; font-weight: 600; }
 .ff-root .ff-quiet input[type=time] { min-height: 28px; padding: 1px 6px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }

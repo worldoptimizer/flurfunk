@@ -543,7 +543,8 @@ function list_for( int $user_id, int $before = 0, int $limit = 30 ): array {
 			'read'     => null !== $r->read_at,
 			'headline' => $w['headline'],
 			'topic'    => $w['topic'],
-			'text'     => mb_substr( $w['text'], 0, 240 ),
+			// The title already shows as topic; the text continues from there, shortened with an ellipsis.
+			'text'     => mb_strimwidth( '' !== $w['topic'] && str_starts_with( $w['text'], $w['topic'] ) ? ltrim( substr( $w['text'], strlen( $w['topic'] ) ) ) : $w['text'], 0, 240, '…' ),
 			'channel'  => ( Store\channel( (int) $t->channel_id ) )->slug ?? '',
 		);
 	}
