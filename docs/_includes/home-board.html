@@ -1,0 +1,60 @@
+{%- assign h = '/assets/hero/' | relative_url -%}
+<section class="section section-band" id="board" aria-labelledby="board-title">
+  <div class="wrap split">
+    <header class="section-head">
+      <p class="kicker">Tasks</p>
+      <h2 id="board-title">A board for everything that has to get done.</h2>
+      <p class="lead">Any thread can be a task. The board shows the tasks you can see in four columns; a click opens the thread in a drawer over the columns.</p>
+      <ul class="checks">
+        <li>Drag a card to change its state, or press Alt+Arrow on a focused card.</li>
+        <li><b>Question</b> notifies the person who started the task and the responsible people.</li>
+        <li>Due dates remind people once a day at the hour they chose.</li>
+        <li>Filter by channel and by responsible person; Done keeps the last 14 days.</li>
+      </ul>
+      <p><a href="{{ '/user-guide.html#the-board' | relative_url }}">The board in the user guide</a></p>
+    </header>
+
+    <div class="showcase">
+      <p class="visually-hidden">Illustration: a task board with the columns Open, In progress, Question and Done. A card moves through all four columns, then its thread opens in a drawer.</p>
+      <div class="mock bd" aria-hidden="true" data-demo="board">
+        <div class="bd-head">
+          <b>Board</b>
+          <span class="bd-filter">All channels</span>
+          <span class="bd-filter">Everyone</span>
+        </div>
+        <div class="bd-lanes">
+          <div class="bd-lane"><b>Open</b>
+            <div class="bd-card"><span>Podcast guest list</span><small># editorial &middot; Oct 30</small><span class="bd-foot"><em>1</em><img src="{{ h }}avatar-mia.webp" alt="" width="96" height="96" loading="lazy"></span></div>
+            <div class="bd-slot"></div>
+          </div>
+          <div class="bd-lane"><b>In progress</b>
+            <div class="bd-card"><span>Autumn issue: cover story</span><small># editorial &middot; Fri</small><span class="bd-foot"><em>2</em><img src="{{ h }}avatar-mia.webp" alt="" width="96" height="96" loading="lazy"></span></div>
+            <div class="bd-slot"></div>
+          </div>
+          <div class="bd-lane"><b>Question</b>
+            <div class="bd-card"><span>Photo credits for page 12</span><small># editorial &middot; today</small><span class="bd-foot"><em>3</em><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96" loading="lazy"></span></div>
+            <div class="bd-slot"></div>
+          </div>
+          <div class="bd-lane is-done"><b>Done</b>
+            <div class="bd-card"><span>New archive on staging</span><small># tech &middot; Mon</small><span class="bd-foot"><em>5</em><img src="{{ h }}avatar-jonas.webp" alt="" width="96" height="96" loading="lazy"></span></div>
+            <div class="bd-slot"></div>
+          </div>
+          <div class="bd-card bd-move">
+            <span>Newsletter goes out Thursday</span>
+            <small># editorial &middot; Thu</small>
+            <span class="bd-foot"><em>4</em><span class="bd-people"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96" loading="lazy"><img src="{{ h }}avatar-lea.webp" alt="" width="96" height="96" loading="lazy"></span></span>
+          </div>
+        </div>
+        <div class="bd-drawer">
+          <div class="bd-drawer-head">
+            <b>Newsletter goes out Thursday</b>
+            <span class="bd-state">Done</span>
+          </div>
+          <div class="bd-msg"><img src="{{ h }}avatar-lea.webp" alt="" width="96" height="96" loading="lazy"><p><b>Lea Okafor</b>Draft for Thursday is in the editor. Can someone check the links?</p></div>
+          <div class="bd-msg"><img src="{{ h }}avatar-tom.webp" alt="" width="96" height="96" loading="lazy"><p><b>Tom Berger</b>Links checked, scheduled for 8:00.</p></div>
+          <p class="bd-note">Tom Berger set the state to Done</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

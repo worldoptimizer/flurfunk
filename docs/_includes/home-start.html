@@ -1,0 +1,39 @@
+<section class="section" id="quick-start" aria-labelledby="start-title">
+  <div class="wrap">
+    <header class="section-head">
+      <p class="kicker">Quick start</p>
+      <h2 id="start-title">Running in two commands.</h2>
+      <p class="lead">Needs WordPress 6.5+, PHP 8.1+ and MySQL or MariaDB. Web Push needs HTTPS and PHP&rsquo;s OpenSSL extension.</p>
+    </header>
+
+    <ol class="steps" role="list">
+      <li class="step">
+        <span class="step-n" aria-hidden="true">1</span>
+        <h3>Get the plugin</h3>
+        <div class="code">
+{% highlight bash %}
+cd wp-content/plugins
+git clone https://github.com/worldoptimizer/flurfunk.git flurfunk
+{% endhighlight %}
+        </div>
+        <p>Or upload a release zip under <em>Plugins &rarr; Add New &rarr; Upload Plugin</em>.</p>
+      </li>
+      <li class="step">
+        <span class="step-n" aria-hidden="true">2</span>
+        <h3>Activate it</h3>
+        <div class="code">
+{% highlight bash %}
+wp plugin activate flurfunk
+{% endhighlight %}
+        </div>
+        <p>Activation creates the tables and a <code>#general</code> channel for the team.</p>
+      </li>
+      <li class="step">
+        <span class="step-n" aria-hidden="true">3</span>
+        <h3>Set it up</h3>
+        <p><em>Settings &rarr; Flurfunk</em>: name, logo, colours, who counts as team or guest, and the channels. Then open <em>Flurfunk</em> in the admin menu.</p>
+        <p><a href="{{ '/installation.html' | relative_url }}">Installation and administration</a></p>
+      </li>
+    </ol>
+  </div>
+</section>

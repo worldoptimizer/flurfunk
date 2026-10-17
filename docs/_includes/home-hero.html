@@ -1,0 +1,15 @@
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap hero-inner">
+    <div class="hero-text">
+      <p class="eyebrow">WordPress plugin &middot; GPL-2.0-or-later</p>
+      <h1 id="hero-title">{{ site.title }}</h1>
+      <p class="pitch">{{ page.pitch | default: site.description }}</p>
+      <p class="hero-actions">
+        <a class="button button-primary" href="#quick-start">Get started</a>
+        <a class="button button-quiet" href="{{ site.github_url }}">GitHub</a>
+      </p>
+      <p class="hero-meta">WordPress 6.5+ &middot; PHP 8.1+ &middot; no external service</p>
+    </div>
+    {% include home-app.html %}
+  </div>
+</section>

@@ -1,0 +1,57 @@
+<section class="section section-band" id="developers" aria-labelledby="dev-title">
+  <div class="wrap">
+    <header class="section-head section-head-wide">
+      <p class="kicker">For developers</p>
+      <h2 id="dev-title">Plain PHP and JavaScript. Hooks everywhere.</h2>
+      <p class="lead">No build step and no framework. Register a slash command with cards, attach threads to your own objects, embed threads on any admin screen, or post from scripts and CI through the REST API.</p>
+    </header>
+
+    <div class="dev-grid">
+      <figure class="code">
+        <figcaption><b>A slash command with cards</b><span>PHP</span></figcaption>
+{% highlight php %}
+add_action( 'init', function () {
+	flurfunk_register_provider( 'myplugin/report', array(
+		'command'  => 'report',
+		'label'    => 'Report',
+		'hint'     => 'Insert a report card',
+		'search'   => fn ( string $q, int $user_id ) => array(
+			array( 'ref' => array( 'id' => 12 ), 'title' => 'Q3', 'subtitle' => 'Draft' ),
+		),
+		'snapshot' => fn ( array $ref, int $user_id ) => array(
+			'title'  => 'Q3',
+			'metric' => array( 'value' => '1,284', 'label' => 'views' ),
+			'url'    => admin_url( 'admin.php?page=reports&id=' . (int) $ref['id'] ),
+		),
+		'can'      => fn ( int $user_id ) => user_can( $user_id, 'edit_posts' ),
+	) );
+} );
+{% endhighlight %}
+      </figure>
+
+      <div class="dev-side">
+        <figure class="code">
+          <figcaption><b>Post a thread from a script</b><span>Shell</span></figcaption>
+{% highlight bash %}
+curl -u "login:application password" \
+  -H 'Content-Type: application/json' \
+  -d '{"channel":"general","title":"Deploy","body":"Release 2.4.0 is live."}' \
+  https://example.com/wp-json/flurfunk/v1/threads
+{% endhighlight %}
+        </figure>
+
+        <ul class="dev-list">
+          <li><code>flurfunk_register_target()</code> attaches threads to products, customers or anything else.</li>
+          <li><code>Flurfunk.mountRefs()</code>, <code>mountChannel()</code> and <code>mountTarget()</code> embed threads on admin screens.</li>
+          <li>Assistant accounts post through WP-CLI or the REST API, with no editing rights.</li>
+          <li><code>wp flurfunk export</code> and <code>import</code> move everything, files included.</li>
+        </ul>
+
+        <p class="dev-links">
+          <a class="button button-primary" href="{{ '/developers.html' | relative_url }}">Developer guide</a>
+          <a class="button button-quiet" href="{{ '/examples.html' | relative_url }}">Examples</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
