@@ -34,6 +34,41 @@ wp flurfunk post --ref=checklist:billing --card='flurfunk/post:{"id":12}'
 Assistants take part like the team (including private channels they are invited to through
 `flurfunk_channel_level`) and are marked "Assistant" in the conversation.
 
+## Tasks
+
+Any thread can be a task: tick box, due date, people responsible. Changes show up as events in
+the thread. "My tasks" lists open tasks assigned to you by due date; overdue ones are marked
+red, also in the sidebar. Responsible people are notified when they get a task and reminded on
+the due date (once a day, at their chosen hour).
+
+## Notifications
+
+One dispatcher, several channels. What counts:
+
+| Kind | When |
+| --- | --- |
+| mention | someone wrote @you |
+| assigned | you were made responsible for a task |
+| due | a task of yours is due today or overdue (daily, once) |
+| reply | new message in a thread you started, wrote in, are responsible for or follow |
+| done | a task you started or are responsible for was ticked off |
+| message | anything else you can see – only if you chose "everything" |
+
+Every notification lands in the list behind the bell. Each person decides per channel, under
+their name at the bottom of the sidebar:
+
+- **Mail**: right away (mentions, tasks, replies), once a day as a summary, everything, never.
+- **Push** to this device (browser or phone, also when Flurfunk is closed): mentions/tasks/
+  replies, everything, nothing – with quiet hours.
+- **System notifications while Flurfunk is open in the background** (without push).
+- **Hour** for the daily summary and due reminders.
+- Per thread: **follow** (every reply) or **mute** (only mentions and tasks).
+
+Push needs HTTPS and PHP's OpenSSL extension (standard); keys (VAPID) are created
+automatically, no external service or library. On iPhone/iPad, push works once Flurfunk is
+added to the home screen (the page ships a web app manifest). The service worker only receives
+pushes; it controls no pages.
+
 ## People and access
 
 A person is **team** or **guest** (capabilities chosen in the settings; default
@@ -125,13 +160,18 @@ The "Attached to" picker searches all registered types. Guests only ever see the
 | `flurfunk_can_edit` | may a person edit or delete a message or thread (default: author and admins) |
 | `flurfunk_target_info` | title and link of a target |
 | `flurfunk_user_role_label` | role shown next to names |
-| `flurfunk_notify_recipients`, `flurfunk_mail` | who gets mails, mail content (false = skip) |
+| `flurfunk_notify_recipients` | user => kind for a new thread or message |
+| `flurfunk_mail` | mail subject/body (false = skip) |
+| `flurfunk_push_payload` | title, body, url, tag, icon of a push message |
+| `flurfunk_rate_limit` | messages per minute and person (default 30, admins exempt) |
+| `flurfunk_thread_limit` | messages loaded per thread (default 300) |
 | `flurfunk_openstation_icon` | desktop icon arguments (false = none) |
 
 ### Actions
 
 `flurfunk_thread_created( $thread )`, `flurfunk_message_added( $thread, $message_id )`,
-`flurfunk_message_edited( $thread, $message_id )`, `flurfunk_message_deleted( $thread, $message_id )`.
+`flurfunk_message_edited( $thread, $message_id )`, `flurfunk_message_deleted( $thread, $message_id )`,
+`flurfunk_assigned( $thread, $user_ids, $actor )`, `flurfunk_status_changed( $thread, $status, $actor )`.
 
 ### Embeds
 
@@ -166,11 +206,15 @@ Optional cards for other plugins live in `integrations/` and load only when that
 
 ## Tests
 
-- `wp eval-file tests/api-edge.php <team> <team2> <guest>` – 50 checks on rights, input, mentions,
+- `wp eval-file tests/api-edge.php <team> <team2> <guest>` – 100+ checks on rights, input, mentions,
   read state, paging, editing, targets, mails, export/import. Works on staging, cleans up after itself.
 - `tests/e2e` – Playwright against a running site (`FF_BASE`, `FF_TEAM`, `FF_TEAM_PASS`, `FF_TEAM2`,
   `FF_TEAM2_PASS`, `FF_GUEST`, `FF_GUEST_PASS`, optional `FF_QUERY`): layout at several widths,
   escaping, mentions, slash menu, picker, edit/delete, drafts, expired nonce, logout, accessibility.
+
+- `tests/push/run.sh` – Web Push crypto checked against Node (decrypt, ES256 signature).
+- `node tests/format.test.cjs` – the text formatter.
+- `wp eval-file tests/load.php` – 2000 threads / 20000 messages, timings, cleans up.
 
 ## Development
 

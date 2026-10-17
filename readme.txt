@@ -20,7 +20,9 @@ Flurfunk brings the conversations of an editorial team into wp-admin, next to th
 * Slash commands insert cards from other plugins: posts, statistics, newsletters …
 * Guests (e.g. guest authors) see only what concerns their own posts.
 * Files stay out of the media library until someone adds them – without copying or moving.
-* Light and dark, email notifications each person sets for themselves.
+* Tasks with due dates and responsible people, "My tasks", reminders.
+* Notifications: in-app list, mail (instant or daily summary), Web Push to browsers and phones, quiet hours, follow or mute threads.
+* Light and dark, everything each person sets for themselves.
 * Assistant accounts for agents and scripts, clearly marked in the conversation.
 * Works in plain wp-admin and inside the OpenStation desktop.
 * Own tables, one JSON format for export and import (with files), privacy export/erase.
