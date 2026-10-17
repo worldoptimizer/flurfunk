@@ -40,7 +40,7 @@ function &registry(): array {
 function register( string $type, array $args ): void {
 	$type = substr( sanitize_key( $type ), 0, 32 );
 	if ( '' === $type || ! is_callable( $args['info'] ?? null ) ) {
-		_doing_it_wrong( __FUNCTION__, esc_html__( 'A Flurfunk target type needs an info callback.', 'flurfunk' ), '0.2.0' );
+		_doing_it_wrong( __FUNCTION__, esc_html__( 'A Flurfunk target type needs an info callback.', 'flurfunk' ), '0.1.0' );
 		return;
 	}
 	$registry          = &registry();

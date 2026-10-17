@@ -132,7 +132,7 @@ function all(): array {
 		'Photo' => __( 'Photo', 'flurfunk' ),
 		'Initials' => __( 'Initials', 'flurfunk' ),
 		'Right away: mentions, tasks, replies in my threads' => __( 'Right away: mentions, tasks, replies in my threads', 'flurfunk' ),
-		'Once a day: a summary at 7 am' => __( 'Once a day: a summary at 7 am', 'flurfunk' ),
+		'Once a day: a summary at %s' => __( 'Once a day: a summary at %s', 'flurfunk' ),
 		'Every new message I can see' => __( 'Every new message I can see', 'flurfunk' ),
 		'Never – I check myself' => __( 'Never – I check myself', 'flurfunk' ),
 		'Mentions, tasks, replies' => __( 'Mentions, tasks, replies', 'flurfunk' ),

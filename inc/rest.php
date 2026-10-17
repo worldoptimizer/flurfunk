@@ -322,6 +322,7 @@ function create_thread( WP_REST_Request $r ) {
 			'due'         => (string) ( $p['due'] ?? '' ),
 			'assignees'   => array_map( 'intval', (array) ( $p['assignees'] ?? array() ) ),
 			'attachments' => (array) ( $p['attachments'] ?? array() ),
+			'files'       => array_map( 'intval', (array) ( $p['files'] ?? array() ) ),
 			'ref_key'     => $ref,
 		)
 	);

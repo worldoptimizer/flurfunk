@@ -189,7 +189,7 @@ return array(
 		'Notify: only mentions' => 'Benachrichtigung: nur Erwähnungen',
 		'Off for this device' => 'Auf diesem Gerät aus',
 		'On for this device' => 'Auf diesem Gerät an',
-		'Once a day: a summary at 7 am' => 'Einmal am Tag: Zusammenfassung um 7 Uhr',
+		'Once a day: a summary at %s' => 'Einmal am Tag: eine Zusammenfassung um %s',
 		'Only in Flurfunk so far. Adding it keeps the file where it is.' => 'Bisher nur im Flurfunk. Beim Übernehmen bleibt die Datei, wo sie ist.',
 		'Only mentions and tasks' => 'Nur Erwähnungen und Aufgaben',
 		'Only threads about their own posts' => 'Nur Threads zu eigenen Artikeln',

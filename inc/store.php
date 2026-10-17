@@ -4,8 +4,8 @@
  *
  *   thread  { id, channel, ref_key, target: {type,id}|null, title|null, body, author, created,
  *             status: 'open'|'doing'|'waiting'|'done'|null, resolved: {by,at}|null, mentions[], attachments[] }
- *   message { id, type: 'message'|'status', author, created, text, mentions[], files[],
- *             attachments[], status?, edited }
+ *   message { id, type: 'message'|'status'|'event'|'deleted', author, created, text, mentions[],
+ *             files[], attachments[], status?, edited } – events carry event: due|assign and its data
  *   Text: plain text, mentions as <@ID>. Times in UTC (ISO 8601).
  *
  * @package Flurfunk
@@ -253,10 +253,14 @@ function people(): array {
 	$users = array_unique(
 		array_merge(
 			get_users(
-				array(
-					'capability' => 'edit_posts',
-					'fields'     => 'ID',
-					'orderby'    => 'display_name',
+				(array) apply_filters(
+					'flurfunk_people_query',
+					array(
+						// Everyone who can be team or guest by the settings; kind() decides below.
+						'capability__in' => array_values( array_filter( array_unique( array( 'edit_posts', \Flurfunk\Settings\get()['team_cap'], \Flurfunk\Settings\get()['guest_cap'] ) ) ) ),
+						'fields'         => 'ID',
+						'orderby'        => 'display_name',
+					)
 				)
 			),
 			get_users(
@@ -348,7 +352,8 @@ function create_thread( array $args, bool $check = true ) {
 	}
 	$body  = clean_text( $args['body'] ?? '' );
 	$title = sanitize_text_field( (string) ( $args['title'] ?? '' ) );
-	if ( '' === $body && '' === $title && empty( $args['attachments'] ) ) {
+	$files = files( (array) ( $args['files'] ?? array() ), $author, $check );
+	if ( '' === $body && '' === $title && empty( $args['attachments'] ) && ! $files ) {
 		return new \WP_Error( 'flurfunk_empty', __( 'The conversation is empty.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	// Two people ticking the same embedded checklist item at once must not create two threads.
@@ -373,6 +378,7 @@ function create_thread( array $args, bool $check = true ) {
 			'target_id'     => $tid,
 			'title'         => $title,
 			'body'          => $body,
+			'files'         => (string) wp_json_encode( $files ),
 			'author_id'     => $author,
 			'status'        => in_array( $status, STATUSES, true ) ? $status : '',
 			'resolved_by'   => (int) ( $args['resolved']['by'] ?? 0 ),
@@ -426,8 +432,9 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 	if ( ! $thread || ( $check && ! Access\can_see( $thread, $author ) ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
 	}
-	$type  = in_array( $args['type'] ?? '', array( 'status', 'deleted' ), true ) ? $args['type'] : 'message';
-	$body  = 'message' === $type ? clean_text( $args['body'] ?? '' ) : '';
+	// Task history ("event") only comes in through the import; it is written by set_task otherwise.
+	$type  = in_array( $args['type'] ?? '', $check ? array( 'status', 'deleted' ) : array( 'status', 'deleted', 'event' ), true ) ? $args['type'] : 'message';
+	$body  = 'message' === $type ? clean_text( $args['body'] ?? '' ) : ( 'event' === $type ? (string) wp_json_encode( array_intersect_key( (array) ( $args['event'] ?? array() ), array_flip( array( 'event', 'due', 'added', 'removed' ) ) ) ) : '' );
 	$rate  = $check && 'message' === $type ? rate_limit( $author ) : true;
 	if ( is_wp_error( $rate ) ) {
 		return $rate;
@@ -974,6 +981,7 @@ function format_thread( object $t, array $atts = array(), array $ments = array()
 		) : null,
 		'title'       => '' !== $t->title ? $t->title : null,
 		'body'        => $t->body,
+		'files'       => array_map( __NAMESPACE__ . '\\file_view', json_decode( (string) ( $t->files ?? '' ), true ) ?: array() ),
 		'author'      => (int) $t->author_id,
 		'created'     => iso( $t->created ),
 		'status'      => '' !== $t->status ? $t->status : null,
@@ -1251,7 +1259,7 @@ function list_threads( int $user_id, array $args = array() ): array {
 		$c       = channel_by_slug( (string) $args['channel'] );
 		$where[] = 't.channel_id = ' . ( $c ? (int) $c->id : 0 );
 	}
-	if ( ! empty( $args['target'] ) && preg_match( '/^([a-z_]+):(\d+)$/', (string) $args['target'], $m ) ) {
+	if ( ! empty( $args['target'] ) && preg_match( '/^([a-z0-9_-]+):(\d+)$/', (string) $args['target'], $m ) ) {
 		$where[] = $wpdb->prepare( 't.target_type = %s AND t.target_id = %d', $m[1], (int) $m[2] );
 	}
 	if ( ! empty( $args['ref_prefix'] ) ) {

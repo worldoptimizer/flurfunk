@@ -502,6 +502,14 @@ $check( 'the board shows recently ticked-off tasks', in_array( (int) $bt['id'], 
 $mine = wp_list_pluck( Store\list_threads( $team, array( 'view' => 'board', 'person' => $team2, 'limit' => 200 ) ), 'id' );
 $check( 'the board filters by person', in_array( (int) $bt['id'], array_map( 'intval', $mine ), true ) && ! in_array( (int) $t2['id'], array_map( 'intval', $mine ), true ) );
 
+WP_CLI::log( 'Files on the first post' );
+$as( $team );
+$tf = wp_insert_attachment( array( 'post_title' => 'ff-test-start', 'post_mime_type' => 'text/plain', 'post_status' => 'inherit', 'post_author' => $team ), false );
+list( $s, $ft ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'files' => array( $tf ) ) );
+$check( 'a thread can start with only a file', 200 === $s && 1 === count( $ft['files'] ?? array() ), $ft['files'] ?? $s );
+wp_delete_attachment( $tf, true );
+$check( 'the people list follows the team and guest capabilities', in_array( $guest, array_map( static fn ( $p ) => (int) $p['id'], Store\people() ), true ) );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );

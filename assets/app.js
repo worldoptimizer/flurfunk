@@ -1265,7 +1265,7 @@
 			const p = boot.me.prefs;
 			const seg = [ [ 'light', t( 'Light' ) ], [ 'dark', t( 'Dark' ) ], [ 'system', t( 'Automatic' ) ] ];
 			const pic = [ [ 'photo', t( 'Photo' ) ], [ 'initials', t( 'Initials' ) ] ];
-			const mail = [ [ 'mentions', t( 'Right away: mentions, tasks, replies in my threads' ) ], [ 'digest', t( 'Once a day: a summary at 7 am' ) ], [ 'all', t( 'Every new message I can see' ) ], [ 'none', t( 'Never – I check myself' ) ] ];
+			const mail = [ [ 'mentions', t( 'Right away: mentions, tasks, replies in my threads' ) ], [ 'digest', t( 'Once a day: a summary at %s', pad2( p.hour ?? 7 ) + ':00' ) ], [ 'all', t( 'Every new message I can see' ) ], [ 'none', t( 'Never – I check myself' ) ] ];
 			const push = [ [ 'mentions', t( 'Mentions, tasks, replies' ) ], [ 'all', t( 'Everything' ) ], [ 'none', t( 'Nothing' ) ] ];
 			const [ qFrom, qTo ] = p.quiet ? p.quiet.split( '-' ) : [ '22:00', '07:00' ];
 			const ps = ui.pushState || 'unknown';
@@ -1539,7 +1539,7 @@
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
-				+ cards( th.attachments ) + targetChip( th )
+				+ files( th.files ) + cards( th.attachments ) + targetChip( th )
 				+ taskControls( th )
 				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
@@ -2193,7 +2193,7 @@
 			+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' )
 			+ ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 			+ '<div class="ff-msg-body">' + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + '</div>'
-			+ cards( th.attachments ) + targetChip( th )
+			+ files( th.files ) + cards( th.attachments ) + targetChip( th )
 			+ ( 'done' === th.status ? '' : taskControls( th ) )
 			+ '<p class="ff-meta">' + nameHtml( th.author ) + ' · ' + esc( when( th.created ) ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.replies ? summary( th, open.has( th.id ), 'toggle' ) : '<button type="button" class="ff-link ff-answer" data-ff="answer">' + esc( t( 'Reply' ) ) + '</button>' )

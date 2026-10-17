@@ -11,7 +11,7 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const OPTION     = 'flurfunk_db_version';
 
 /**
@@ -55,6 +55,7 @@ CREATE TABLE " . table( 'threads' ) . " (
   target_id bigint(20) unsigned NOT NULL DEFAULT 0,
   title varchar(255) NOT NULL DEFAULT '',
   body longtext NOT NULL,
+  files longtext,
   author_id bigint(20) unsigned NOT NULL,
   status varchar(8) NOT NULL DEFAULT '',
   due_date date DEFAULT NULL,

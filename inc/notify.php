@@ -46,7 +46,7 @@ const REMIND   = 'flurfunk_remind';
  * @param int $user_id User.
  */
 function prefs( int $user_id ): array {
-	// Each preference is its own meta entry (flurfunk_pref_<key>), so two settings changed at the
+	// Each preference is its own meta entry (flurfunk_prefs_<key>), so two settings changed at the
 	// same moment can't overwrite each other; the older combined entry still counts as fallback.
 	$p = (array) get_user_meta( $user_id, PREFS, true );
 	foreach ( KEYS as $k ) {
@@ -209,7 +209,10 @@ function event( object $thread, int $message_id ): void {
 			}
 		}
 	}
-	dispatch( $thread, $message_id, (array) apply_filters( 'flurfunk_notify_recipients', $to, $thread, $message_id ), $sender );
+	$to = (array) apply_filters( 'flurfunk_notify_recipients', $to, $thread, $message_id );
+	// Whoever a filter adds must still be allowed to read the thread.
+	$to = array_filter( $to, static fn ( $kind, $uid ) => Access\can_see( $thread, (int) $uid ), ARRAY_FILTER_USE_BOTH );
+	dispatch( $thread, $message_id, $to, $sender );
 }
 
 /**
@@ -409,7 +412,16 @@ add_action(
 );
 
 /**
- * Is it this person's hour for daily mails and reminders?
+ * Has this person's hour for daily mails and reminders come today?
+ *
+ * @param int $user_id User.
+ */
+function is_past_their_hour( int $user_id ): bool {
+	return (int) wp_date( 'G' ) >= prefs( $user_id )['hour'];
+}
+
+/**
+ * Is it exactly this person's hour?
  *
  * @param int $user_id User.
  */
@@ -431,7 +443,7 @@ function remind_due( bool $force = false ): int {
 	$n     = 0;
 	foreach ( $rows as $r ) {
 		$done = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . " WHERE kind = 'due' AND thread_id = %d AND user_id = %d AND created >= %s", $r->id, $r->assignee, get_gmt_from_date( $today . ' 00:00:00' ) ) ); // phpcs:ignore WordPress.DB
-		if ( ! $done && ( $force || is_their_hour( (int) $r->assignee ) ) && Access\can_see( $r, (int) $r->assignee ) ) {
+		if ( ! $done && ( $force || is_past_their_hour( (int) $r->assignee ) ) && Access\can_see( $r, (int) $r->assignee ) ) {
 			dispatch( $r, 0, array( (int) $r->assignee => 'due' ), 0 );
 			++$n;
 		}
@@ -450,9 +462,11 @@ function send_digests( bool $force = false ): int {
 	$sent = 0;
 	foreach ( Store\people() as $p ) {
 		$uid = (int) $p['id'];
-		if ( 'digest' !== prefs( $uid )['mail'] || ( ! $force && ! is_their_hour( $uid ) ) ) {
+		// Once a day from their hour on, so a run WP-Cron missed is caught up by the next one.
+		if ( 'digest' !== prefs( $uid )['mail'] || ( ! $force && ( ! is_past_their_hour( $uid ) || wp_date( 'Y-m-d' ) === get_user_meta( $uid, 'flurfunk_digest_day', true ) ) ) ) {
 			continue;
 		}
+		update_user_meta( $uid, 'flurfunk_digest_day', wp_date( 'Y-m-d' ) );
 		$since = (string) get_user_meta( $uid, 'flurfunk_digest_last', true ) ?: gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT n.*, t.title, t.body, t.channel_id FROM ' . table( 'notifications' ) . ' n JOIN ' . table( 'threads' ) . ' t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s ORDER BY n.id', $uid, $since ) ); // phpcs:ignore WordPress.DB
 		update_user_meta( $uid, 'flurfunk_digest_last', Store\now() );

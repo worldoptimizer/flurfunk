@@ -49,6 +49,7 @@ function export( string $bundle = '' ): array {
 		$t             = Store\format_thread( $r, $atts, $ments );
 		$t['messages'] = Store\format_messages( $r, $atts, $ments );
 		if ( '' !== $bundle ) {
+			$t['messages'][] = array( 'files' => $t['files'] ); // The thread's own files, copied along below.
 			foreach ( $t['messages'] as &$msg ) {
 				foreach ( $msg['files'] ?? array() as $i => $f ) {
 					$src = ! empty( $f['id'] ) ? get_attached_file( (int) $f['id'] ) : '';
@@ -63,6 +64,7 @@ function export( string $bundle = '' ): array {
 				}
 			}
 			unset( $msg );
+			$t['files'] = array_pop( $t['messages'] )['files'];
 		}
 		$t['read']     = (object) ( $reads[ (int) $r->id ] ?? array() );
 		$add( (int) $r->author_id );
@@ -161,6 +163,7 @@ function import( array $data, string $bundle = '' ): array {
 				'created'     => $t['created'] ?? null,
 				'mentions'    => array_filter( array_map( $user, (array) ( $t['mentions'] ?? array() ) ) ),
 				'attachments' => (array) ( $t['attachments'] ?? array() ),
+				'files'       => array_map( $file, (array) ( $t['files'] ?? array() ) ),
 				'due'         => (string) ( $t['due'] ?? '' ),
 				'assignees'   => array_values( array_filter( array_map( $user, (array) ( $t['assignees'] ?? array() ) ) ) ),
 				'ref_key'     => $ref,
@@ -178,6 +181,12 @@ function import( array $data, string $bundle = '' ): array {
 				array(
 					'type'        => $m['type'] ?? 'message',
 					'status'      => $m['status'] ?? '',
+					'event'       => 'event' === ( $m['type'] ?? '' ) ? array(
+						'event'   => $m['event'] ?? '',
+						'due'     => $m['due'] ?? null,
+						'added'   => array_values( array_filter( array_map( $user, (array) ( $m['added'] ?? array() ) ) ) ),
+						'removed' => array_values( array_filter( array_map( $user, (array) ( $m['removed'] ?? array() ) ) ) ),
+					) : null,
 					'body'        => $text( (string) ( $m['text'] ?? '' ) ),
 					// Media IDs belong to the source site: files from a bundle are stored again,
 					// otherwise name, type and a link to the original remain.

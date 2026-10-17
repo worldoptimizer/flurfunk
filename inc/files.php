@@ -165,7 +165,9 @@ function cleanup( int $older = KEEP ): int {
 	$ids     = $wpdb->get_col( $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND CAST(meta_value AS UNSIGNED) < %d", META, time() - $older ) ); // phpcs:ignore WordPress.DB
 	$removed = 0;
 	foreach ( array_map( 'intval', $ids ) as $id ) {
-		$used = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'messages' ) . " WHERE type = 'message' AND ( files LIKE %s OR files LIKE %s )", '%"id":' . $id . ',%', '%"id":' . $id . '}%' ) ); // phpcs:ignore WordPress.DB
+		$like = array( '%"id":' . $id . ',%', '%"id":' . $id . '}%' );
+		$used = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'messages' ) . " WHERE type = 'message' AND ( files LIKE %s OR files LIKE %s )", $like[0], $like[1] ) ) // phpcs:ignore WordPress.DB
+			|| $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'threads' ) . ' WHERE files LIKE %s OR files LIKE %s', $like[0], $like[1] ) ); // phpcs:ignore WordPress.DB
 		if ( ! $used && wp_delete_attachment( $id, true ) ) {
 			++$removed;
 		}
