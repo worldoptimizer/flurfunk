@@ -335,7 +335,21 @@
 			}
 		} );
 		draw();
-		( anchor.closest( '.ff-task, .ff-left, .ff-row' ) || anchor.parentNode ).append( pop );
+		// Fixed to the viewport next to the button, below or above depending on the room left, so
+		// no container can clip it.
+		const root = anchor.closest( '.ff-root' ) || document.body;
+		root.append( pop );
+		const r = anchor.getBoundingClientRect();
+		const h = Math.min( 340, pop.offsetHeight || 340 );
+		pop.style.position = 'fixed';
+		pop.style.left = Math.max( 8, Math.min( r.left, window.innerWidth - pop.offsetWidth - 8 ) ) + 'px';
+		if ( window.innerHeight - r.bottom > h + 12 || r.top < h + 12 ) {
+			pop.style.top = ( r.bottom + 6 ) + 'px';
+			pop.style.bottom = 'auto';
+		} else {
+			pop.style.bottom = ( window.innerHeight - r.top + 6 ) + 'px';
+			pop.style.top = 'auto';
+		}
 		document.addEventListener( 'mousedown', outside );
 		q.focus();
 	};

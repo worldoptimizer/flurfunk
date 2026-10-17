@@ -42,7 +42,15 @@ const DUE      = 'flurfunk_due';
  * @param int $user_id User.
  */
 function prefs( int $user_id ): array {
-	$p     = (array) get_user_meta( $user_id, PREFS, true );
+	// Each preference is its own meta entry (flurfunk_pref_<key>), so two settings changed at the
+	// same moment can't overwrite each other; the older combined entry still counts as fallback.
+	$p = (array) get_user_meta( $user_id, PREFS, true );
+	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge' ) as $k ) {
+		$v = get_user_meta( $user_id, PREFS . '_' . $k, true );
+		if ( '' !== $v || metadata_exists( 'user', $user_id, PREFS . '_' . $k ) ) {
+			$p[ $k ] = 'badge' === $k ? (bool) $v : $v;
+		}
+	}
 	$quiet = (string) ( $p['quiet'] ?? '' );
 	return array(
 		'theme'  => in_array( $p['theme'] ?? '', array( 'system', 'light', 'dark' ), true ) ? $p['theme'] : 'light',
@@ -61,8 +69,9 @@ function prefs( int $user_id ): array {
  * @param array $in      Changes.
  */
 function save_prefs( int $user_id, array $in ): array {
-	$p = array_merge( prefs( $user_id ), array_intersect_key( $in, array_flip( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge' ) ) ) );
-	update_user_meta( $user_id, PREFS, $p );
+	foreach ( array_intersect_key( $in, array_flip( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge' ) ) ) as $k => $v ) {
+		update_user_meta( $user_id, PREFS . '_' . $k, 'badge' === $k ? ( $v ? '1' : '0' ) : sanitize_text_field( (string) $v ) );
+	}
 	return prefs( $user_id );
 }
 
