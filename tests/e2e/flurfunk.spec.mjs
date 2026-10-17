@@ -215,7 +215,7 @@ test.describe( 'team', () => {
 		const root = page.locator( '.ff-pane .ff-msg', { hasText: 'Anhänge' } );
 		await expect( root.locator( '.ff-gallery .ff-image' ) ).toHaveCount( 3 );
 		await expect( root.locator( '.ff-more-files summary' ) ).toContainText( '4' );
-		await expect( root.locator( '.ff-more-files .ff-file' ) ).toBeHidden();
+		await expect( root.locator( '.ff-more-files .ff-file' ).first() ).toBeHidden();
 		await root.locator( '.ff-more-files summary' ).click();
 		await expect( root.locator( '.ff-more-files .ff-file' ) ).toHaveCount( 4 );
 		await root.locator( '.ff-gallery .ff-image' ).nth( 1 ).click();
