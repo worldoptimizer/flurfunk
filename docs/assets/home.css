@@ -89,7 +89,6 @@
   justify-content: center;
   margin-top: clamp(2.5rem, 6vw, 4rem);
   padding-inline: clamp(1rem, 4vw, 2rem);
-  perspective: 2400px;
 }
 
 .ua {
@@ -125,9 +124,13 @@
   line-height: 1.4;
   text-align: left;
   user-select: none;
-  transform: rotateX(4deg);
-  transform-origin: 50% 0;
+  /* Flat at rest; with a mouse over it, it leans very slightly towards the pointer (site.js). */
+  transform: perspective(2400px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-origin: 50% 40%;
+  transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+.ua.is-tilting { transition-duration: 0.18s; }
+@media (prefers-reduced-motion: reduce) { .ua { transform: none; transition: none; } }
 .ua p { margin: 0; }
 .ua ul { margin: 0; padding: 0; list-style: none; }
 .ua img { display: block; max-width: none; object-fit: cover; }

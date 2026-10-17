@@ -273,3 +273,31 @@
     initDemos();
   });
 })();
+
+// Hero window: leans a little towards the mouse while it is over the window, flat otherwise.
+(function () {
+  var win = document.querySelector('.ua');
+  if (!win || !window.matchMedia('(hover: hover) and (pointer: fine)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return;
+  }
+  var frame = 0;
+  win.addEventListener('pointermove', function (e) {
+    if (frame) { return; }
+    frame = requestAnimationFrame(function () {
+      frame = 0;
+      var r = win.getBoundingClientRect();
+      var x = (e.clientX - r.left) / r.width * 2 - 1;  // -1 … 1, left to right
+      var y = (e.clientY - r.top) / r.height * 2 - 1;  // -1 … 1, top to bottom
+      win.classList.add('is-tilting');
+      // The window turns its face a touch towards the pointer: at most 1.5° sideways, 1° up/down.
+      win.style.setProperty('--tilt-y', (x * 1.5).toFixed(2) + 'deg');
+      win.style.setProperty('--tilt-x', (y * -1).toFixed(2) + 'deg');
+    });
+  });
+  win.addEventListener('pointerleave', function () {
+    win.classList.remove('is-tilting');
+    win.style.setProperty('--tilt-x', '0deg');
+    win.style.setProperty('--tilt-y', '0deg');
+  });
+})();
+
