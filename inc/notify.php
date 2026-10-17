@@ -67,7 +67,7 @@ function prefs( int $user_id ): array {
 		// Push paused until (ISO time), '' = not paused.
 		'pause'  => ! empty( $p['pause'] ) && strtotime( $p['pause'] . ' UTC' ) > time() ? Store\iso( $p['pause'] ) : '',
 		// Per channel (slug): all = every new thread and reply, mentions = only what concerns me.
-		'channels' => array_filter( is_array( $p['channels'] ?? null ) ? $p['channels'] : array(), static fn ( $v, $k ) => is_string( $k ) && in_array( $v, array( 'all', 'mentions' ), true ), ARRAY_FILTER_USE_BOTH ),
+		'channels' => array_filter( is_array( $p['channels'] ?? null ) ? $p['channels'] : array(), static fn ( $v, $k ) => ( is_string( $k ) || is_int( $k ) ) && in_array( $v, array( 'all', 'mentions' ), true ), ARRAY_FILTER_USE_BOTH ),
 	);
 }
 
@@ -96,6 +96,7 @@ function save_prefs( int $user_id, array $in ): array {
 	if ( isset( $in['pause'] ) ) {
 		// 1h | 3h | tomorrow | none.
 		$map         = array( '1h' => 'hour', 'tomorrow' => 'tomorrow' );
+		$in['pause'] = is_string( $in['pause'] ) ? $in['pause'] : '';
 		$in['pause'] = '3h' === $in['pause'] ? gmdate( 'Y-m-d H:i:s', time() + 3 * HOUR_IN_SECONDS ) : ( isset( $map[ $in['pause'] ] ) ? (string) Store\remind_time( $map[ $in['pause'] ], $user_id ) : '' );
 	}
 	foreach ( array_intersect_key( $in, array_flip( KEYS ) ) as $k => $v ) {
@@ -572,7 +573,8 @@ function unread( int $user_id ): int {
  */
 function prune(): int {
 	global $wpdb;
-	$days = (array) apply_filters( 'flurfunk_notification_days', array( 'read' => 90, 'unread' => 180 ) );
+	$days = wp_parse_args( (array) apply_filters( 'flurfunk_notification_days', array( 'read' => 90, 'unread' => 180 ) ), array( 'read' => 90, 'unread' => 180 ) );
+	$days = array_map( static fn ( $d ) => max( 1, (int) $d ), $days );
 	$n    = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NOT NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['read'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
 	$n   += (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['unread'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
 	return $n;
@@ -613,6 +615,9 @@ function send_reminders(): int {
 	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.*, r.user_id reminded, r.remind_at FROM $r r JOIN " . table( 'threads' ) . ' t ON t.id = r.thread_id WHERE r.remind_at IS NOT NULL AND r.remind_at <= %s ORDER BY r.remind_at LIMIT 200', Store\now() ) ); // phpcs:ignore WordPress.DB
 	$n    = 0;
 	foreach ( $rows as $row ) {
+		if ( is_quiet( (int) $row->reminded ) ) {
+			continue; // Quiet hours or paused: it fires once they end.
+		}
 		// Claim it first, so two overlapping runs never send the same reminder twice.
 		$claimed = $wpdb->query( $wpdb->prepare( "UPDATE $r SET remind_at = NULL WHERE user_id = %d AND thread_id = %d AND remind_at = %s", $row->reminded, $row->id, $row->remind_at ) ); // phpcs:ignore WordPress.DB
 		if ( $claimed && Access\can_see( $row, (int) $row->reminded ) ) {

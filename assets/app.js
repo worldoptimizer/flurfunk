@@ -500,6 +500,7 @@
 				// The site's key changed (moved or restored site): the old subscription can no longer be used.
 				const key = sub.options && sub.options.applicationServerKey;
 				if ( key && boot.push.key && ! sameBytes( new Uint8Array( key ), keyBytes( boot.push.key ) ) ) {
+					await api( 'me/push', { method: 'DELETE', body: { endpoint: sub.endpoint } } ).catch( () => {} );
 					await sub.unsubscribe();
 					sub = await reg.pushManager.subscribe( { userVisibleOnly: true, applicationServerKey: keyBytes( boot.push.key ) } );
 				}

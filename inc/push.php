@@ -313,7 +313,8 @@ function send( int $user_id, array $payload ): bool {
 function renew( string $old_endpoint, array $sub ): bool {
 	global $wpdb;
 	$row = $wpdb->get_row( $wpdb->prepare( 'SELECT user_id, label FROM ' . table( 'push' ) . ' WHERE endpoint_hash = %s', hash( 'sha256', $old_endpoint ) ) ); // phpcs:ignore WordPress.DB
-	if ( ! $row ) {
+	// The browser's push service stays the same; never let a renewal point pushes elsewhere.
+	if ( ! $row || wp_parse_url( (string) ( $sub['endpoint'] ?? '' ), PHP_URL_HOST ) !== wp_parse_url( $old_endpoint, PHP_URL_HOST ) ) {
 		return false;
 	}
 	if ( true !== subscribe( (int) $row->user_id, $sub, (string) $row->label ) ) {
