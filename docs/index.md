@@ -44,16 +44,21 @@ block editor and as a number in the posts list column. Plugins can register more
 
 ### Tasks
 
-Any thread can be a task: a tick box, a due date and people responsible. "My tasks" lists your
-open tasks by due date and marks overdue ones in red. Responsible people are notified when they
-get a task and reminded on the due date.
+Any thread can be a task with a state (open, in progress, question, done), a due date and
+people responsible. "My tasks" lists your tasks by due date and marks overdue ones in red. The
+**Board** shows all tasks in columns by state; cards move by drag and drop or with the keyboard.
+Responsible people are notified when they get a task, when a task needs an answer, and on the
+due date.
+
+![The board](assets/screenshot-board.png)
 
 ### Mentions, formatting, files
 
 Write `@Name` to mention someone. Simple Slack-like formatting (`*bold*`, `_italic_`, lists,
-quotes, code) works in every message. Files are uploaded right into the conversation; images
-show as previews, audio and video as players. Files stay out of the media library until someone
-adds them, without being copied or moved.
+quotes, code) works in every message. Files are uploaded right into the conversation or picked
+from the media library (up to 50 per message). Images show as previews or a gallery and open in
+a lightbox; audio and video show as players. Uploaded files stay out of the media library until
+someone adds them, without being copied or moved.
 
 ### Slash commands and cards
 

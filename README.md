@@ -9,7 +9,9 @@ inside the OpenStation desktop.
   the sidebar and opens your settings (light/dark, which mails you get, push, unread badge).
 - **Editor panel** "Conversations" for the configured post types.
 - **Posts list column** with the number of conversations and open tasks.
-- **Tasks** with due dates, responsible people, "My tasks" and reminders.
+- **Tasks** with states (open, in progress, question, done), due dates, responsible people,
+  "My tasks", a board with drag and drop, and reminders.
+- **Files** uploaded or picked from the media library, image galleries with a lightbox.
 - **Notifications** in the app, by mail (instant or daily summary) and by Web Push, with quiet
   hours, pause, per-channel levels, follow, mute and "remind me".
 - **Team and guests**: each channel decides what the team and what guests (e.g. guest authors)
@@ -28,7 +30,7 @@ extension; no external service or library.
 | --- | --- |
 | [Overview](docs/index.md) | What Flurfunk does, feature tour |
 | [Installation and administration](docs/installation.md) | Requirements, settings, access, assistants, cron, moving sites, privacy, uninstall, troubleshooting |
-| [User guide](docs/user-guide.md) | Threads, formatting, mentions, slash commands, files, tasks, notifications, shortcuts |
+| [User guide](docs/user-guide.md) | Threads, formatting, mentions, slash commands, files, tasks, the board, notifications, shortcuts |
 | [Developer guide](docs/developers.md) | Architecture, data format, REST API, providers, targets, embeds, hooks, WP-CLI |
 | [Examples](docs/examples.md) | A provider, a card renderer, a target type, embeds, shell and CI scripts, filters |
 

@@ -69,7 +69,7 @@ All tables are prefixed `{$wpdb->prefix}flurfunk_`.
 | Table | Rows | Key columns |
 | --- | --- | --- |
 | `channels` | channels | `slug` (unique), `name`, `topic`, `access_team`, `access_guests`, `position`, `archived` |
-| `threads` | threads (the first post) | `channel_id`, `ref_key`, `target_type`, `target_id`, `title`, `body`, `author_id`, `status` (`''`, `open`, `done`), `due_date`, `resolved_by`, `resolved_at`, `created`, `last_activity` |
+| `threads` | threads (the first post) | `channel_id`, `ref_key`, `target_type`, `target_id`, `title`, `body`, `author_id`, `status` (`''`, `open`, `doing`, `waiting`, `done`), `due_date`, `resolved_by`, `resolved_at`, `created`, `last_activity` |
 | `messages` | replies and log lines | `thread_id`, `type` (`message`, `status`, `event`, `deleted`), `author_id`, `body`, `status`, `files` (JSON), `created`, `edited` |
 | `mentions` | who was mentioned where | `thread_id`, `message_id` (0 = the thread itself), `user_id` |
 | `reads` | per person and thread | `last_message_id`, `seen`, `follow` (1 follow, -1 mute, 0 default), `remind_at` |
@@ -194,7 +194,7 @@ The REST API, the export and the import use the same shapes.
 | `body` | string | Text of the first post |
 | `author` | int | User ID (0 = removed) |
 | `created` | ISO time | |
-| `status` | `open`, `done` or null | null = not a task |
+| `status` | `open`, `doing`, `waiting`, `done` or null | Task state, see [task states](#task-states); null = not a task |
 | `resolved` | `{by, at}` or null | Who ticked it off and when |
 | `mentions` | int[] | People mentioned in the first post |
 | `attachments` | card[] | Cards on the first post |
@@ -208,7 +208,7 @@ The REST API, the export and the import use the same shapes.
 | `type` | Fields |
 | --- | --- |
 | `message` | `id`, `author`, `created`, `text`, `mentions[]`, `files[]`, `attachments[]`, `edited` |
-| `status` | `id`, `author`, `created`, `status` (`open`, `done`, `none`) |
+| `status` | `id`, `author`, `created`, `status` (`open`, `doing`, `waiting`, `done`, `none`) |
 | `event` | `id`, `author`, `created`, `event` (`due` with `due`, or `assign` with `added[]`, `removed[]`) |
 | `deleted` | `id`, `author`, `created` |
 
@@ -221,10 +221,25 @@ The REST API, the export and the import use the same shapes.
 | `ref` | The provider's reference, e.g. `{"id": 12}` |
 | `snapshot` | The card data, see [snapshot fields](#snapshot-fields) |
 
+### Task states
+
+| State | Shown as | Meaning |
+| --- | --- | --- |
+| `open` | Open | To do |
+| `doing` | In progress | Someone is working on it |
+| `waiting` | Question | Needs an answer before it can go on; notifies the author and the responsible people |
+| `done` | Done | Ticked off; `resolved` says by whom and when |
+
+`open`, `doing` and `waiting` count as active: they appear in "My tasks", "Open tasks", the task
+counts and the due reminders. Changing the state adds a `status` message to the thread. A thread
+with status null is not a task.
+
 ### File
 
-Stored as `{id, name, size, type}`. On output Flurfunk adds `url`, `title`, `library` (false =
-still a hidden Flurfunk file), and for images `preview`, `width`, `height`. A file deleted from the
+Stored as `{id, name, size, type}`. A message refers to the attachment; nothing is copied, so a
+file from the media library stays where it is. On output Flurfunk adds `url`, `title`, `library`
+(false = still a hidden Flurfunk file), and for images `preview` (medium large), `thumb`
+(thumbnail), `width`, `height`. A file deleted from the
 media library gets `missing: true`. Bundle exports add `bundle` (path inside the folder). Files
 imported without a bundle have `id: 0` and keep the `url` of the old site.
 
@@ -242,11 +257,11 @@ Request bodies are JSON (`Content-Type: application/json`), except file uploads.
 | --- | --- | --- | --- |
 | GET | `bootstrap` | | Everything the app needs to start, see below |
 | GET | `counts` | | Unread numbers, see below |
-| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`), `channel` (slug), `target` (`type:id`), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `limit` (1–200, default 40), `order` (`ref` = oldest first) | Thread summaries |
+| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`, `board`), `channel` (slug), `target` (`type:id`), `person` (user ID: only tasks this person is responsible for), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `limit` (1–200, default 40), `order` (`ref` = oldest first) | Thread summaries |
 | POST | `threads` | `channel` (slug, required), `title`, `body`, `target` `{type, id}`, `task` (bool; implied by `due` or `assignees`), `due` (`Y-m-d`), `assignees` (user IDs), `attachments` (`[{provider, ref}]`), `ref_key` | The new thread (full). With a `ref_key` that exists already: that thread, unchanged |
 | GET | `threads/<id>` | `peek=1` to not mark it as read | Full thread; marks it and its notifications as read |
-| POST | `threads/<id>/messages` | `body`, `files` (attachment IDs), `attachments` | The full thread |
-| POST | `threads/<id>/status` | `status`: `open`, `done` or `''` (no longer a task) | The full thread |
+| POST | `threads/<id>/messages` | `body`, `files` (attachment IDs: uploaded Flurfunk files or media library files, up to 50), `attachments` | The full thread |
+| POST | `threads/<id>/status` | `status`: `open`, `doing`, `waiting`, `done`, or `''` (no longer a task) | The full thread |
 | POST | `threads/<id>/edit` | `title`, `body` | The full thread |
 | POST | `threads/<id>/task` | `due` (`Y-m-d` or `''`), `assignees` (user IDs, replaces the list) | The full thread |
 | POST | `threads/<id>/follow` | `mode`: `follow`, `mute` or `default` | `{follow: 1, -1 or 0}` |
@@ -295,7 +310,20 @@ see `flurfunk_thread_limit`) plus:
 | `remind` | Your reminder (ISO) or null |
 | `audience` | As above |
 
+Views of `GET threads`:
+
+| `view` | Threads | Order |
+| --- | --- | --- |
+| `all` (default) | everything visible | last activity |
+| `mentions` | where you were mentioned | last activity |
+| `tasks` | active tasks (`open`, `doing`, `waiting`) | due date (none last), then activity |
+| `mine` | active tasks you are responsible for | as `tasks` |
+| `board` | active tasks plus tasks done in the last 14 days (filter `flurfunk_board_done_days`) | as `tasks` |
+
+The board in the app asks for `view=board&limit=200`, optionally with `channel` and `person`.
+
 **`GET counts`**: `{total, mentions, tasks, mine, overdue, channels: {slug: n}, targets: {"type:id": n}, notifications}`.
+`tasks`, `mine` and `overdue` count active tasks.
 
 **`GET bootstrap`**: `format`, `me` (person plus `prefs`, `manage`, `upload`), `people`,
 `channels` (with your `level`), `providers` (`id`, `command`, `label`, `hint`), `counts`,
@@ -334,11 +362,11 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | Starts a thread | as "sees", plus may attach to the chosen target | `flurfunk_can_target` |
 | Attaches to a target | the target type's `can` callback (default: team, and the target exists) | `flurfunk_can_target` |
 | Edits or deletes | author or `manage_options` | `flurfunk_can_edit` |
-| Changes status, due date, assignees | sees the thread | `flurfunk_can_resolve` |
+| Changes task state, due date, assignees | sees the thread | `flurfunk_can_resolve` |
 | Is mentioned or assigned | only people who can see the thread | |
 | Inserts or refreshes a card | the provider's `can`, and `snapshot` must not return null | |
 | Uploads | `upload_files` or assistant | |
-| Attaches a media library file by ID | `edit_post` on the attachment, or its author | |
+| Attaches a media library file by ID | their own files and files they may edit (`edit_post`); assistants any file not attached to a private post | `flurfunk_can_attach` |
 | Manages settings and channels | `manage_options` | |
 
 `own-posts` only ever applies to the target type `post`.
@@ -358,7 +386,7 @@ Views for `flurfunk_url()` (and the `view` query argument of the app page):
 | View | Opens |
 | --- | --- |
 | `''` or `all` | All threads |
-| `mentions`, `mine`, `tasks`, `notifications` | Those views |
+| `mentions`, `mine`, `tasks`, `board`, `notifications` | Those views |
 | `channel:<slug>` | A channel |
 | `target:<type>:<id>` | Conversations about a target, e.g. `target:post:12` |
 | `thread:<id>` | A thread |
@@ -508,9 +536,9 @@ add_action( 'init', function () {
 	flurfunk_register_target( 'dossier', array(
 		'label'  => 'Dossier',
 		'search' => fn ( string $q, int $user_id ) => array(
-			array( 'id' => 12, 'title' => 'Balkan', 'subtitle' => '38 posts' ),
+			array( 'id' => 12, 'title' => 'Travel', 'subtitle' => '12 posts' ),
 		),
-		'info'   => fn ( int $id ) => array( 'title' => 'Balkan', 'url' => admin_url( '…' ), 'status' => 'open' ),
+		'info'   => fn ( int $id ) => array( 'title' => 'Travel', 'url' => admin_url( '…' ), 'status' => 'open' ),
 		'can'    => fn ( int $user_id, int $id ) => user_can( $user_id, 'edit_others_posts' ),
 	) );
 } );
@@ -551,8 +579,9 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 ```
 
 `Flurfunk\Admin\enqueue()` adds `assets/app.css`, `assets/app.js` (handle `flurfunk`) and the
-configuration (`window.flurfunkConfig`: REST root, nonce, URLs, translations). The current user
-must be able to use Flurfunk; for others the REST calls fail.
+configuration (`window.flurfunkConfig`: REST root, nonce, URLs, translations), and for people
+with `upload_files` WordPress's media dialog (`wp_enqueue_media()`) for "From media library".
+The current user must be able to use Flurfunk; for others the REST calls fail.
 
 Embedded views always use the light theme, the site's accent colour and Flurfunk's styles.
 
@@ -637,11 +666,14 @@ locked in the database.
 | `flurfunk_owned_post_ids` | `int[] $ids`, `int $user_id` | int[] | Posts that count as a person's own (co-authors). |
 | `flurfunk_post_owners` | `int[] $user_ids`, `WP_Post $post` | int[] | Owners of a post, for the "… can read this" hint only. |
 | `flurfunk_can_target` | `bool $can`, `string $type`, `int $id`, `int $user_id` | bool | May the person attach a thread to this target? Also used by the `/post` snapshot. |
-| `flurfunk_can_resolve` | `bool $can`, `object $thread`, `int $user_id` | bool | May the person change the status, due date or assignees? |
+| `flurfunk_can_resolve` | `bool $can`, `object $thread`, `int $user_id` | bool | May the person change the task state, due date or assignees? |
+| `flurfunk_can_attach` | `bool $can`, `WP_Post $attachment`, `int $user_id` | bool | May the person refer to this media library file in a message? Default: own files, files they may edit, and for assistants any file not attached to a private post. |
+| `flurfunk_max_files` | `int $max` | int | Files per message. Default 50. |
+| `flurfunk_board_done_days` | `int $days` | int | How long done tasks stay on the board. Default 14. |
 | `flurfunk_can_edit` | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `manage_options`. |
 | `flurfunk_target_info` | `array $info`, `string $type`, `int $id` | array | `type`, `title`, `url`, `status`, `label` of a target for the interface. |
 | `flurfunk_user_role_label` | `string $role`, `WP_User $user` | string | The role shown next to names. |
-| `flurfunk_notify_recipients` | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder and done notifications. |
+| `flurfunk_notify_recipients` | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder, question (`waiting`) and done notifications. |
 | `flurfunk_mail` | `array {subject, body}`, `WP_User $user`, `?object $thread`, `int $message_id` | array or false | Change a notification mail, or return false to skip it. `$thread` is null for the daily digest. |
 | `flurfunk_push_payload` | `array {title, body, url, tag, icon}`, `array $n` | array | Change a push message. `$n` has `uid`, `kind`, `thread` (row), `message_id`, `actor`. |
 | `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for administrators; 0 = off. |
@@ -650,7 +682,7 @@ locked in the database.
 | `flurfunk_openstation_icon` | `array {title, icon, url, position}` | array or false | Desktop icon when the OpenStation plugin is active; false = none. |
 
 Notification kinds for `flurfunk_notify_recipients` are `mention`, `assigned`, `due`, `remind`,
-`done`, `reply`, `channel` and `message`; other values are ignored. If several notifications for
+`waiting`, `done`, `reply`, `channel` and `message`; other values are ignored. If several notifications for
 the same person and event come together, the most important kind wins (in that order).
 Recipients you add are not checked against thread access, so check `Flurfunk\Access\can_see()`
 yourself.
@@ -668,7 +700,7 @@ yourself.
 | `flurfunk_message_edited` | `object $thread`, `int $message_id` | After a message was edited. |
 | `flurfunk_message_deleted` | `object $thread`, `int $message_id` | After a message was deleted. |
 | `flurfunk_assigned` | `object $thread`, `int[] $added`, `int $actor` | After people were made responsible. |
-| `flurfunk_status_changed` | `object $thread`, `string $status`, `int $actor` | After a task was opened, done, or stopped being a task (`''`). |
+| `flurfunk_status_changed` | `object $thread`, `string $status`, `int $actor` | After the task state changed (`open`, `doing`, `waiting`, `done`), or the thread stopped being a task (`''`). |
 
 Editing a thread's own title or text (`threads/<id>/edit`) fires no action.
 
@@ -821,8 +853,9 @@ breaks in messages do not break the request.
 
 ### Files
 
-Upload the file first, then attach its ID to a reply. A new thread cannot carry files directly;
-post them as the first reply.
+Upload the file first, then attach its ID to a reply. A file that is already in the media library
+can be attached by its attachment ID without uploading it again. A new thread cannot carry files
+directly; post them as the first reply.
 
 ```bash
 FID=$(curl -sS -u "$AUTH" \
