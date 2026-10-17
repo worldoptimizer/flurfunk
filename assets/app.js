@@ -232,6 +232,8 @@
 		} else if ( images.length ) {
 			gallery = '<div class="ff-gallery">' + images.map( ( f ) => box( f, f.thumb || f.preview || f.url, true ) ).join( '' ) + '</div>';
 		}
+		// Long lists: players load nothing until someone presses play.
+		const preload = all.length > 3 ? 'none' : 'metadata';
 		const rest = all.filter( ( f ) => ! isImage( f ) ).map( ( f ) => {
 			const type = String( f.type || '' );
 			const label = esc( nameOf( f ) ) + ' <small>· ' + size( f.size ) + '</small>';
@@ -242,7 +244,7 @@
 				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio>' + adoptBtn( f ) + '</figure>';
 			}
 			if ( type.startsWith( 'video/' ) ) {
-				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption>' + adoptBtn( f ) + '</figure>';
+				return '<figure class="ff-media ff-video"><video controls preload="' + preload + '" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption>' + adoptBtn( f ) + '</figure>';
 			}
 			return '<span class="ff-media-wrap"><a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>' + adoptBtn( f ) + '</span>';
 		} );
