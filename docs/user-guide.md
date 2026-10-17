@@ -146,9 +146,6 @@ There are two ways to add files to a reply:
 
 A message can carry up to 50 files. You can attach your own files and files you may edit.
 
-> In version 0.1.0, files picked while *starting* a new thread are not saved. Start the thread
-> first, then attach the files in a reply.
-
 How files show:
 
 - One image shows as a preview, several as a gallery of thumbnails. Clicking an image opens it

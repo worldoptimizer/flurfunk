@@ -151,7 +151,7 @@ function column( string $col, int $post_id ): void {
 		$stats = array();
 		$ids   = array_map( 'intval', wp_list_pluck( (array) ( $wp_query->posts ?? array() ), 'ID' ) );
 		if ( $ids ) {
-			$rows = $wpdb->get_results( 'SELECT t.target_id, COUNT(*) n, SUM(t.status = \'open\') open FROM ' . \Flurfunk\Schema\table( 'threads' ) . " t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', $ids ) . ') AND ' . Access\where( get_current_user_id() ) . ' GROUP BY t.target_id' ); // phpcs:ignore WordPress.DB
+			$rows = $wpdb->get_results( 'SELECT t.target_id, COUNT(*) n, SUM(t.status IN ( \'open\', \'doing\', \'waiting\' )) open FROM ' . \Flurfunk\Schema\table( 'threads' ) . " t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', $ids ) . ') AND ' . Access\where( get_current_user_id() ) . ' GROUP BY t.target_id' ); // phpcs:ignore WordPress.DB
 			foreach ( $rows as $r ) {
 				$stats[ (int) $r->target_id ] = $r;
 			}
