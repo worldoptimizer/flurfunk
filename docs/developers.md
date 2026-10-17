@@ -676,6 +676,8 @@ locked in the database.
 | `flurfunk_notify_recipients` | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder, question (`waiting`) and done notifications. |
 | `flurfunk_mail` | `array {subject, body}`, `WP_User $user`, `?object $thread`, `int $message_id` | array or false | Change a notification mail, or return false to skip it. `$thread` is null for the daily digest. |
 | `flurfunk_push_payload` | `array {title, body, url, tag, icon}`, `array $n` | array | Change a push message. `$n` has `uid`, `kind`, `thread` (row), `message_id`, `actor`. |
+| `flurfunk_push_hosts` | `string[] $hosts` | string[] | Push services a browser subscription may point to; `*.example.com` matches subdomains. Default: `fcm.googleapis.com`, `android.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`. |
+| `flurfunk_push_renew_limit` | `int $max` | int | Logged-out subscription renewals per IP address and hour. Default 30; 0 = off. |
 | `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for administrators; 0 = off. |
 | `flurfunk_thread_limit` | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
 | `flurfunk_notification_days` | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
@@ -763,7 +765,7 @@ wp flurfunk bot-create [--name=<name>] [--login=<login>] [--default]
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--name` | `Assistent` | Display name |
+| `--name` | `Assistant` (translated) | Display name |
 | `--login` | `flurfunk-assistent` | Login name. An existing user with that login is marked as assistant. |
 | `--default` | | Use it for `wp flurfunk post` when no `--as` is given |
 

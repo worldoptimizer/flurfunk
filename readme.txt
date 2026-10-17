@@ -1,5 +1,5 @@
 === Flurfunk ===
-Contributors: maxziebell
+Contributors: max-ziebell
 Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
@@ -20,22 +20,30 @@ Flurfunk brings the conversations of an editorial team into wp-admin, next to th
 * Slash commands insert cards from other plugins: posts, statistics, newsletters …
 * Guests (e.g. guest authors) see only what concerns their own posts.
 * Files stay out of the media library until someone adds them – without copying or moving.
-* Tasks with due dates and responsible people, "My tasks", reminders.
+* Tasks with due dates and responsible people, "My tasks", a board, reminders.
 * Notifications: in-app list, mail (instant or daily summary), Web Push to browsers and phones, quiet hours, follow or mute threads.
 * Light and dark, everything each person sets for themselves.
 * Assistant accounts for agents and scripts, clearly marked in the conversation.
-* Works in plain wp-admin and inside the OpenStation desktop.
+* Works in plain wp-admin, full screen as an installable web app, and inside the OpenStation desktop.
 * Own tables, one JSON format for export and import (with files), privacy export/erase.
 
-Developers extend Flurfunk with providers (slash commands and cards), targets and filters. See the README in the repository.
+Developers extend Flurfunk with providers (slash commands and cards), targets, filters and a REST API. Documentation: [worldoptimizer.github.io/flurfunk](https://worldoptimizer.github.io/flurfunk/), source code and issues: [github.com/worldoptimizer/flurfunk](https://github.com/worldoptimizer/flurfunk).
 
 == Installation ==
 
 1. Upload the plugin and activate it.
-2. Open Settings → Flurfunk: name, logo, colours, who counts as team or guest, channels.
-3. Open Flurfunk in the admin menu.
+2. Open Flurfunk in the admin menu: #general has a short welcome thread that explains the basics.
+3. Open Settings → Flurfunk: name, logo, colours, who counts as team or guest, channels, assistants.
 
 == Frequently Asked Questions ==
+
+= Who can use Flurfunk? =
+
+Everyone who can edit other people's posts (editors and administrators) is "team" and sees all channels. Everyone else who can write posts (authors, contributors) is a "guest" and only sees conversations about their own posts. Both are adjustable per site and per channel in the settings.
+
+= Push notifications don't work. Why? =
+
+Push needs HTTPS. Browsers only offer push on secure sites, so on a site without HTTPS the setting says so and push stays off. Mail and the in-app notifications work everywhere. On iPhone and iPad, add Flurfunk to the home screen first (Share → Add to Home Screen); iOS only allows push for web apps.
 
 = Where are files stored? =
 
@@ -43,7 +51,42 @@ In uploads/flurfunk/, as normal attachments that the media library hides. "Add t
 
 = Can scripts or AI agents post? =
 
-Yes, as an assistant account: `wp flurfunk bot-create`, then `wp flurfunk post` or the REST API with an application password.
+Yes, as an assistant account. Create one under Settings → Flurfunk → Assistants, give it an application password (needs HTTPS) and send requests to the REST API, for example `POST /wp-json/flurfunk/v1/threads`. On the command line: `wp flurfunk bot-create`, then `wp flurfunk post`.
+
+= What happens to the conversations when I delete the plugin? =
+
+By default they stay, so a reinstall picks up where you left off. Untick "Keep conversations when the plugin is deleted" under Settings → Flurfunk → Data to remove the tables, the Flurfunk files and the assistant accounts on deletion. Export them first if you want a copy.
+
+== External services ==
+
+Flurfunk talks to outside services only for these two features.
+
+= Web Push =
+
+When a person turns on push notifications in their browser, the browser registers with its vendor's push service and gives Flurfunk an address there. From then on, for each notification that person should get (a mention, a task, a reply …), Flurfunk sends an encrypted message to that address; the push service delivers it to the browser. The content (title, a short text, a link into Flurfunk) is end-to-end encrypted for that browser (RFC 8291), so the push service cannot read it; it sees the address, the time and the size of the message, plus the site's administration email address, which the Web Push standard (VAPID, RFC 8292) asks senders to give as a contact. Nothing is sent for people who did not turn push on, and turning it off removes the address. Flurfunk only accepts addresses of these services:
+
+* Google Firebase Cloud Messaging (Chrome, Edge on Android, Opera, Samsung Internet): [Terms](https://firebase.google.com/terms), [Privacy](https://policies.google.com/privacy)
+* Mozilla Push Service (Firefox): [Terms](https://www.mozilla.org/about/legal/terms/services/), [Privacy](https://www.mozilla.org/privacy/firefox/)
+* Apple Push Notification service (Safari on macOS, iPhone and iPad): [Terms](https://www.apple.com/legal/internet-services/terms/site.html), [Privacy](https://www.apple.com/legal/privacy/)
+* Microsoft Windows Push Notification Services (Edge on Windows): [Terms](https://www.microsoft.com/servicesagreement), [Privacy](https://privacy.microsoft.com/privacystatement)
+
+= Profile pictures (Gravatar) =
+
+Flurfunk shows profile pictures through WordPress's own avatar function. Unless a plugin provides local avatars, WordPress loads them from Gravatar, which receives a hash of the person's email address. Sites with avatars turned off (Settings → Discussion) and people who chose initials in their Flurfunk settings load nothing from there. [Gravatar Terms](https://wordpress.com/tos/), [Privacy](https://automattic.com/privacy/)
+
+== Screenshots ==
+
+1. The overview: channels and posts in the sidebar, the thread list and an open thread.
+2. The same in the dark appearance.
+3. The board: tasks by state, moved by dragging.
+4. A card opened from the board: the thread slides in over the columns.
+5. The Conversations panel in the block editor.
+6. The notifications behind the bell.
+7. A card inserted with a slash command.
+8. An image from a message in the lightbox.
+9. Full screen, outside wp-admin, with a task thread open next to the list.
+10. Flurfunk on a phone.
+11. Each person's own settings: appearance, mail, push and quiet hours.
 
 == Changelog ==
 
