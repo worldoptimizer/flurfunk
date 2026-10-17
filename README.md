@@ -1,4 +1,14 @@
-# Flurfunk
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/flurfunk-lockup-dark.svg">
+    <img src="assets/brand/flurfunk-lockup.svg" alt="Flurfunk" width="260">
+  </picture>
+</h1>
+
+[![License: GPL v2 or later](https://img.shields.io/badge/license-GPL--2.0--or--later-1d1d1f)](LICENSE)
+![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-1d1d1f)
+![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-1d1d1f)
+![No build step](https://img.shields.io/badge/build-none-ffc93c)
 
 Team conversations inside WordPress. Channels, threads and tasks, attachable to posts, with
 @mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and

@@ -180,6 +180,9 @@ function head(): void {
 	echo '<meta name="mobile-web-app-capable" content="yes">' . "\n" . '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n";
 	printf( '<meta name="apple-mobile-web-app-title" content="%s">' . "\n", esc_attr( Settings\name() ) );
 	printf( '<link rel="apple-touch-icon" href="%s">' . "\n", esc_url( touch_icon() ) );
+	if ( ! get_site_icon_url() ) {
+		printf( '<link rel="icon" type="image/svg+xml" href="%s">' . "\n", esc_url( FLURFUNK_URL . 'assets/brand/flurfunk-favicon.svg' ) );
+	}
 }
 
 /**
@@ -213,7 +216,8 @@ function icons(): array {
 		foreach ( array( 'any', 'maskable' ) as $purpose ) {
 			foreach ( array( 192, 512 ) as $size ) {
 				$icons[] = array(
-					'src'     => FLURFUNK_URL . 'assets/icon-' . $size . '.png',
+					// Maskable: full-bleed, the system cuts the shape; "any" keeps its rounded corners.
+					'src'     => FLURFUNK_URL . 'assets/icon-' . ( 'maskable' === $purpose ? 'maskable-' : '' ) . $size . '.png',
 					'sizes'   => $size . 'x' . $size,
 					'type'    => 'image/png',
 					'purpose' => $purpose,
