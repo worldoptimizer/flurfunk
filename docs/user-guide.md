@@ -9,6 +9,7 @@ This page explains Flurfunk for the people who use it every day.
 - [Slash commands and cards](#slash-commands-and-cards)
 - [Files](#files)
 - [Tasks](#tasks)
+- [The board](#the-board)
 - [Conversations about posts](#conversations-about-posts)
 - [Follow, mute, remind me](#follow-mute-remind-me)
 - [Notifications](#notifications)
@@ -36,6 +37,7 @@ The overview has three columns:
 | Mentions | Threads where someone mentioned you |
 | My tasks | Open tasks you are responsible for, by due date |
 | Open tasks | All tasks not ticked off yet |
+| Board | Tasks in columns by state: open, in progress, question, done |
 | `#channel` | The threads of one channel |
 | A post | All conversations about this post, from every channel |
 | Bell | Your notifications |
@@ -135,22 +137,35 @@ current data.
 
 ## Files
 
-Click **Attach file** to add files to a reply. You can pick several at once (up to 10 per
-message). Wait until the upload has finished, then send.
+There are two ways to add files to a reply:
+
+- **Attach file** uploads files from your computer. You can pick several at once. Wait until the
+  upload has finished, then send.
+- **From media library** opens WordPress's media dialog. Pick one or more files that are already
+  in the library. Nothing is copied: the message refers to the file where it is.
+
+A message can carry up to 50 files. You can attach your own files and files you may edit.
 
 > In version 0.1.0, files picked while *starting* a new thread are not saved. Start the thread
 > first, then attach the files in a reply.
 
-- Images show as previews; click to open the full size.
-- Audio and video files show as players.
-- Other files show as a download link with name and size.
+How files show:
 
-Files you attach in Flurfunk do not appear in the media library. If a file should be used
+- One image shows as a preview, several as a gallery of thumbnails. Clicking an image opens it
+  in a large view (lightbox): use the arrow keys or the ‹ › buttons to go through the images of
+  the message, **Download** to save one, and Escape or a click next to the image to close it.
+  Ctrl-click or Cmd-click opens the file in a new tab instead.
+- Audio and video files show as players.
+- Other files show as a download link with name and size. Long lists show the first six files;
+  the rest fold away under "… more files".
+
+Files you upload in Flurfunk do not appear in the media library. If a file should be used
 elsewhere, click **Add to media library** next to it. The file keeps its place and address, so
 the message still works. Files nobody refers to any more are deleted after 30 days. A file
 someone deleted from the media library shows as "no longer available".
 
-You need the WordPress permission to upload files to see the **Attach file** button.
+You need the WordPress permission to upload files to see the **Attach file** and **From media
+library** buttons.
 
 ## Tasks
 
@@ -163,22 +178,49 @@ A task has:
 
 | Part | How |
 | --- | --- |
-| Status | Tick **Done** to close it, untick to reopen it. |
+| State | **Open**, **In progress**, **Question** or **Done**, chosen from the menu in the thread. Ticking **Done** closes the task, unticking reopens it. |
 | Responsible | **Assign** (or **Change**) opens a list of people with a search box. Up to 20 people. |
 | Due date | Pick a date; × removes it. |
 
 Each change is noted in the thread, for example "Ada made Ben responsible" or "Ada set the due
 date to Fri, 24 Oct".
 
-**My tasks** lists your open tasks by due date (tasks without a date last). Tasks due today are
-marked, overdue ones are red, and the sidebar counts them. **Open tasks** lists all open tasks.
+The states:
+
+| State | Use it when |
+| --- | --- |
+| Open | The task is waiting to be started. |
+| In progress | Someone is working on it. |
+| Question | It cannot go on without an answer. The person who started the task and the responsible people are notified. |
+| Done | It is finished. |
+
+**My tasks** lists your tasks that are not done (open, in progress or question) by due date
+(tasks without a date last). Tasks due today are marked, overdue ones are red, and the sidebar
+counts them. **Open tasks** lists all tasks that are not done.
 
 Notifications about tasks:
 
 - You get a notification when someone makes you responsible.
-- On the due date, and every day after while the task is open and overdue, you are reminded once
-  a day at your chosen hour.
+- On the due date, and every day after while the task is not done and overdue, you are reminded
+  once a day at your chosen hour.
+- When someone sets a task you started or are responsible for to **Question**, you are notified.
 - When someone ticks off a task you started or are responsible for, you are notified.
+
+## The board
+
+**Board** in the sidebar shows the tasks you can see in four columns: Open, In progress,
+Question and Done. Done shows the tasks finished in the last 14 days. Each card shows the title,
+the channel, the due date, the number of replies and the responsible people.
+
+![The board with four columns](assets/screenshot-board.png)
+
+- Drag a card to another column to change its state.
+- With the keyboard: focus a card and press Alt+Arrow right or Alt+Arrow left to move it one
+  column on.
+- Click a card (or press Enter) to open the thread next to the board.
+- The two menus in the header filter by channel and by responsible person ("Me" for your own).
+
+A move shows at once and is saved in the background. If saving fails, the card goes back.
 
 ## Conversations about posts
 
@@ -221,6 +263,7 @@ quiet hours or a pause waits until they end.
 | Due | A task of yours is due today or overdue (once a day). |
 | Reminder | The reminder you set on a thread. |
 | Reply | A new message in a thread you started, wrote in, are responsible for, or follow. |
+| Question | A task you started or are responsible for was set to "Question". |
 | Done | A task you started or are responsible for was ticked off. |
 | Channel | A new thread or reply in a channel you set to "every new post". |
 | Message | Anything else you can see, only if you chose "everything" for mail or push. |
@@ -282,9 +325,12 @@ Push is set per device. Turn it on in each browser and on each phone you use.
 | Escape | Editing a message | Cancel the edit |
 | Escape | Your settings | Close them |
 | Escape | Open thread (focus outside the text boxes) | Close the thread |
+| Escape | Lightbox | Close it |
+| Arrow left / right | Lightbox | Previous or next image |
 | Arrow down / up | Text box with an open menu, pickers | Move through the suggestions |
 | Enter | Search box of the "Attached to" picker | Choose the first result |
-| Enter or Space | Focused thread in the list | Open it |
+| Enter or Space | Focused thread in the list or card on the board | Open it |
+| Alt+Arrow left / right | Focused card on the board | Move it to the previous or next column |
 | Arrow left / right | Focused column edge | Make the column narrower or wider |
 
 ## For guests

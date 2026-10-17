@@ -154,14 +154,15 @@ the `flurfunk_owned_post_ids` filter.
 | Read a thread, reply | everyone who can see it |
 | Start a thread | team and guests in `all` channels; in `own-posts` channels only about their own posts |
 | Attach a thread to a post | team: any post of the configured types; guests: their own posts |
-| Tick a task, set due date and responsible people | everyone who can see the thread |
+| Change a task's state, due date and responsible people | everyone who can see the thread |
 | Edit or delete a message or thread | its author and administrators (`manage_options`) |
 | Upload files | people with `upload_files`, and assistants |
+| Attach files from the media library | their own files and files they may edit; assistants (through the API) any file not attached to a private post |
 | Add a Flurfunk file to the media library | people with `upload_files`; guests only their own files |
 | Manage settings and channels | administrators (`manage_options`) |
 
 Developers can adjust several of these with filters (`flurfunk_can_edit`, `flurfunk_can_resolve`,
-`flurfunk_can_target`).
+`flurfunk_can_target`, `flurfunk_can_attach`).
 
 ## Assistants (agents and scripts)
 
@@ -218,7 +219,7 @@ Flurfunk schedules four WP-Cron events:
 | Hook | Schedule | Job |
 | --- | --- | --- |
 | `flurfunk_remind` | every 5 minutes (`flurfunk_5min`) | Sends the "remind me" reminders people set on threads. |
-| `flurfunk_due` | hourly, at about half a minute past the hour | Reminds responsible people of tasks due today or overdue, once per day, at each person's chosen hour. |
+| `flurfunk_due` | hourly, at about half a minute past the hour | Reminds responsible people of tasks that are not done and due today or overdue, once per day, at each person's chosen hour. |
 | `flurfunk_digest` | hourly, same timing | Sends the daily summary mail to people who chose it, at their chosen hour. |
 | `flurfunk_cleanup_files` | daily | Removes unused Flurfunk files older than 30 days and old notifications (read after 90 days, unread after 180). |
 
