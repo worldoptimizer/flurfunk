@@ -524,3 +524,18 @@ function unread( int $user_id ): int {
 	global $wpdb;
 	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . ' WHERE user_id = %d AND read_at IS NULL', $user_id ) ); // phpcs:ignore WordPress.DB
 }
+
+/**
+ * Keep the notification list from growing forever: read ones go after 90 days, unread after 180
+ * (filter flurfunk_notification_days). Runs with the daily cleanup.
+ *
+ * @return int Removed rows.
+ */
+function prune(): int {
+	global $wpdb;
+	$days = (array) apply_filters( 'flurfunk_notification_days', array( 'read' => 90, 'unread' => 180 ) );
+	$n    = (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NOT NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['read'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
+	$n   += (int) $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'notifications' ) . ' WHERE read_at IS NULL AND created < %s', gmdate( 'Y-m-d H:i:s', time() - (int) $days['unread'] * DAY_IN_SECONDS ) ) ); // phpcs:ignore WordPress.DB
+	return $n;
+}
+add_action( 'flurfunk_cleanup_files', __NAMESPACE__ . '\\prune' );

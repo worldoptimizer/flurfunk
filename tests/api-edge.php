@@ -449,6 +449,14 @@ $check( 'opening a thread marks its notifications read', Flurfunk\Notify\unread(
 list( $s, $c ) = $req( 'POST', 'notifications', array( 'all' => true ) );
 $check( 'mark all read', 0 === (int) $c['notifications'], $c['notifications'] ?? $s );
 
+global $wpdb;
+$wpdb->insert( $wpdb->prefix . 'flurfunk_notifications', array( 'user_id' => $team2, 'thread_id' => $t2['id'], 'kind' => 'reply', 'created' => gmdate( 'Y-m-d H:i:s', time() - 100 * DAY_IN_SECONDS ), 'read_at' => gmdate( 'Y-m-d H:i:s' ) ) );
+$old = (int) $wpdb->insert_id;
+$wpdb->insert( $wpdb->prefix . 'flurfunk_notifications', array( 'user_id' => $team2, 'thread_id' => $t2['id'], 'kind' => 'reply', 'created' => gmdate( 'Y-m-d H:i:s', time() - 100 * DAY_IN_SECONDS ) ) );
+$young = (int) $wpdb->insert_id;
+Flurfunk\Notify\prune();
+$check( 'old read notifications are pruned, unread ones kept longer', ! $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $old" ) && $wpdb->get_var( "SELECT id FROM {$wpdb->prefix}flurfunk_notifications WHERE id = $young" ) );
+
 WP_CLI::log( 'Digest, quiet hours, push' );
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'digest' ) );
 delete_user_meta( $team2, 'flurfunk_digest_last' );
