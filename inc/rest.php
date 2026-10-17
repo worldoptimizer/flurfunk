@@ -404,7 +404,7 @@ function delete_message( WP_REST_Request $r ) {
  */
 function upload( WP_REST_Request $r ) {
 	$disposition = (string) $r->get_header( 'content_disposition' );
-	$name        = preg_match( '/filename\*?=(?:UTF-8\'\')?"?([^";]+)"?/i', $disposition, $m ) ? rawurldecode( $m[1] ) : 'datei';
+	$name        = preg_match( '/filename\*?=(?:UTF-8\'\')?"?([^";]+)"?/i', $disposition, $m ) ? rawurldecode( $m[1] ) : 'file';
 	$id          = \Flurfunk\Files\store( $name, (string) $r->get_body() );
 	return is_wp_error( $id ) ? $id : Store\file_view( Store\files( array( $id ), get_current_user_id(), true )[0] ?? array( 'id' => $id ) );
 }

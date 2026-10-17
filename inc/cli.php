@@ -136,7 +136,7 @@ class Command {
 	 * ## OPTIONS
 	 *
 	 * [--name=<name>]
-	 * : Display name. Default: Assistent.
+	 * : Display name. Default: Assistant (translated).
 	 *
 	 * [--login=<login>]
 	 * : Login name. Default: flurfunk-assistent.
@@ -149,7 +149,7 @@ class Command {
 	 * @param array $assoc_args Options.
 	 */
 	public function bot_create( array $args, array $assoc_args ): void {
-		$id = \Flurfunk\Access\create_bot( $assoc_args['name'] ?? 'Assistent', $assoc_args['login'] ?? 'flurfunk-assistent' );
+		$id = \Flurfunk\Access\create_bot( $assoc_args['name'] ?? __( 'Assistant', 'flurfunk' ), $assoc_args['login'] ?? 'flurfunk-assistent' );
 		if ( is_wp_error( $id ) ) {
 			WP_CLI::error( $id );
 		}

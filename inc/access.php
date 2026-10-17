@@ -55,11 +55,11 @@ function is_bot( int $user_id ): bool {
 /**
  * Create (or mark) an assistant account: a subscriber without editing rights.
  *
- * @param string $name  Display name.
+ * @param string $name  Display name (empty: "Assistant", translated).
  * @param string $login Login name.
  * @return int|\WP_Error User ID.
  */
-function create_bot( string $name = 'Assistent', string $login = 'flurfunk-assistent' ) {
+function create_bot( string $name = '', string $login = 'flurfunk-assistent' ) {
 	$login = sanitize_user( $login, true ) ?: 'flurfunk-assistent';
 	$user  = get_user_by( 'login', $login );
 	$id    = $user ? $user->ID : wp_insert_user(
@@ -67,7 +67,7 @@ function create_bot( string $name = 'Assistent', string $login = 'flurfunk-assis
 			'user_login'   => $login,
 			'user_pass'    => wp_generate_password( 40 ),
 			'user_email'   => $login . '@invalid.invalid',
-			'display_name' => sanitize_text_field( $name ) ?: 'Assistent',
+			'display_name' => sanitize_text_field( $name ) ?: __( 'Assistant', 'flurfunk' ),
 			'role'         => 'subscriber',
 		)
 	);

@@ -52,9 +52,9 @@ function store( string $name, string $data ) {
 	require_once ABSPATH . 'wp-admin/includes/file.php';
 	require_once ABSPATH . 'wp-admin/includes/media.php';
 	require_once ABSPATH . 'wp-admin/includes/image.php';
-	$name = sanitize_file_name( wp_basename( $name ) ) ?: 'datei';
+	$name = sanitize_file_name( wp_basename( $name ) ) ?: 'file';
 	$tmp  = wp_tempnam( $name );
-	file_put_contents( $tmp, $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	file_put_contents( $tmp, $data ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- a temporary file from wp_tempnam() for media_handle_sideload().
 	$dir = static function ( array $u ): array {
 		$sub         = '/' . DIR . '/' . gmdate( 'Y/m' ) . '/' . strtolower( wp_generate_password( 12, false ) );
 		$u['subdir'] = $sub;
