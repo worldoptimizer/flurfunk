@@ -25,7 +25,6 @@ const out = path.join(__dirname, '..', 'docs', 'assets', 'og.png');
 
   await page.setContent(`<!doctype html><html data-theme="dark"><head>
     <base href="${base}">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&display=block">
     <link rel="stylesheet" href="assets/site.css">
     <link rel="stylesheet" href="assets/home.css">
     <style>

@@ -19,9 +19,7 @@
   <link rel="icon" href="{{ '/assets/brand/flurfunk-favicon.svg' | relative_url }}" type="image/svg+xml">
   <link rel="icon" href="{{ '/assets/brand/favicon-32.png' | relative_url }}" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="{{ '/assets/brand/apple-touch-icon.png' | relative_url }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap">
+  <link rel="preload" href="{{ '/assets/fonts/newsreader-latin-wght.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
   {%- if page.layout == 'home' %}
   <link rel="stylesheet" href="{{ '/assets/home.css' | relative_url }}">
