@@ -59,7 +59,7 @@
 .ff-nav > .ff-resize { right: -5px; }
 .ff-pane > .ff-resize { left: -5px; }
 .ff-resize::after { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: transparent; transition: background .1s; }
-.ff-resize:hover::after, .ff-resize:focus-visible::after, .ff-resize.is-dragging::after { background: var(--ff-accent); width: 2px; left: 3px; }
+.ff-resize:hover::after, .ff-resize:focus-visible::after, .ff-resize.is-dragging::after { background: color-mix(in srgb, var(--ff-ink) 28%, transparent); width: 2px; left: 3px; }
 .ff-resize:focus-visible { outline: none; }
 .ff-app.is-resizing { cursor: col-resize; user-select: none; }
 .ff-app > * { min-height: 0; }
@@ -342,9 +342,9 @@
 /* Header: title left, search and "mark all as read" right */
 .ff-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .ff-head-text { min-width: 0; }
-.ff-head-tools { display: flex; align-items: center; gap: 12px; }
+.ff-head-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; min-width: 0; max-width: 100%; }
 .ff-root .ff-chan-notify { min-height: 32px; max-width: 16rem; padding: 2px 8px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); font: inherit; font-size: 13px; }
-.ff-root .ff-search input { width: 14rem; max-width: 40vw; min-height: 32px; padding: 4px 10px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }
+.ff-root .ff-search input { width: 14rem; max-width: 100%; min-height: 32px; padding: 4px 10px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }
 @media (max-width: 700px) { .ff-head-tools { width: 100%; } .ff-root .ff-search input { width: 100%; max-width: none; } .ff-search { flex: 1; } }
 
 /* Lists inside messages: !important because admin themes hide list markers with ID selectors. */
@@ -397,6 +397,7 @@
 /* Thread header: title and close on the first line, follow/mute/remind on their own line below. */
 .ff-pane-head .ff-follow { order: 3; flex-basis: 100%; justify-content: flex-start; margin: 0; }
 .ff-head-tools .ff-link { white-space: nowrap; }
+.ff-search { min-width: 0; max-width: 100%; }
 .ff-push-row { gap: 10px; }
 .ff-push-state { font-size: 13px; font-weight: 600; }
 .ff-root .ff-quiet input[type=time] { min-height: 28px; padding: 1px 6px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }
