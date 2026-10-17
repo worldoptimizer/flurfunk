@@ -517,6 +517,13 @@ Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59'
 $check( 'quiet hours are recognised', Flurfunk\Notify\is_quiet( $team2 ) );
 Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:00', ( $h + 2 ) % 24, ( $h + 3 ) % 24 ) ) );
 $check( '… and outside them push is allowed', ! Flurfunk\Notify\is_quiet( $team2 ) );
+$p = Flurfunk\Notify\save_prefs( $team2, array( 'pause' => '3h' ) );
+$check( 'pausing push for three hours', $p['pause'] && abs( strtotime( $p['pause'] ) - time() - 3 * HOUR_IN_SECONDS ) < 120 && Flurfunk\Notify\is_quiet( $team2 ), $p['pause'] );
+$p = Flurfunk\Notify\save_prefs( $team2, array( 'pause' => 'none' ) );
+$check( '… and resuming', '' === $p['pause'] && ! Flurfunk\Notify\is_quiet( $team2 ), $p['pause'] );
+update_user_meta( $team2, 'flurfunk_prefs_pause', gmdate( 'Y-m-d H:i:s', time() - 60 ) );
+$check( 'a pause that ran out no longer counts', '' === Flurfunk\Notify\prefs( $team2 )['pause'] );
+$check( 'nonsense does not pause', '' === Flurfunk\Notify\save_prefs( $team2, array( 'pause' => 'forever' ) )['pause'] );
 $as( $team2 );
 list( $s ) = $req( 'POST', 'me/push', array( 'subscription' => array( 'endpoint' => 'https://push.invalid/x', 'keys' => array( 'p256dh' => 'abc', 'auth' => 'def' ) ) ) );
 $check( 'invalid push subscriptions are refused', 400 === $s, $s );

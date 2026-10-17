@@ -432,6 +432,11 @@
 		return Uint8Array.from( s, ( c ) => c.charCodeAt( 0 ) );
 	};
 	const sameBytes = ( a, b ) => a.length === b.length && a.every( ( v, i ) => v === b[ i ] );
+	const paused = () => !! ( boot.me && boot.me.prefs.pause && new Date( boot.me.prefs.pause ) > new Date() );
+	const pausedUntil = () => {
+		const d = new Date( boot.me.prefs.pause );
+		return d.toLocaleString( locale(), d.toDateString() === new Date().toDateString() ? { hour: '2-digit', minute: '2-digit' } : { weekday: 'short', hour: '2-digit', minute: '2-digit' } );
+	};
 	const swRegistration = async () => {
 		if ( ! pushSupported() || ! cfg.swUrl ) {
 			return null;
@@ -1160,7 +1165,7 @@
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
-				+ '<button type="button" class="ff-me-tile" data-ff="settings" aria-expanded="' + ui.settings + '"><span class="ff-sq" aria-hidden="true">' + esc( initials( boot.me.name ) ) + photo( person( boot.me.id ) ) + '</span><span class="ff-me-name"><strong>' + esc( boot.me.name ) + '</strong><small>' + esc( boot.me.role ) + '</small></span>' + icon.gear + '<span class="screen-reader-text">' + esc( t( 'My settings' ) ) + '</span></button></div>';
+				+ '<button type="button" class="ff-me-tile" data-ff="settings" aria-expanded="' + ui.settings + '"><span class="ff-sq" aria-hidden="true">' + esc( initials( boot.me.name ) ) + photo( person( boot.me.id ) ) + '</span><span class="ff-me-name"><strong>' + esc( boot.me.name ) + '</strong><small>' + esc( paused() ? t( 'Paused until %s', pausedUntil() ) : boot.me.role ) + '</small></span>' + icon.gear + '<span class="screen-reader-text">' + esc( t( 'My settings' ) ) + '</span></button></div>';
 		};
 		const settingsHtml = () => {
 			const p = boot.me.prefs;
@@ -1187,6 +1192,7 @@
 				+ '<label class="ff-hour">' + esc( t( 'Daily summary and task reminders at' ) ) + ' <select data-ff="pref" data-pref="hour">' + Array.from( { length: 24 }, ( _, h ) => '<option value="' + h + '"' + ( p.hour === h ? ' selected' : '' ) + '>' + pad2( h ) + ':00</option>' ).join( '' ) + '</select></label>'
 				+ '<h3>' + esc( t( 'Push notifications' ) ) + '</h3>' + pushBox
 				+ ( 'on' === ps ? '<div class="ff-seg">' + push.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="push" data-val="' + v + '" aria-pressed="' + ( p.push === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>' : '' )
+				+ ( 'on' === ps || browserNotesOn() ? pauseBox( p ) : '' )
 				+ '<label><input type="checkbox" data-ff="quiet-on"' + ( p.quiet ? ' checked' : '' ) + '> ' + esc( t( 'Quiet hours (no push)' ) ) + '</label>'
 				+ '<div class="ff-row ff-quiet"><input type="time" data-ff="quiet" data-part="from" value="' + esc( qFrom ) + '" aria-label="' + esc( t( 'From' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '> – <input type="time" data-ff="quiet" data-part="to" value="' + esc( qTo ) + '" aria-label="' + esc( t( 'To' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '></div>'
 				+ ( 'Notification' in window ? '<label><input type="checkbox" data-ff="browser-notes"' + ( browserNotesOn() ? ' checked' : '' ) + '> ' + esc( t( 'Show notifications while Flurfunk is open in the background' ) ) + '</label>' : '' )
@@ -1194,6 +1200,10 @@
 				+ ( boot.settings ? '<a class="ff-link" href="' + esc( boot.settings ) + '" target="_top">' + esc( t( 'Flurfunk settings for this site' ) ) + '</a>' : '' )
 				+ '</div>';
 		};
+
+		const pauseBox = ( p ) => paused()
+			? '<div class="ff-row ff-pause"><span>' + esc( t( 'Paused until %s', pausedUntil() ) ) + '</span><button type="button" class="ff-link" data-ff="pref" data-pref="pause" data-val="none">' + esc( t( 'Resume' ) ) + '</button></div>'
+			: '<div class="ff-row ff-pause"><span>' + esc( t( 'Pause:' ) ) + '</span>' + [ [ '1h', t( '1 hour' ) ], [ '3h', t( '3 hours' ) ], [ 'tomorrow', t( 'until tomorrow' ) ] ].map( ( [ v, l ] ) => '<button type="button" class="ff-link" data-ff="pref" data-pref="pause" data-val="' + v + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>';
 
 		/* feed */
 		const unreadHere = () => {
@@ -1437,6 +1447,10 @@
 		let shownNote = 0;
 		const showBrowserNotes = async () => {
 			const items = await api( 'notifications?limit=5' );
+			if ( paused() ) {
+				shownNote = Math.max( shownNote, ...items.map( ( n ) => n.id ) );
+				return;
+			}
 			items.filter( ( n ) => ! n.read && n.id > shownNote ).reverse().forEach( ( n ) => {
 				const note = new Notification( n.headline, { body: n.topic, tag: 'flurfunk-' + n.thread, icon: boot.look.logo || undefined } );
 				note.onclick = () => {

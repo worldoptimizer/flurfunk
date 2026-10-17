@@ -64,8 +64,10 @@ name at the bottom of the sidebar:
   replies, everything, nothing – with quiet hours.
 - **System notifications while Flurfunk is open in the background** (without push).
 - **Hour** for the daily summary and due reminders.
+- **Pause** push for an hour, three hours or until tomorrow (the tile shows until when).
 - Per channel, in the channel header: **every post**, **only mentions** or as usual.
-- Per thread: **follow** (every reply) or **mute** (only mentions and tasks).
+- Per thread: **follow** (every reply) or **mute** (only mentions and tasks), and **remind me**
+  in an hour, tomorrow or next Monday.
 
 Push needs HTTPS and PHP's OpenSSL extension (standard); keys (VAPID) are created
 automatically, no external service or library. On iPhone/iPad, push works once Flurfunk is

@@ -35,7 +35,7 @@ defined( 'ABSPATH' ) || exit;
 const PREFS    = 'flurfunk_prefs';
 const PERSONAL = array( 'mention', 'assigned', 'due', 'remind', 'reply', 'done', 'channel' );
 const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'remind' => 4, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
-const KEYS     = array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels' );
+const KEYS     = array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels', 'pause' );
 const DIGEST   = 'flurfunk_digest';
 const DUE      = 'flurfunk_due';
 const REMIND   = 'flurfunk_remind';
@@ -64,6 +64,8 @@ function prefs( int $user_id ): array {
 		'quiet'  => preg_match( '/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/', $quiet ) ? $quiet : '',
 		'badge'  => isset( $p['badge'] ) ? (bool) $p['badge'] : true,
 		'hour'   => isset( $p['hour'] ) && '' !== $p['hour'] && (int) $p['hour'] >= 0 && (int) $p['hour'] <= 23 ? (int) $p['hour'] : 7,
+		// Push paused until (ISO time), '' = not paused.
+		'pause'  => ! empty( $p['pause'] ) && strtotime( $p['pause'] . ' UTC' ) > time() ? Store\iso( $p['pause'] ) : '',
 		// Per channel (slug): all = every new thread and reply, mentions = only what concerns me.
 		'channels' => array_filter( is_array( $p['channels'] ?? null ) ? $p['channels'] : array(), static fn ( $v, $k ) => is_string( $k ) && in_array( $v, array( 'all', 'mentions' ), true ), ARRAY_FILTER_USE_BOTH ),
 	);
@@ -91,6 +93,11 @@ function save_prefs( int $user_id, array $in ): array {
 		}
 	}
 	unset( $in['channels'], $in['channel'] );
+	if ( isset( $in['pause'] ) ) {
+		// 1h | 3h | tomorrow | none.
+		$map         = array( '1h' => 'hour', 'tomorrow' => 'tomorrow' );
+		$in['pause'] = '3h' === $in['pause'] ? gmdate( 'Y-m-d H:i:s', time() + 3 * HOUR_IN_SECONDS ) : ( isset( $map[ $in['pause'] ] ) ? (string) Store\remind_time( $map[ $in['pause'] ], $user_id ) : '' );
+	}
 	foreach ( array_intersect_key( $in, array_flip( KEYS ) ) as $k => $v ) {
 		update_user_meta( $user_id, PREFS . '_' . $k, 'badge' === $k ? ( $v ? '1' : '0' ) : sanitize_text_field( (string) $v ) );
 	}
@@ -103,7 +110,11 @@ function save_prefs( int $user_id, array $in ): array {
  * @param int $user_id User.
  */
 function is_quiet( int $user_id ): bool {
-	$q = prefs( $user_id )['quiet'];
+	$p = prefs( $user_id );
+	if ( '' !== $p['pause'] ) {
+		return true;
+	}
+	$q = $p['quiet'];
 	if ( '' === $q ) {
 		return false;
 	}

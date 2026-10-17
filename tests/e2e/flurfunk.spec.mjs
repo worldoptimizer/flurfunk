@@ -497,6 +497,30 @@ test.describe( 'team', () => {
 		await expect.poll( async () => ( await api( page, 'threads/' + th.id + '?peek=1' ) ).follow ).toBe( -1 );
 	} );
 
+	test( 'remind me later from the thread header', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e erinnern ' + Date.now() } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await page.locator( '.ff-pane select[data-ff="remind"]' ).selectOption( 'tomorrow' );
+		await expect( page.locator( '.ff-pane select.ff-remind.is-set' ) ).toBeVisible();
+		expect( ( await api( page, 'threads/' + th.id + '?peek=1' ) ).remind ).toBeTruthy();
+		await page.locator( '.ff-pane select[data-ff="remind"]' ).selectOption( 'none' );
+		await expect( page.locator( '.ff-pane select.ff-remind.is-set' ) ).toHaveCount( 0 );
+		expect( ( await api( page, 'threads/' + th.id + '?peek=1' ) ).remind ).toBeNull();
+	} );
+
+	test( 'notification level per channel', async ( { page } ) => {
+		await page.locator( '.ff-nav [data-view="channel:general"]' ).click();
+		const sel = page.locator( '.ff-head select[data-ff="channel-notify"]' );
+		await sel.selectOption( 'mentions' );
+		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.channels.general ).toBe( 'mentions' );
+		await page.reload();
+		await page.locator( '.ff-nav [data-view="channel:general"]' ).click();
+		await expect( sel ).toHaveValue( 'mentions' );
+		await sel.selectOption( 'default' );
+		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.channels.general ).toBeUndefined();
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];
