@@ -388,9 +388,21 @@ function create_thread( array $args, bool $check = true ) {
 	$row = thread_row( $id );
 	save_mentions( $row, 0, $check ? mentions_in( $body, $row ) : array_map( 'intval', (array) ( $args['mentions'] ?? array() ) ) );
 	save_attachments( $row, 0, (array) ( $args['attachments'] ?? array() ), $author, $check );
+	if ( ! empty( $args['due'] ) || ! empty( $args['assignees'] ) ) {
+		// Silent on creation: the thread itself announces the task, no separate events.
+		$task = array();
+		if ( ! empty( $args['due'] ) ) {
+			$task['due'] = $args['due'];
+		}
+		if ( ! empty( $args['assignees'] ) ) {
+			$task['assignees'] = $args['assignees'];
+		}
+		set_task( $id, $task, $check );
+		$wpdb->query( $wpdb->prepare( 'DELETE FROM ' . table( 'messages' ) . " WHERE thread_id = %d AND type = 'event'", $id ) ); // phpcs:ignore WordPress.DB
+	}
 	if ( $check ) {
 		mark_read( $id, $author );
-		do_action( 'flurfunk_thread_created', $row );
+		do_action( 'flurfunk_thread_created', thread_row( $id ) );
 	}
 	return $id;
 }
@@ -485,6 +497,9 @@ function set_status( int $thread_id, string $status ) {
 			'status' => '' === $status ? 'none' : $status,
 		)
 	);
+	if ( ! is_wp_error( $id ) ) {
+		do_action( 'flurfunk_status_changed', thread_row( $thread_id ), $status, $user );
+	}
 	return is_wp_error( $id ) ? $id : true;
 }
 
@@ -855,7 +870,123 @@ function format_thread( object $t, array $atts = array(), array $ments = array()
 		) : null,
 		'mentions'    => $ments[ (int) $t->id ][0] ?? array(),
 		'attachments' => $atts[ (int) $t->id ][0] ?? array(),
+		'due'         => ! empty( $t->due_date ) ? (string) $t->due_date : null,
+		'assignees'   => assignees( (int) $t->id ),
 	);
+}
+
+/**
+ * People responsible for a task (cached per request; prime with assignees_for()).
+ *
+ * @param int $thread_id Thread.
+ * @return int[]
+ */
+function assignees( int $thread_id ): array {
+	$map = assignees_for( array( $thread_id ) );
+	return $map[ $thread_id ] ?? array();
+}
+
+/**
+ * Load assignees of several threads at once.
+ *
+ * @param int[] $thread_ids Threads.
+ * @param bool  $fresh      Ignore the cache.
+ * @return array<int,int[]>
+ */
+function assignees_for( array $thread_ids, bool $fresh = false ): array {
+	global $wpdb;
+	static $cache = array();
+	if ( $fresh ) {
+		$cache = array();
+	}
+	$missing = array_values( array_diff( array_map( 'intval', $thread_ids ), array_keys( $cache ) ) );
+	if ( $missing ) {
+		foreach ( $missing as $id ) {
+			$cache[ $id ] = array();
+		}
+		$rows = $wpdb->get_results( 'SELECT thread_id, user_id FROM ' . table( 'assignees' ) . ' WHERE thread_id IN (' . implode( ',', $missing ) . ') ORDER BY created' ); // phpcs:ignore WordPress.DB
+		foreach ( $rows as $r ) {
+			$cache[ (int) $r->thread_id ][] = (int) $r->user_id;
+		}
+	}
+	return array_intersect_key( $cache, array_flip( array_map( 'intval', $thread_ids ) ) );
+}
+
+/**
+ * Change due date and/or assignees of a task. Changes are logged as events in the thread;
+ * new assignees are notified.
+ *
+ * @param int   $thread_id Thread.
+ * @param array $args      due ('Y-m-d' or '' to clear), assignees (user IDs, replaces the list).
+ * @param bool  $check     Check permissions (off for imports).
+ * @return true|\WP_Error
+ */
+function set_task( int $thread_id, array $args, bool $check = true ) {
+	global $wpdb;
+	$user = get_current_user_id();
+	$t    = thread_row( $thread_id );
+	if ( ! $t || ( $check && ! Access\can_see( $t, $user ) ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+	}
+	if ( $check && ! apply_filters( 'flurfunk_can_resolve', true, $t, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	if ( '' === $t->status ) {
+		$wpdb->update( table( 'threads' ), array( 'status' => 'open' ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+	}
+	$events = array();
+	if ( array_key_exists( 'due', $args ) ) {
+		$due = (string) $args['due'];
+		$due = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $due ) && checkdate( (int) substr( $due, 5, 2 ), (int) substr( $due, 8, 2 ), (int) substr( $due, 0, 4 ) ) ? $due : null;
+		if ( (string) $t->due_date !== (string) $due ) {
+			$wpdb->update( table( 'threads' ), array( 'due_date' => $due ), array( 'id' => $thread_id ) ); // phpcs:ignore WordPress.DB
+			$events[] = array( 'event' => 'due', 'due' => $due );
+		}
+	}
+	if ( array_key_exists( 'assignees', $args ) ) {
+		$before = assignees( $thread_id );
+		$want   = array();
+		foreach ( array_unique( array_map( 'intval', (array) $args['assignees'] ) ) as $uid ) {
+			if ( $uid && Access\can_use( $uid ) && Access\can_see( $t, $uid ) ) {
+				$want[] = $uid;
+			}
+		}
+		$want    = array_slice( $want, 0, 20 );
+		$added   = array_values( array_diff( $want, $before ) );
+		$removed = array_values( array_diff( $before, $want ) );
+		foreach ( $added as $uid ) {
+			$wpdb->replace( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid, 'assigned_by' => $user, 'created' => now() ) ); // phpcs:ignore WordPress.DB
+		}
+		foreach ( $removed as $uid ) {
+			$wpdb->delete( table( 'assignees' ), array( 'thread_id' => $thread_id, 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
+		}
+		assignees_for( array(), true );
+		if ( $added || $removed ) {
+			$events[] = array( 'event' => 'assign', 'added' => $added, 'removed' => $removed );
+		}
+		if ( $added && $check ) {
+			do_action( 'flurfunk_assigned', thread_row( $thread_id ), $added, $user );
+		}
+	}
+	foreach ( $events as $e ) {
+		$wpdb->insert( // phpcs:ignore WordPress.DB
+			table( 'messages' ),
+			array(
+				'thread_id' => $thread_id,
+				'type'      => 'event',
+				'author_id' => $user,
+				'body'      => (string) wp_json_encode( $e ),
+				'status'    => '',
+				'files'     => '[]',
+				'created'   => now(),
+			)
+		);
+	}
+	if ( $events ) {
+		$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'threads' ) . ' SET last_activity = %s WHERE id = %d', now(), $thread_id ) ); // phpcs:ignore WordPress.DB
+		bump();
+	}
+	return true;
 }
 
 /**
@@ -875,6 +1006,15 @@ function format_messages( object $t, array $atts, array $ments, int $limit = 0 )
 	$out  = array();
 	foreach ( $rows as $m ) {
 		$mid = (int) $m->id;
+		if ( 'event' === $m->type ) {
+			$out[] = array(
+				'id'      => $mid,
+				'type'    => 'event',
+				'author'  => (int) $m->author_id,
+				'created' => iso( $m->created ),
+			) + (array) json_decode( $m->body, true );
+			continue;
+		}
 		if ( 'deleted' === $m->type ) {
 			$out[] = array(
 				'id'      => $mid,
@@ -1005,6 +1145,9 @@ function list_threads( int $user_id, array $args = array() ): array {
 	if ( 'tasks' === $view ) {
 		$where[] = "t.status = 'open'";
 	}
+	if ( 'mine' === $view ) {
+		$where[] = $wpdb->prepare( "t.status = 'open' AND t.id IN ( SELECT thread_id FROM " . table( 'assignees' ) . ' WHERE user_id = %d )', $user_id );
+	}
 	$q = trim( (string) ( $args['q'] ?? '' ) );
 	if ( '' !== $q ) {
 		$like    = '%' . $wpdb->esc_like( $q ) . '%';
@@ -1017,7 +1160,7 @@ function list_threads( int $user_id, array $args = array() ): array {
 		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
 	}
 	$limit = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
-	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : 't.last_activity DESC';
+	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( in_array( $view, array( 'mine', 'tasks' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' );
 	$rows  = $wpdb->get_results( "SELECT t.* FROM $t t WHERE " . implode( ' AND ', $where ) . " ORDER BY $order LIMIT $limit" ); // phpcs:ignore WordPress.DB
 	return summarize( $rows, $user_id );
 }
@@ -1036,6 +1179,7 @@ function summarize( array $rows, int $user_id ): array {
 	}
 	$ids   = array_map( static fn ( $r ) => (int) $r->id, $rows );
 	$in    = implode( ',', $ids );
+	assignees_for( $ids );
 	$m     = table( 'messages' );
 	$read  = read_state( $ids, $user_id );
 	$atts  = attachments_for( $ids );
@@ -1082,7 +1226,7 @@ function summarize( array $rows, int $user_id ): array {
 function counts( int $user_id ): array {
 	global $wpdb;
 	// Asked on every admin page (menu badge): cache per person until anything changes.
-	$key    = 'flurfunk_counts_' . $user_id . '_' . revision( $user_id );
+	$key    = 'flurfunk_counts_' . $user_id . '_' . revision( $user_id ) . '_' . wp_date( 'Ymd' );
 	$cached = get_transient( $key );
 	if ( is_array( $cached ) ) {
 		return $cached;
@@ -1095,18 +1239,24 @@ function counts( int $user_id ): array {
 		"SELECT t.id, t.channel_id, t.target_type, t.target_id, t.status,
 			( SELECT COUNT(*) FROM $m m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) )
 			+ ( r.user_id IS NULL AND t.author_id <> %d ) AS unread,
-			EXISTS ( SELECT 1 FROM $mt x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned
+			EXISTS ( SELECT 1 FROM $mt x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned,
+			EXISTS ( SELECT 1 FROM " . table( 'assignees' ) . " a WHERE a.thread_id = t.id AND a.user_id = %d ) AS mine,
+			t.due_date
 		FROM $t t LEFT JOIN $r r ON r.thread_id = t.id AND r.user_id = %d
 		WHERE " . Access\where( $user_id ),
 		$user_id,
 		$user_id,
 		$user_id,
+		$user_id,
 		$user_id
 	);
+	$today = wp_date( 'Y-m-d' );
 	$out = array(
 		'total'    => 0,
 		'mentions' => 0,
 		'tasks'    => 0,
+		'mine'     => 0,
+		'overdue'  => 0,
 		'channels' => array(),
 		'targets'  => array(),
 	);
@@ -1122,7 +1272,12 @@ function counts( int $user_id ): array {
 		$out['total']    += $n;
 		$out['mentions'] += $row->mentioned && $n ? 1 : 0;
 		$out['tasks']    += 'open' === $row->status ? 1 : 0;
+		if ( 'open' === $row->status && $row->mine ) {
+			++$out['mine'];
+			$out['overdue'] += $row->due_date && $row->due_date < $today ? 1 : 0;
+		}
 	}
+	$out['notifications'] = \Flurfunk\Notify\unread( $user_id );
 	set_transient( $key, $out, 10 * MINUTE_IN_SECONDS );
 	return $out;
 }

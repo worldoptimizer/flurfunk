@@ -39,6 +39,7 @@ function config(): array {
 		'appUrl'        => url(),
 		'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 		'loginUrl'      => wp_login_url( url() ),
+		'swUrl'         => FLURFUNK_URL . 'assets/sw.js',
 		'i18n'          => \Flurfunk\Strings\all(),
 	);
 }

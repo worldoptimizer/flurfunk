@@ -122,6 +122,9 @@ function forget( int $uid ): void {
 	global $wpdb;
 	$wpdb->delete( table( 'reads' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
 	$wpdb->delete( table( 'mentions' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'assignees' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'notifications' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
+	$wpdb->delete( table( 'push' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
 	delete_user_meta( $uid, \Flurfunk\Notify\PREFS );
 }
 

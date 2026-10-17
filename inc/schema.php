@@ -11,13 +11,13 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OPTION     = 'flurfunk_db_version';
 
 /**
  * Table name.
  *
- * @param string $name channels|threads|messages|mentions|reads|attachments.
+ * @param string $name channels|threads|messages|mentions|reads|attachments|assignees|notifications|push.
  */
 function table( string $name ): string {
 	global $wpdb;
@@ -57,6 +57,7 @@ CREATE TABLE " . table( 'threads' ) . " (
   body longtext NOT NULL,
   author_id bigint(20) unsigned NOT NULL,
   status varchar(8) NOT NULL DEFAULT '',
+  due_date date DEFAULT NULL,
   resolved_by bigint(20) unsigned NOT NULL DEFAULT 0,
   resolved_at datetime DEFAULT NULL,
   created datetime NOT NULL,
@@ -65,7 +66,46 @@ CREATE TABLE " . table( 'threads' ) . " (
   KEY channel_activity (channel_id,last_activity),
   KEY target (target_type,target_id),
   KEY ref_key (ref_key),
-  KEY activity (last_activity)
+  KEY activity (last_activity),
+  KEY due (status,due_date)
+) $c;
+CREATE TABLE " . table( 'assignees' ) . " (
+  thread_id bigint(20) unsigned NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  assigned_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  created datetime NOT NULL,
+  PRIMARY KEY  (thread_id,user_id),
+  KEY user_id (user_id)
+) $c;
+CREATE TABLE " . table( 'notifications' ) . " (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  thread_id bigint(20) unsigned NOT NULL,
+  message_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  kind varchar(16) NOT NULL,
+  actor_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  created datetime NOT NULL,
+  read_at datetime DEFAULT NULL,
+  sent varchar(32) NOT NULL DEFAULT '',
+  PRIMARY KEY  (id),
+  KEY user_unread (user_id,read_at),
+  KEY thread (thread_id),
+  KEY kind_thread (kind,thread_id)
+) $c;
+CREATE TABLE " . table( 'push' ) . " (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  endpoint text NOT NULL,
+  endpoint_hash char(64) NOT NULL,
+  p256dh varchar(255) NOT NULL,
+  auth varchar(64) NOT NULL,
+  label varchar(190) NOT NULL DEFAULT '',
+  created datetime NOT NULL,
+  last_ok datetime DEFAULT NULL,
+  failures int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY  (id),
+  UNIQUE KEY endpoint_hash (endpoint_hash),
+  KEY user_id (user_id)
 ) $c;
 CREATE TABLE " . table( 'messages' ) . " (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -152,7 +192,7 @@ add_action(
  */
 function drop(): void {
 	global $wpdb;
-	foreach ( array( 'channels', 'threads', 'messages', 'mentions', 'reads', 'attachments' ) as $t ) {
+	foreach ( array( 'channels', 'threads', 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications', 'push' ) as $t ) {
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . table( $t ) ); // phpcs:ignore WordPress.DB
 	}
 	delete_option( OPTION );

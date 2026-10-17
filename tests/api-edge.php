@@ -47,16 +47,19 @@ $as = function ( int $uid ) {
 	wp_set_current_user( $uid );
 };
 
-// No mails during tests.
-add_filter( 'flurfunk_mail', '__return_false' );
-$mails = array();
+// No mails or pushes leave during tests; record who would have got a mail.
+$mailed = array();
 add_filter(
-	'flurfunk_notify_recipients',
-	function ( $to ) use ( &$mails ) {
-		$mails[] = $to;
-		return $to;
-	}
+	'flurfunk_mail',
+	function ( $mail, $user ) use ( &$mailed ) {
+		$mailed[] = (int) $user->ID;
+		return false;
+	},
+	10,
+	2
 );
+add_filter( 'pre_http_request', fn ( $pre, $args, $url ) => str_contains( (string) $url, 'push.invalid' ) ? new WP_Error( 'blocked', 'test' ) : $pre, 10, 3 );
+$mails = array(); // Kept for the import check below.
 
 Store\ensure_channel( 'ff-test', array( 'name' => 'Test', 'access_guests' => 'own-posts' ), true );
 Store\ensure_channel( 'ff-test-archived', array( 'name' => 'Archiv', 'archived' => 1 ), true );
@@ -349,28 +352,112 @@ $as( $team );
 list( $s, $x ) = $req( 'POST', 'threads/' . $st . '/edit', array( 'title' => 'Neuer Titel', 'body' => 'nichts' ) );
 $check( 'the thread title can be edited', 200 === $s && 'Neuer Titel' === $x['title'], $x['title'] ?? $s );
 
-WP_CLI::log( 'Mail preferences' );
+WP_CLI::log( 'Notifications and mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );
-$recipients = function ( callable $fn ) use ( &$mails ) {
-	$mails = array();
+$flush = function ( callable $fn ) use ( &$mailed ) {
+	global $wpdb;
+	$mailed = array();
+	$max    = (int) $wpdb->get_var( "SELECT COALESCE(MAX(id),0) FROM {$wpdb->prefix}flurfunk_notifications" );
 	$fn();
-	return array_reduce( $mails, fn ( $all, $to ) => $all + $to, array() );
+	Flurfunk\Notify\deliver();
+	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT user_id, kind FROM {$wpdb->prefix}flurfunk_notifications WHERE id > %d", $max ) );
+	$out  = array();
+	foreach ( $rows as $r ) {
+		$out[ (int) $r->user_id ] = $r->kind;
+	}
+	return array( $out, $mailed );
 };
-Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'none' ) );
-$to = $recipients( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "An <@$team2>" ) ) );
-$check( '"never" gets no mail even when mentioned', ! isset( $to[ $team2 ] ), $to );
+Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'none', 'push' => 'none' ) );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "An <@$team2>" ) ) );
+$check( 'a mention always lands in the notification list', 'mention' === ( $notes[ $team2 ] ?? '' ), $notes );
+$check( '"never" gets no mail even when mentioned', ! in_array( $team2, $m, true ), $m );
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'all' ) );
-$to = $recipients( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Für alle' ) ) );
-$check( '"everything" gets mail without mention', isset( $to[ $team2 ] ), $to );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Für alle' ) ) );
+$check( '"everything" gets mail without mention', in_array( $team2, $m, true ) && 'message' === ( $notes[ $team2 ] ?? '' ), array( $notes, $m ) );
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'mentions' ) );
-$to = $recipients( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Ohne Erwähnung' ) ) );
-$check( '"mentions" gets no mail for unrelated threads', ! isset( $to[ $team2 ] ), $to );
-$to = $recipients( fn () => Store\add_message( $t2['id'], array( 'body' => 'Weiter geht es' ) ) );
-$check( 'guest gets mail for replies in a thread about their post', isset( $to[ $guest ] ) && 'reply' === $to[ $guest ], $to );
-$check( 'nobody gets mail about their own message', ! isset( $to[ $team ] ), $to );
-$to = $recipients( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "Intern <@$guest>" ) ) );
-$check( 'guest gets no mail from threads they cannot see', ! isset( $to[ $guest ] ), $to );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Ohne Erwähnung' ) ) );
+$check( '"mentions" gets nothing for unrelated threads', ! isset( $notes[ $team2 ] ) && ! in_array( $team2, $m, true ), array( $notes, $m ) );
+list( $notes, $m ) = $flush( fn () => Store\add_message( $t2['id'], array( 'body' => 'Weiter geht es' ) ) );
+$check( 'guest gets a reply notification in a thread about their post', 'reply' === ( $notes[ $guest ] ?? '' ), $notes );
+$check( 'nobody is notified about their own message', ! isset( $notes[ $team ] ) && ! in_array( $team, $m, true ) );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "Intern <@$guest>" ) ) );
+$check( 'guest gets nothing from threads they cannot see', ! isset( $notes[ $guest ] ) && ! in_array( $guest, $m, true ), $notes );
+
+WP_CLI::log( 'Tasks' );
+$as( $team );
+$yesterday = wp_date( 'Y-m-d', time() - DAY_IN_SECONDS );
+list( $notes ) = $flush(
+	function () use ( $req, $team2, $guest, &$task ) {
+		list( , $task ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'title' => 'Aufgabe', 'body' => 'machen', 'due' => '2030-02-30', 'assignees' => array( $team2, $guest ) ) );
+	}
+);
+$check( 'a new task drops impossible dates and people who cannot see it', 'open' === $task['status'] && null === $task['due'] && array( $team2 ) === $task['assignees'], array( $task['due'], $task['assignees'] ) );
+$check( 'the assignee is notified', 'assigned' === ( $notes[ $team2 ] ?? '' ), $notes );
+list( $s, $x ) = $req( 'POST', 'threads/' . $task['id'] . '/task', array( 'due' => $yesterday, 'assignees' => array( $team2, $team ) ) );
+$ev = array_values( array_filter( $x['messages'], fn ( $mm ) => 'event' === $mm['type'] ) );
+$check( 'changes are logged as events', 2 === count( $ev ) && 'due' === $ev[0]['event'] && $yesterday === $ev[0]['due'] && array( $team ) === $ev[1]['added'], $ev );
+$as( $team2 );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'view' => 'mine' ) );
+$check( '"my tasks" lists it', in_array( $task['id'], wp_list_pluck( $l, 'id' ), true ) );
+$c = Store\counts( $team2 );
+$check( 'counts show my tasks and the overdue one', $c['mine'] >= 1 && $c['overdue'] >= 1, array( $c['mine'], $c['overdue'] ) );
+list( $notes ) = $flush( fn () => Flurfunk\Notify\remind_due() );
+$check( 'due reminders go to assignees of overdue tasks', 'due' === ( $notes[ $team2 ] ?? '' ), $notes );
+list( $notes ) = $flush( fn () => Flurfunk\Notify\remind_due() );
+$check( '… only once a day', ! isset( $notes[ $team2 ] ), $notes );
+list( $notes ) = $flush( fn () => $req( 'POST', 'threads/' . $task['id'] . '/status', array( 'status' => 'done' ) ) );
+$check( 'ticking off notifies author and the other assignees, not oneself', 'done' === ( $notes[ $team ] ?? '' ) && ! isset( $notes[ $team2 ] ), $notes );
+$as( $team );
+list( $s, $x ) = $req( 'POST', 'threads/' . $task['id'] . '/task', array( 'due' => '' ) );
+$check( 'the due date can be removed', null === $x['due'] );
+
+WP_CLI::log( 'Notification list' );
+$as( $team2 );
+list( $s, $list ) = $req( 'GET', 'notifications', null, array( 'limit' => 50 ) );
+$check( 'the list holds my notifications with words', $list && ! empty( $list[0]['headline'] ) && ! empty( $list[0]['topic'] ), $list[0] ?? $s );
+$as( $guest );
+list( $s, $gl ) = $req( 'GET', 'notifications', null, array( 'limit' => 50 ) );
+$check( 'the list never shows threads one cannot see', ! array_filter( $gl, fn ( $n ) => ! Flurfunk\Access\can_see( Store\thread_row( $n['thread'] ), $guest ) ) );
+$as( $team2 );
+$unread = Flurfunk\Notify\unread( $team2 );
+$req( 'GET', 'threads/' . $task['id'] );
+$check( 'opening a thread marks its notifications read', Flurfunk\Notify\unread( $team2 ) < $unread, array( $unread, Flurfunk\Notify\unread( $team2 ) ) );
+list( $s, $c ) = $req( 'POST', 'notifications', array( 'all' => true ) );
+$check( 'mark all read', 0 === (int) $c['notifications'], $c['notifications'] ?? $s );
+
+WP_CLI::log( 'Digest, quiet hours, push' );
+Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'digest' ) );
+delete_user_meta( $team2, 'flurfunk_digest_last' );
+$as( $team );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "Für die Zusammenfassung <@$team2>" ) ) );
+$check( 'digest people get no immediate mail', ! in_array( $team2, $m, true ) && 'mention' === ( $notes[ $team2 ] ?? '' ) );
+$mailed = array();
+Flurfunk\Notify\send_digests();
+$check( 'the daily digest mails them once', 1 === count( array_keys( $mailed, $team2, true ) ), $mailed );
+$mailed = array();
+Flurfunk\Notify\send_digests();
+$check( '… and not again for the same notifications', ! in_array( $team2, $mailed, true ) );
+$now = wp_date( 'H:i' );
+$h   = (int) substr( $now, 0, 2 );
+Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:59', $h, $h ) ) );
+$check( 'quiet hours are recognised', Flurfunk\Notify\is_quiet( $team2 ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'quiet' => sprintf( '%02d:00-%02d:00', ( $h + 2 ) % 24, ( $h + 3 ) % 24 ) ) );
+$check( '… and outside them push is allowed', ! Flurfunk\Notify\is_quiet( $team2 ) );
+$as( $team2 );
+list( $s ) = $req( 'POST', 'me/push', array( 'subscription' => array( 'endpoint' => 'https://push.invalid/x', 'keys' => array( 'p256dh' => 'abc', 'auth' => 'def' ) ) ) );
+$check( 'invalid push subscriptions are refused', 400 === $s, $s );
+if ( Flurfunk\Push\available() ) {
+	$k = Flurfunk\Push\new_key();
+	list( $s, $r ) = $req( 'POST', 'me/push', array( 'subscription' => array( 'endpoint' => 'https://push.invalid/ff-test', 'keys' => array( 'p256dh' => Flurfunk\Push\b64( Flurfunk\Push\raw_public( $k ) ), 'auth' => Flurfunk\Push\b64( random_bytes( 16 ) ) ) ) ) );
+	$check( 'a valid subscription is stored', 200 === $s && $r['devices'] >= 1, $r );
+	for ( $i = 0; $i < 6; $i++ ) {
+		Flurfunk\Push\send( $team2, array( 'title' => 'x' ) );
+	}
+	$left = array_filter( Flurfunk\Push\devices( $team2 ), fn ( $d ) => str_contains( $d->endpoint, 'push.invalid' ) );
+	$check( 'a subscription that keeps failing is dropped', ! $left, count( $left ) );
+	$check( 'VAPID keys exist and stay the same', Flurfunk\Push\vapid()['public'] === Flurfunk\Push\vapid()['public'] && 87 === strlen( Flurfunk\Push\vapid()['public'] ) );
+}
 Flurfunk\Notify\save_prefs( $team2, $prefs_before[0] );
 Flurfunk\Notify\save_prefs( $guest, $prefs_before[1] );
 
@@ -388,7 +475,7 @@ global $wpdb;
 $ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived')" ) );
 if ( $ids ) {
 	$in = implode( ',', $ids );
-	foreach ( array( 'messages', 'mentions', 'reads', 'attachments' ) as $tb ) {
+	foreach ( array( 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications' ) as $tb ) {
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_$tb WHERE thread_id IN ($in)" );
 	}
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_threads WHERE id IN ($in)" );

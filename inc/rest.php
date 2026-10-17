@@ -11,6 +11,7 @@
  *   POST threads/<id>/messages     reply
  *   POST threads/<id>/status       open | done | ''
  *   POST threads/<id>/edit         title, body (author or manager)
+ *   POST threads/<id>/task         due (Y-m-d or ''), assignees (user IDs)
  *   POST messages/<id>             new text (author or manager)
  *   DELETE messages/<id>           remove (a note stays in its place)
  *   GET  providers/<id>/search     suggestions for a slash command
@@ -18,7 +19,10 @@
  *   POST cards/<id>/refresh        fetch a fresh snapshot for a card
  *   POST files                     upload a Flurfunk file (raw body, Content-Disposition: filename)
  *   POST files/<id>/adopt          add a Flurfunk file to the media library
- *   POST me/prefs                  theme, mail, badge
+ *   POST me/prefs                  theme, avatar, mail, push, quiet, badge
+ *   GET  notifications             the person's notifications (before, limit)
+ *   POST notifications             mark read ({ ids } or { all: true })
+ *   POST me/push / DELETE me/push  subscribe / unsubscribe this browser; POST me/push/test
  *
  * @package Flurfunk
  */
@@ -58,6 +62,7 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\get_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/messages', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\add_message', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route( NS, '/threads/(?P<id>\d+)/task', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_task', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/edit', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\edit_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route(
 		NS,
@@ -69,6 +74,65 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/status', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_status', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/providers/(?P<provider>[a-z0-9_\-]+/[a-z0-9_\-]+)/search', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\search', 'permission_callback' => $auth ) );
+	register_rest_route(
+		NS,
+		'/notifications',
+		array(
+			array( 'methods' => 'GET', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Notify\list_for( get_current_user_id(), (int) $r->get_param( 'before' ), (int) ( $r->get_param( 'limit' ) ?: 30 ) ), 'permission_callback' => $auth ),
+			array(
+				'methods'             => 'POST',
+				'callback'            => static function ( WP_REST_Request $r ) {
+					$p = (array) $r->get_json_params();
+					\Flurfunk\Notify\mark_read( get_current_user_id(), ! empty( $p['all'] ) ? null : array_map( 'intval', (array) ( $p['ids'] ?? array() ) ) );
+					return Store\counts( get_current_user_id() );
+				},
+				'permission_callback' => $auth,
+			),
+		)
+	);
+	register_rest_route(
+		NS,
+		'/me/push',
+		array(
+			array(
+				'methods'             => 'POST',
+				'callback'            => static function ( WP_REST_Request $r ) {
+					$p  = (array) $r->get_json_params();
+					$ok = \Flurfunk\Push\subscribe( get_current_user_id(), (array) ( $p['subscription'] ?? array() ), (string) ( $p['label'] ?? '' ) );
+					return is_wp_error( $ok ) ? $ok : array( 'devices' => count( \Flurfunk\Push\devices( get_current_user_id() ) ) );
+				},
+				'permission_callback' => $auth,
+			),
+			array(
+				'methods'             => 'DELETE',
+				'callback'            => static function ( WP_REST_Request $r ) {
+					\Flurfunk\Push\unsubscribe( get_current_user_id(), (string) ( $r->get_json_params()['endpoint'] ?? $r->get_param( 'endpoint' ) ?? '' ) );
+					return array( 'devices' => count( \Flurfunk\Push\devices( get_current_user_id() ) ) );
+				},
+				'permission_callback' => $auth,
+			),
+		)
+	);
+	register_rest_route(
+		NS,
+		'/me/push/test',
+		array(
+			'methods'             => 'POST',
+			'callback'            => static fn () => array(
+				'sent' => \Flurfunk\Push\send(
+					get_current_user_id(),
+					array(
+						'title' => __( 'Flurfunk works', 'flurfunk' ),
+						'body'  => __( 'Notifications on this device are on.', 'flurfunk' ),
+						'url'   => \Flurfunk\Admin\url(),
+						'tag'   => 'flurfunk-test',
+						'icon'  => \Flurfunk\Settings\logo(),
+					)
+				),
+			),
+			'permission_callback' => $auth,
+		)
+	);
 	register_rest_route( NS, '/read', array( 'methods' => 'POST', 'callback' => static fn ( WP_REST_Request $r ) => array( 'marked' => Store\mark_all_read( get_current_user_id(), sanitize_key( (string) ( $r->get_json_params()['channel'] ?? '' ) ) ) ) + Store\counts( get_current_user_id() ), 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/cards/(?P<id>\d+)/refresh', array( 'methods' => 'POST', 'callback' => static function ( WP_REST_Request $r ) {
 		$tid = Store\refresh_card( (int) $r['id'] );
@@ -115,6 +179,11 @@ function bootstrap(): array {
 			'sidebar' => $s['sidebar'],
 		),
 		'settings'  => Access\can_manage( $uid ) ? admin_url( 'options-general.php?page=' . \Flurfunk\Settings\PAGE ) : '',
+		'push'      => array(
+			'available' => \Flurfunk\Push\available() && is_ssl(),
+			'key'       => \Flurfunk\Push\available() ? ( \Flurfunk\Push\vapid()['public'] ?? '' ) : '',
+			'devices'   => count( \Flurfunk\Push\devices( $uid ) ),
+		),
 	);
 }
 
@@ -186,6 +255,7 @@ function get_thread( WP_REST_Request $r ) {
 	}
 	if ( empty( $r['peek'] ) ) {
 		Store\mark_read( (int) $r['id'], $uid );
+		\Flurfunk\Notify\mark_read( $uid, null, (int) $r['id'] );
 	}
 	return decorate( $t );
 }
@@ -207,7 +277,9 @@ function create_thread( WP_REST_Request $r ) {
 			'target'      => is_array( $p['target'] ?? null ) ? $p['target'] : null,
 			'title'       => (string) ( $p['title'] ?? '' ),
 			'body'        => (string) ( $p['body'] ?? '' ),
-			'task'        => ! empty( $p['task'] ),
+			'task'        => ! empty( $p['task'] ) || ! empty( $p['due'] ) || ! empty( $p['assignees'] ),
+			'due'         => (string) ( $p['due'] ?? '' ),
+			'assignees'   => array_map( 'intval', (array) ( $p['assignees'] ?? array() ) ),
 			'attachments' => (array) ( $p['attachments'] ?? array() ),
 			'ref_key'     => $ref,
 		)
@@ -303,4 +375,14 @@ function upload( WP_REST_Request $r ) {
 function adopt( WP_REST_Request $r ) {
 	$ok = \Flurfunk\Files\adopt( (int) $r['id'] );
 	return is_wp_error( $ok ) ? $ok : Store\file_view( Store\files( array( (int) $r['id'] ), get_current_user_id(), false )[0] ?? array() );
+}
+
+/**
+ * POST threads/<id>/task.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function set_task( WP_REST_Request $r ) {
+	$ok = Store\set_task( (int) $r['id'], array_intersect_key( (array) $r->get_json_params(), array_flip( array( 'due', 'assignees' ) ) ) );
+	return is_wp_error( $ok ) ? $ok : decorate( Store\full_thread( (int) $r['id'], get_current_user_id() ) );
 }

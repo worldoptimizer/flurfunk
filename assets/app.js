@@ -106,6 +106,7 @@
 		clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7"/></svg>',
 		file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>',
 		doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M6 3h8l4 4v14H6zM9 12h6M9 16h6"/></svg>',
+		bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg>',
 		chev: '<svg class="ff-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
 		gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>',
 	};
@@ -246,6 +247,98 @@
 		: '' );
 	const statusPill = ( th ) => ( 'done' === th.status ? '<span class="ff-pill is-done">' + esc( t( 'done' ) ) + '</span>' : 'open' === th.status ? '<span class="ff-pill is-open">' + esc( t( 'open' ) ) + '</span>' : '' );
 	const audiencePill = ( th ) => ( boot && 'team' === boot.me.kind && th.audience && th.audience.length ? '<span class="ff-pill is-seen">' + esc( t( '%s can read this', th.audience.join( ', ' ) ) ) + '</span>' : '' );
+	const pad2 = ( n ) => String( n ).padStart( 2, '0' );
+	const today = () => {
+		const d = new Date();
+		return d.getFullYear() + '-' + pad2( d.getMonth() + 1 ) + '-' + pad2( d.getDate() );
+	};
+	const fmtDate = ( ymd ) => new Date( ymd + 'T12:00:00' ).toLocaleDateString( locale(), { weekday: 'short', day: 'numeric', month: 'short' } );
+	const dueChip = ( th ) => {
+		if ( ! th.due || 'open' !== th.status ) {
+			return '';
+		}
+		const d = today();
+		const cls = th.due < d ? ' is-over' : th.due === d ? ' is-today' : '';
+		const txt = th.due < d ? t( 'overdue since %s', fmtDate( th.due ) ) : th.due === d ? t( 'due today' ) : t( 'due %s', fmtDate( th.due ) );
+		return '<span class="ff-due' + cls + '">' + esc( txt ) + '</span>';
+	};
+	const names = ( ids ) => ( ids || [] ).map( ( id ) => person( id ).name ).join( ', ' );
+	const assigneeStack = ( th ) => ( th.assignees && th.assignees.length && 'open' === th.status ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' );
+	// Responsible people and due date of a task, editable in place.
+	const taskControls = ( th ) => {
+		if ( null === th.status || undefined === th.status ) {
+			return '';
+		}
+		const who = th.assignees && th.assignees.length ? th.assignees.map( ( id ) => '<span class="ff-who-chip">' + ava( id ) + esc( person( id ).name ) + '</span>' ).join( '' ) : '<span class="ff-muted">' + esc( t( 'nobody yet' ) ) + '</span>';
+		return '<div class="ff-task"><span class="ff-task-l">' + esc( t( 'Responsible' ) ) + '</span>' + who
+			+ '<button type="button" class="ff-link" data-ff="assign" data-tid="' + th.id + '">' + esc( th.assignees && th.assignees.length ? t( 'Change' ) : t( 'Assign' ) ) + '</button>'
+			+ '<label class="ff-task-l">' + esc( t( 'Due' ) ) + ' <input type="date" data-ff="due" data-tid="' + th.id + '" value="' + esc( th.due || '' ) + '"></label>'
+			+ ( th.due ? '<button type="button" class="ff-x ff-due-x" data-ff="due-clear" data-tid="' + th.id + '" aria-label="' + esc( t( 'Remove due date' ) ) + '">×</button>' : '' )
+			+ dueChip( th ) + '</div>';
+	};
+	/**
+	 * Pick people (checkboxes with search) in a small popover next to the anchor.
+	 *
+	 * @param {Element}  anchor   Button that opened it.
+	 * @param {number[]} selected Preselected user IDs.
+	 * @param {Function} onDone   Called with the chosen IDs.
+	 */
+	const peoplePicker = ( anchor, selected, onDone ) => {
+		document.querySelectorAll( '.ff-people-pop' ).forEach( ( x ) => x.remove() );
+		const chosen = new Set( selected );
+		const pop = document.createElement( 'div' );
+		pop.className = 'ff-pop ff-people-pop';
+		pop.setAttribute( 'role', 'dialog' );
+		pop.setAttribute( 'aria-label', t( 'Responsible' ) );
+		pop.innerHTML = '<input type="search" class="ff-pick-q" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Search' ) ) + '"><div class="ff-pick-list"></div><div class="ff-row"><button type="button" class="ff-send" data-pp="done">' + esc( t( 'Done' ) ) + '</button><button type="button" class="ff-link" data-pp="cancel">' + esc( t( 'Cancel' ) ) + '</button></div>';
+		const list = $( '.ff-pick-list', pop );
+		const q = $( '.ff-pick-q', pop );
+		const draw = () => {
+			const term = q.value.toLowerCase();
+			list.innerHTML = boot.people.filter( ( p ) => ! term || p.name.toLowerCase().includes( term ) ).slice( 0, 40 ).map( ( p ) => '<label class="ff-pp"><input type="checkbox" value="' + p.id + '"' + ( chosen.has( p.id ) ? ' checked' : '' ) + '>' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( p.role ) + '</small></span></label>' ).join( '' );
+		};
+		const close = () => {
+			pop.remove();
+			document.removeEventListener( 'mousedown', outside );
+			anchor.focus();
+		};
+		const outside = ( e ) => {
+			if ( ! pop.contains( e.target ) && e.target !== anchor ) {
+				close();
+			}
+		};
+		q.addEventListener( 'input', draw );
+		list.addEventListener( 'change', ( e ) => {
+			const id = +e.target.value;
+			if ( e.target.checked ) {
+				chosen.add( id );
+			} else {
+				chosen.delete( id );
+			}
+		} );
+		pop.addEventListener( 'click', ( e ) => {
+			const b = e.target.closest( '[data-pp]' );
+			if ( b ) {
+				e.stopPropagation();
+				const ids = [ ...chosen ];
+				close();
+				if ( 'done' === b.dataset.pp ) {
+					onDone( ids );
+				}
+			}
+		} );
+		pop.addEventListener( 'keydown', ( e ) => {
+			if ( 'Escape' === e.key ) {
+				e.preventDefault();
+				e.stopPropagation();
+				close();
+			}
+		} );
+		draw();
+		( anchor.closest( '.ff-task, .ff-left, .ff-row' ) || anchor.parentNode ).append( pop );
+		document.addEventListener( 'mousedown', outside );
+		q.focus();
+	};
 	const doneBox = ( th, extra ) => ( null === th.status || undefined === th.status ? '' : '<label class="ff-state"><input type="checkbox" data-ff="done"' + ( extra || '' ) + ( 'done' === th.status ? ' checked' : '' ) + '> ' + esc( t( 'Done' ) ) + '</label>' );
 
 	const summary = ( th, expanded, act ) => {
@@ -273,6 +366,25 @@
 			html += '<li class="ff-event">' + esc( t( '%s earlier messages are not shown here.', th.older ) ) + '</li>';
 		}
 		( th.messages || [] ).forEach( ( m ) => {
+			if ( 'event' === m.type ) {
+				const who = person( m.author ).name;
+				const parts = [];
+				if ( 'assign' === m.event ) {
+					if ( m.added && m.added.length ) {
+						parts.push( t( '%1$s made %2$s responsible', who, names( m.added ) ) );
+					}
+					if ( m.removed && m.removed.length ) {
+						parts.push( t( '%1$s took %2$s off the task', who, names( m.removed ) ) );
+					}
+				} else if ( 'due' === m.event ) {
+					parts.push( m.due ? t( '%1$s set the due date to %2$s', who, fmtDate( m.due ) ) : t( '%s removed the due date', who ) );
+				}
+				if ( parts.length ) {
+					html += '<li class="ff-event">' + esc( parts.join( ' · ' ) ) + ' · ' + esc( when( m.created ) ) + '</li>';
+				}
+				prev = null;
+				return;
+			}
 			if ( 'deleted' === m.type ) {
 				html += '<li class="ff-event is-deleted">' + esc( t( '%s deleted a message', person( m.author ).name ) ) + '</li>';
 				prev = null;
@@ -296,6 +408,85 @@
 			prev = m;
 		} );
 		return html ? '<ol class="ff-thread">' + html + '</ol>' : '';
+	};
+
+	/* ------------------------------------------------------------------ push and browser notifications */
+
+	const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+	const keyBytes = ( b64 ) => {
+		const s = atob( ( b64 + '='.repeat( ( 4 - b64.length % 4 ) % 4 ) ).replace( /-/g, '+' ).replace( /_/g, '/' ) );
+		return Uint8Array.from( s, ( c ) => c.charCodeAt( 0 ) );
+	};
+	const swRegistration = async () => {
+		if ( ! pushSupported() || ! cfg.swUrl ) {
+			return null;
+		}
+		const reg = ( await navigator.serviceWorker.getRegistration( cfg.swUrl ) ) || ( await navigator.serviceWorker.register( cfg.swUrl ) );
+		if ( ! reg.active ) {
+			// The worker controls no page, so "ready" would never resolve: wait for it to activate.
+			await new Promise( ( resolve ) => {
+				const sw = reg.installing || reg.waiting;
+				if ( ! sw ) {
+					resolve();
+					return;
+				}
+				sw.addEventListener( 'statechange', () => 'activated' === sw.state && resolve() );
+			} );
+		}
+		return reg;
+	};
+	const pushState = async () => {
+		if ( ! pushSupported() || ! boot.push || ! boot.push.available ) {
+			return 'unsupported';
+		}
+		if ( 'denied' === Notification.permission ) {
+			return 'blocked';
+		}
+		const reg = await navigator.serviceWorker.getRegistration( cfg.swUrl );
+		const sub = reg && ( await reg.pushManager.getSubscription() );
+		return sub ? 'on' : 'off';
+	};
+	const deviceLabel = () => {
+		const ua = navigator.userAgent;
+		const browser = /Edg\//.test( ua ) ? 'Edge' : /Firefox\//.test( ua ) ? 'Firefox' : /Chrome\//.test( ua ) ? 'Chrome' : /Safari\//.test( ua ) ? 'Safari' : t( 'Browser' );
+		const os = /Mac OS X/.test( ua ) ? 'macOS' : /Windows/.test( ua ) ? 'Windows' : /Android/.test( ua ) ? 'Android' : /iPhone|iPad/.test( ua ) ? 'iOS' : /Linux/.test( ua ) ? 'Linux' : '';
+		return browser + ( os ? ' · ' + os : '' );
+	};
+	const pushOn = async () => {
+		if ( 'granted' !== ( await Notification.requestPermission() ) ) {
+			throw new Error( t( 'Notifications are blocked in this browser. Allow them in the site settings of your browser.' ) );
+		}
+		const reg = await swRegistration();
+		const sub = ( await reg.pushManager.getSubscription() ) || ( await reg.pushManager.subscribe( { userVisibleOnly: true, applicationServerKey: keyBytes( boot.push.key ) } ) );
+		const r = await api( 'me/push', { method: 'POST', body: { subscription: sub.toJSON(), label: deviceLabel() } } );
+		boot.push.devices = r.devices;
+	};
+	const pushOff = async () => {
+		const reg = await navigator.serviceWorker.getRegistration( cfg.swUrl );
+		const sub = reg && ( await reg.pushManager.getSubscription() );
+		if ( sub ) {
+			const r = await api( 'me/push', { method: 'DELETE', body: { endpoint: sub.endpoint } } );
+			boot.push.devices = r.devices;
+			await sub.unsubscribe();
+		}
+	};
+	// Push subscriptions can rotate; tell the server the current one on every start.
+	const pushResync = async () => {
+		try {
+			if ( 'on' === ( await pushState() ) ) {
+				const reg = await navigator.serviceWorker.getRegistration( cfg.swUrl );
+				const sub = await reg.pushManager.getSubscription();
+				await api( 'me/push', { method: 'POST', body: { subscription: sub.toJSON(), label: deviceLabel() } } );
+			}
+		} catch ( e ) {}
+	};
+	const browserNotesKey = () => 'flurfunk-browser-notes-' + boot.me.id;
+	const browserNotesOn = () => {
+		try {
+			return '1' === window.localStorage.getItem( browserNotesKey() ) && 'Notification' in window && 'granted' === Notification.permission;
+		} catch ( e ) {
+			return false;
+		}
 	};
 
 	/* ------------------------------------------------------------------ edit and delete */
@@ -371,6 +562,16 @@
 			startEdit( holder, m ? m.text : '', async ( text ) => onUpdate( await api( 'messages/' + mid, { method: 'POST', body: { body: text } } ) ) );
 			return true;
 		}
+		if ( 'assign' === act || 'due-clear' === act ) {
+			const tid = +el.dataset.tid;
+			const th = threads.find( ( x ) => x.id === tid ) || {};
+			if ( 'due-clear' === act ) {
+				onUpdate( await api( 'threads/' + tid + '/task', { method: 'POST', body: { due: '' } } ) );
+			} else {
+				peoplePicker( el, th.assignees || [], async ( ids ) => onUpdate( await api( 'threads/' + tid + '/task', { method: 'POST', body: { assignees: ids } } ) ) );
+			}
+			return true;
+		}
 		if ( 'card-refresh' === act ) {
 			el.disabled = true;
 			try {
@@ -401,6 +602,20 @@
 			return true;
 		}
 		return false;
+	};
+
+	/**
+	 * Due date changed in a task row (change event). Returns true when handled.
+	 *
+	 * @param {Element}  el       The date input.
+	 * @param {Function} onUpdate Called with the updated thread.
+	 */
+	const dueChange = async ( el, onUpdate ) => {
+		if ( 'due' !== el.dataset.ff ) {
+			return false;
+		}
+		onUpdate( await api( 'threads/' + el.dataset.tid + '/task', { method: 'POST', body: { due: el.value } } ) );
+		return true;
 	};
 
 	/* ------------------------------------------------------------------ target picker */
@@ -814,6 +1029,12 @@
 			if ( 'tasks' === kind ) {
 				return { title: t( 'Open tasks' ), sub: t( 'Everything not ticked off yet' ), args: { view: 'tasks' } };
 			}
+			if ( 'mine' === kind ) {
+				return { title: t( 'My tasks' ), sub: t( 'Assigned to you, by due date' ), args: { view: 'mine' } };
+			}
+			if ( 'notifications' === kind ) {
+				return { title: t( 'Notifications' ), sub: t( 'What happened for you' ), args: {}, notifications: true };
+			}
 			if ( 'search' === kind ) {
 				const q = ui.view.slice( 7 );
 				return { title: t( 'Search: %s', q ), sub: t( 'Threads and replies that contain it' ), args: { view: 'all', q }, search: q };
@@ -905,11 +1126,13 @@
 			const c = boot.counts;
 			const btn = ( view, glyph, label, n, title ) => '<button type="button" data-ff="nav" data-view="' + esc( view ) + '"' + ( ui.view === view && ! ui.threadOnly ? ' aria-current="true"' : '' ) + ( n ? ' class="is-unread"' : '' ) + ( title ? ' title="' + esc( title ) + '"' : '' ) + '><span class="ff-glyph" aria-hidden="true">' + glyph + '</span><span class="ff-lbl">' + esc( label ) + '</span>' + ( n ? '<b>' + n + '</b>' : '' ) + '</button>';
 			const targets = boot.recent.filter( ( x ) => x.title );
-			nav.innerHTML = resizer( 'nav', t( 'Drag to make the sidebar wider or narrower' ) ) + '<div class="ff-ws">' + ( boot.look.logo ? '<img src="' + esc( boot.look.logo ) + '" alt="">' : '' ) + '<span>' + esc( boot.look.name ) + '</span></div>'
+			nav.innerHTML = resizer( 'nav', t( 'Drag to make the sidebar wider or narrower' ) ) + '<div class="ff-ws">' + ( boot.look.logo ? '<img src="' + esc( boot.look.logo ) + '" alt="">' : '' ) + '<span>' + esc( boot.look.name ) + '</span>'
+				+ '<button type="button" class="ff-bell" data-ff="nav" data-view="notifications"' + ( 'notifications' === ui.view ? ' aria-current="true"' : '' ) + ' aria-label="' + esc( c.notifications ? t( 'Notifications (%s new)', c.notifications ) : t( 'Notifications' ) ) + '">' + icon.bell + ( c.notifications ? '<b>' + c.notifications + '</b>' : '' ) + '</button></div>'
 				+ '<div class="ff-nav-list">'
 				+ btn( 'all', '≡', t( 'All threads' ), 0 )
 				+ btn( 'mentions', '@', t( 'Mentions' ), c.mentions )
-				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 ) + ( c.tasks ? '' : '' )
+				+ btn( 'mine', '✓', t( 'My tasks' ), c.mine || 0, c.overdue ? t( '%s overdue', c.overdue ) : '' ).replace( '<b>', c.overdue ? '<b class="is-over">' : '<b class="is-soft">' )
+				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
 				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
@@ -921,12 +1144,29 @@
 			const p = boot.me.prefs;
 			const seg = [ [ 'light', t( 'Light' ) ], [ 'dark', t( 'Dark' ) ], [ 'system', t( 'Automatic' ) ] ];
 			const pic = [ [ 'photo', t( 'Photo' ) ], [ 'initials', t( 'Initials' ) ] ];
-			const mail = [ [ 'mentions', t( 'Mentions and replies in my threads' ) ], [ 'all', t( 'Every new message I can see' ) ], [ 'none', t( 'Never – I check myself' ) ] ];
+			const mail = [ [ 'mentions', t( 'Right away: mentions, tasks, replies in my threads' ) ], [ 'digest', t( 'Once a day: a summary at 7 am' ) ], [ 'all', t( 'Every new message I can see' ) ], [ 'none', t( 'Never – I check myself' ) ] ];
+			const push = [ [ 'mentions', t( 'Mentions, tasks, replies' ) ], [ 'all', t( 'Everything' ) ], [ 'none', t( 'Nothing' ) ] ];
+			const [ qFrom, qTo ] = p.quiet ? p.quiet.split( '-' ) : [ '22:00', '07:00' ];
+			const ps = ui.pushState || 'unknown';
+			const pushBox = 'unsupported' === ps
+				? '<p class="ff-meta">' + esc( t( 'Push notifications are not available in this browser or on this server.' ) ) + '</p>'
+				: 'blocked' === ps
+					? '<p class="ff-meta">' + esc( t( 'Notifications are blocked in this browser. Allow them in the site settings of your browser.' ) ) + '</p>'
+					: '<div class="ff-row ff-push-row"><span class="ff-push-state">' + esc( 'on' === ps ? t( 'On for this device' ) : t( 'Off for this device' ) ) + '</span>'
+						+ '<button type="button" class="ff-link" data-ff="push-toggle">' + esc( 'on' === ps ? t( 'Turn off' ) : t( 'Turn on' ) ) + '</button>'
+						+ ( 'on' === ps ? '<button type="button" class="ff-link" data-ff="push-test">' + esc( t( 'Send a test' ) ) + '</button>' : '' ) + '</div>'
+						+ ( ui.pushError ? '<p class="ff-error">' + esc( ui.pushError ) + '</p>' : '' )
+						+ ( boot.push && boot.push.devices ? '<p class="ff-meta">' + esc( t( 'Devices with push: %s', boot.push.devices ) ) + '</p>' : '' );
 			return '<div class="ff-settings" role="group" aria-label="' + esc( t( 'My settings' ) ) + '">'
 				+ '<h3>' + esc( t( 'Appearance' ) ) + '</h3><div class="ff-seg">' + seg.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="theme" data-val="' + v + '" aria-pressed="' + ( p.theme === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>'
 				+ '<h3>' + esc( t( 'Profile picture' ) ) + '</h3><div class="ff-seg">' + pic.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="avatar" data-val="' + v + '" aria-pressed="' + ( p.avatar === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>'
 				+ '<p class="ff-meta">' + esc( t( 'Your picture from your profile or Gravatar. Without one, your initials show.' ) ) + '</p>'
 				+ '<h3>' + esc( t( 'Email me' ) ) + '</h3>' + mail.map( ( [ v, l ] ) => '<label><input type="radio" name="ff-mail" data-ff="pref" data-pref="mail" value="' + v + '"' + ( p.mail === v ? ' checked' : '' ) + '> ' + esc( l ) + '</label>' ).join( '' )
+				+ '<h3>' + esc( t( 'Push notifications' ) ) + '</h3>' + pushBox
+				+ ( 'on' === ps ? '<div class="ff-seg">' + push.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="push" data-val="' + v + '" aria-pressed="' + ( p.push === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>' : '' )
+				+ '<label><input type="checkbox" data-ff="quiet-on"' + ( p.quiet ? ' checked' : '' ) + '> ' + esc( t( 'Quiet hours (no push)' ) ) + '</label>'
+				+ '<div class="ff-row ff-quiet"><input type="time" data-ff="quiet" data-part="from" value="' + esc( qFrom ) + '" aria-label="' + esc( t( 'From' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '> – <input type="time" data-ff="quiet" data-part="to" value="' + esc( qTo ) + '" aria-label="' + esc( t( 'To' ) ) + '"' + ( p.quiet ? '' : ' disabled' ) + '></div>'
+				+ ( 'Notification' in window ? '<label><input type="checkbox" data-ff="browser-notes"' + ( browserNotesOn() ? ' checked' : '' ) + '> ' + esc( t( 'Show notifications while Flurfunk is open in the background' ) ) + '</label>' : '' )
 				+ '<h3>' + esc( t( 'Badge' ) ) + '</h3><label><input type="checkbox" data-ff="pref" data-pref="badge"' + ( p.badge ? ' checked' : '' ) + '> ' + esc( t( 'Show the unread number on the menu icon' ) ) + '</label>'
 				+ ( boot.settings ? '<a class="ff-link" href="' + esc( boot.settings ) + '" target="_top">' + esc( t( 'Flurfunk settings for this site' ) ) + '</a>' : '' )
 				+ '</div>';
@@ -941,7 +1181,7 @@
 		const renderHead = () => {
 			const v = viewInfo();
 			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p></div>'
-				+ '<div class="ff-head-tools">' + ( unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
+				+ '<div class="ff-head-tools">' + ( v.notifications ? ( boot.counts.notifications ? '<button type="button" class="ff-link" data-ff="notes-read">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' ) : unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
 				+ '<form class="ff-search" role="search"><input type="search" name="q" value="' + esc( v.search || '' ) + '" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Search conversations' ) ) + '"></form></div>';
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
@@ -950,14 +1190,35 @@
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<p class="ff-preview">' + preview( th.body ) + '</p>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
+			+ ( dueChip( th ) || assigneeStack( th ) ? '<p class="ff-task-line">' + dueChip( th ) + assigneeStack( th ) + '</p>' : '' )
 			+ summary( th, false, 'open' ) + '</div></article>';
+		const noteHtml = ( n ) => '<article class="ff-post ff-note-item' + ( n.read ? '' : ' is-unread' ) + '" data-ff="open-note" data-id="' + n.thread + '" data-nid="' + n.id + '" tabindex="0">'
+			+ ( n.actor ? ava( n.actor ) : '<span class="ff-ava" aria-hidden="true">' + icon.bell + '</span>' ) + '<div class="ff-post-body">'
+			+ '<p class="ff-who"><b>' + esc( n.headline ) + '</b> <span>' + esc( when( n.created ) ) + ( n.channel ? ' · #' + esc( chName( n.channel ) ) : '' ) + '</span></p>'
+			+ '<p class="ff-title">' + esc( n.topic ) + '</p>'
+			+ ( n.text && n.text !== n.topic ? '<p class="ff-preview">' + preview( n.text ) + '</p>' : '' ) + '</div></article>';
 		const renderFeed = () => {
+			if ( viewInfo().notifications ) {
+				feed.innerHTML = ui.notes && ui.notes.length
+					? ui.notes.map( noteHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older notifications' ) ) + '</button>' : '' )
+					: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'No notifications yet.' ) ) + '</p>';
+				return;
+			}
 			feed.innerHTML = ui.list.length
 				? ui.list.map( postHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '' )
 				: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
 		};
 		const loadList = async ( append ) => {
 			const v = viewInfo();
+			if ( v.notifications ) {
+				const before = append && ui.notes && ui.notes.length ? ui.notes[ ui.notes.length - 1 ].id : 0;
+				const items = await api( 'notifications?' + query( { limit: 40, before } ) );
+				ui.notes = append ? ( ui.notes || [] ).concat( items ) : items;
+				ui.more = items.length === 40;
+				ui.loading = false;
+				renderFeed();
+				return;
+			}
 			const args = Object.assign( { limit: 40 }, v.args );
 			if ( append && ui.list.length ) {
 				args.before = ui.list[ ui.list.length - 1 ].activity;
@@ -972,6 +1233,10 @@
 		/* composer for new threads */
 		const renderComposer = () => {
 			const v = viewInfo();
+			if ( v.notifications ) {
+				slot.replaceChildren();
+				return;
+			}
 			const startable = boot.channels.filter( ( c ) => 'all' === c.level || ( 'own-posts' === c.level && v.target ) || 'own-posts' === c.level );
 			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>';
 			const guest = 'guest' === boot.me.kind;
@@ -985,11 +1250,17 @@
 				autoGrow: true,
 				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', chName( v.channel ) ) : t( 'New thread … (@name, / for cards)' ),
 				submitLabel: t( 'Start thread' ),
-				extra: chSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>',
+				extra: chSel + '<label class="ff-check"><input type="checkbox" name="task"> ' + esc( t( 'Task' ) ) + '</label>'
+					+ '<span class="ff-task-new"><label class="ff-check">' + esc( t( 'Due' ) ) + ' <input type="date" name="due"></label><input type="hidden" name="assignees" value=""><button type="button" class="ff-link" data-ff="new-assign">' + esc( t( 'Assign' ) ) + '</button></span>',
 				onSubmit: async ( payload, form ) => {
 					const tg = v.target ? v.target : form.elements.target && form.elements.target.value ? { type: form.elements.target.value.split( ':' )[ 0 ], id: +form.elements.target.value.split( ':' )[ 1 ] } : null;
-					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: v.channel || form.elements.channel.value, target: tg, task: form.elements.task.checked } ) } );
+					const assignees = form.elements.assignees.value ? form.elements.assignees.value.split( ',' ).map( Number ) : [];
+					const task = form.elements.task.checked;
+					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: v.channel || form.elements.channel.value, target: tg, task, due: task ? form.elements.due.value : '', assignees: task ? assignees : [] } ) } );
 					form.elements.task.checked = false;
+					form.elements.due.value = '';
+					form.elements.assignees.value = '';
+					$( '[data-ff="new-assign"]', form ).textContent = t( 'Assign' );
 					await refresh();
 					openThread( th.id, th );
 				},
@@ -997,6 +1268,15 @@
 			if ( ! v.target ) {
 				$( '.ff-left', c ).insertBefore( targetPicker( guest ), $( '.ff-check', c ) );
 			}
+			$( '[data-ff="new-assign"]', c ).addEventListener( 'click', ( e ) => {
+				const hidden = c.elements.assignees;
+				const btn = e.currentTarget;
+				peoplePicker( btn, hidden.value ? hidden.value.split( ',' ).map( Number ) : [], ( ids ) => {
+					hidden.value = ids.join( ',' );
+					btn.textContent = ids.length ? t( 'Responsible: %s', names( ids ) ) : t( 'Assign' );
+					c.elements.task.checked = c.elements.task.checked || ids.length > 0;
+				} );
+			} );
 			slot.replaceChildren( c );
 		};
 
@@ -1009,6 +1289,7 @@
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ cards( th.attachments ) + targetChip( th )
+				+ taskControls( th )
 				+ '<div class="ff-root-row">' + statusPill( th ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
 			const c = composer( {
@@ -1057,7 +1338,11 @@
 		/* refresh: counts, list (and open thread if nobody is typing there) */
 		const refresh = async () => {
 			try {
+				const before = boot.counts.notifications || 0;
 				boot.counts = await api( 'counts' );
+				if ( boot.counts.notifications > before && document.hidden && browserNotesOn() && 'on' !== ui.pushState ) {
+					showBrowserNotes();
+				}
 				if ( ! ui.settings ) {
 					renderNav(); // Not while the settings are open: that would steal the focus.
 				}
@@ -1067,6 +1352,21 @@
 				await loadList();
 				updateBadge( boot.counts.total );
 			} catch ( e ) {}
+		};
+		// New notifications as system notifications while the window is in the background (only when
+		// this browser gets no push, which would show them already).
+		let shownNote = 0;
+		const showBrowserNotes = async () => {
+			const items = await api( 'notifications?limit=5' );
+			items.filter( ( n ) => ! n.read && n.id > shownNote ).reverse().forEach( ( n ) => {
+				const note = new Notification( n.headline, { body: n.topic, tag: 'flurfunk-' + n.thread, icon: boot.look.logo || undefined } );
+				note.onclick = () => {
+					window.focus();
+					openThread( n.thread );
+					note.close();
+				};
+			} );
+			shownNote = Math.max( shownNote, ...items.map( ( n ) => n.id ) );
 		};
 		// What can change while a thread is open: new, edited or deleted messages, the status, the
 		// thread text, refreshed cards.
@@ -1129,7 +1429,27 @@
 				closeThread();
 			} else if ( 'more' === act ) {
 				loadList( true );
+			} else if ( 'push-toggle' === act ) {
+				el.disabled = true;
+				try {
+					if ( 'on' === ui.pushState ) {
+						await pushOff();
+					} else {
+						await pushOn();
+					}
+				} catch ( x ) {
+					ui.pushError = x.message;
+				}
+				ui.pushState = await pushState();
+				renderNav();
+				ui.pushError = '';
+			} else if ( 'push-test' === act ) {
+				const r = await api( 'me/push/test', { method: 'POST', body: {} } );
+				el.textContent = r.sent ? t( 'Sent – it should appear shortly' ) : t( 'Could not send' );
 			} else if ( 'settings' === act ) {
+				if ( ! ui.settings ) {
+					ui.pushState = await pushState().catch( () => 'unsupported' );
+				}
 				ui.settings = ! ui.settings;
 				renderNav();
 				$( '.ff-me-tile', nav ).focus();
@@ -1148,6 +1468,24 @@
 				}
 				applyLook( root );
 				renderNav();
+			} else if ( 'open-note' === act ) {
+				const nid = +el.dataset.nid;
+				api( 'notifications', { method: 'POST', body: { ids: [ nid ] } } ).then( ( c ) => {
+					boot.counts = c;
+					renderNav();
+					updateBadge( c.total );
+				} );
+				const n = ( ui.notes || [] ).find( ( x ) => x.id === nid );
+				if ( n ) {
+					n.read = true;
+				}
+				openThread( +el.dataset.id );
+				renderFeed();
+			} else if ( 'notes-read' === act ) {
+				boot.counts = await api( 'notifications', { method: 'POST', body: { all: true } } );
+				renderNav();
+				renderHead();
+				await loadList();
 			} else if ( 'read-all' === act ) {
 				const v = viewInfo();
 				const r = await api( 'read', { method: 'POST', body: v.channel ? { channel: v.channel } : {} } );
@@ -1183,7 +1521,7 @@
 			const post = e.target.closest && e.target.closest( '.ff-post' );
 			if ( post && e.target === post && ( 'Enter' === e.key || ' ' === e.key ) ) {
 				e.preventDefault();
-				openThread( +post.dataset.id );
+				post.click();
 			}
 			if ( 'Escape' === e.key && ui.settings ) {
 				ui.settings = false;
@@ -1200,6 +1538,13 @@
 		} );
 		root.addEventListener( 'change', async ( e ) => {
 			const el = e.target;
+			if ( await dueChange( el, ( th ) => {
+				ui.current = th;
+				renderPane( th );
+				refresh();
+			} ) ) {
+				return;
+			}
 			if ( 'done' === el.dataset.ff && ui.thread ) {
 				ui.current = await api( 'threads/' + ui.thread + '/status', { method: 'POST', body: { status: el.checked ? 'done' : 'open' } } );
 				renderPane( ui.current );
@@ -1207,6 +1552,23 @@
 			} else if ( 'pref' === el.dataset.ff ) {
 				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { [ el.dataset.pref ]: 'checkbox' === el.type ? el.checked : el.value } } );
 				updateBadge( boot.counts.total );
+			} else if ( 'quiet-on' === el.dataset.ff || 'quiet' === el.dataset.ff ) {
+				const box = el.closest( '.ff-settings' );
+				const on = $( '[data-ff="quiet-on"]', box ).checked;
+				box.querySelectorAll( '[data-ff="quiet"]' ).forEach( ( i ) => {
+					i.disabled = ! on;
+				} );
+				const value = on ? $( '[data-part="from"]', box ).value + '-' + $( '[data-part="to"]', box ).value : '';
+				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { quiet: value } } );
+			} else if ( 'browser-notes' === el.dataset.ff ) {
+				let on = el.checked;
+				if ( on && 'granted' !== Notification.permission ) {
+					on = 'granted' === ( await Notification.requestPermission() );
+					el.checked = on;
+				}
+				try {
+					window.localStorage.setItem( browserNotesKey(), on ? '1' : '0' );
+				} catch ( x ) {}
 			}
 		} );
 		document.addEventListener( 'click', ( e ) => {
@@ -1223,6 +1585,19 @@
 		renderComposer();
 		await loadList();
 		updateBadge( boot.counts.total );
+		pushState().then( ( st ) => {
+			ui.pushState = st;
+		} ).catch( () => {} );
+		pushResync();
+		if ( pushSupported() ) {
+			// A click on a push notification focuses this window: open the thread.
+			navigator.serviceWorker.addEventListener( 'message', ( e ) => {
+				const m = e.data && 'open' === e.data.flurfunk && String( e.data.url || '' ).match( /thread(?::|%3A)(\d+)/ );
+				if ( m ) {
+					openThread( +m[ 1 ] );
+				}
+			} );
+		}
 		if ( ui.thread ) {
 			openThread( ui.thread );
 		}
@@ -1275,12 +1650,13 @@
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;
 			} ).catch( () => {} ) ) );
-			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, messages: [] } ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, messages: [] } ) ) );
 			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'No conversations about this post yet.' ) ) + '</p>' )
 				+ list.map( ( th ) => '<div class="ff-box' + ( 'done' === th.status ? ' is-done' : '' ) + '" data-id="' + th.id + '">'
 					+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 					+ ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + cards( th.attachments )
 					+ '<p class="ff-meta">' + esc( person( th.author ).name + ' · ' + when( th.created ) + ' · #' + chName( th.channel ) ) + ' ' + audiencePill( th ) + '</p>'
+					+ taskControls( th )
 					+ summary( th, open.has( th.id ), 'toggle' )
 					+ ( full[ th.id ] ? messagesHtml( full[ th.id ] ) + '<div class="ff-reply-slot"></div>' : ( th.replies ? '' : '<div class="ff-reply-slot"></div>' ) )
 					+ '</div>' ).join( '' )
@@ -1340,6 +1716,9 @@
 			}
 		} );
 		root.addEventListener( 'change', async ( e ) => {
+			if ( await dueChange( e.target, () => draw() ) ) {
+				return;
+			}
 			if ( 'done' === e.target.dataset.ff ) {
 				await api( 'threads/' + e.target.dataset.id + '/status', { method: 'POST', body: { status: e.target.checked ? 'done' : 'open' } } );
 				draw();
@@ -1477,6 +1856,7 @@
 			+ ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 			+ '<div class="ff-msg-body">' + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' ) + '</div>'
 			+ cards( th.attachments ) + targetChip( th )
+			+ ( 'done' === th.status ? '' : taskControls( th ) )
 			+ '<p class="ff-meta">' + nameHtml( th.author ) + ' · ' + esc( when( th.created ) ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.replies ? summary( th, open.has( th.id ), 'toggle' ) : '<button type="button" class="ff-link ff-answer" data-ff="answer">' + esc( t( 'Reply' ) ) + '</button>' )
 			+ ( full ? messagesHtml( full ) : '' )
@@ -1488,7 +1868,7 @@
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;
 			} ).catch( () => {} ) ) );
-			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, messages: [] } ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, messages: [] } ) ) );
 			const todo = list.filter( ( th ) => 'done' !== th.status );
 			const done = list.filter( ( th ) => 'done' === th.status );
 			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'Nothing here yet.' ) ) + '</p>' )
@@ -1554,6 +1934,9 @@
 			}
 		} );
 		root.addEventListener( 'change', async ( e ) => {
+			if ( await dueChange( e.target, () => draw() ) ) {
+				return;
+			}
 			if ( 'done' === e.target.dataset.ff ) {
 				await api( 'threads/' + e.target.dataset.id + '/status', { method: 'POST', body: { status: e.target.checked ? 'done' : 'open' } } );
 				draw();

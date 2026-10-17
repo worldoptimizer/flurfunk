@@ -349,3 +349,42 @@
 .ff-preview { margin: 2px 0 0; color: var(--ff-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
 .ff-preview a, .ff-text a { overflow-wrap: anywhere; word-break: break-all; }
 .ff-post-body { min-width: 0; }
+
+/* Tasks: due date, responsible people */
+.ff-due { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--ff-soft2); color: var(--ff-muted); white-space: nowrap; }
+.ff-due.is-today { color: var(--ff-accent-text); }
+.ff-due.is-over { background: #b42318; color: #fff; }
+.ff-task-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 6px 0 0; }
+.ff-assignees .ff-ava { width: 22px; height: 22px; font-size: 9px; margin-right: -5px; box-shadow: 0 0 0 2px var(--ff-paper); }
+.ff-task { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding: 8px 10px; border: 1px solid var(--ff-line); border-radius: 8px; background: var(--ff-soft); font-size: 13px; }
+.ff-task-l { color: var(--ff-muted); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.ff-root .ff-task input[type=date], .ff-root .ff-task-new input[type=date] { min-height: 28px; padding: 1px 6px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); font-size: 13px; }
+.ff-who-chip { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.ff-who-chip .ff-ava { width: 20px; height: 20px; font-size: 9px; }
+.ff-muted { color: var(--ff-muted); }
+.ff-due-x { font-size: 16px; padding: 0 4px; }
+.ff-task-new { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; position: relative; }
+.ff-compose:not(:has(input[name=task]:checked)) .ff-task-new { display: none; }
+.ff-people-pop { left: 0; top: calc(100% + 6px); bottom: auto; width: min(22rem, 80vw); }
+.ff-left .ff-people-pop, .ff-row .ff-people-pop { top: auto; bottom: calc(100% + 6px); }
+.ff-pp { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 5px; cursor: pointer; }
+.ff-pp:hover { background: var(--ff-soft2); }
+.ff-pp .ff-ava { width: 24px; height: 24px; font-size: 9px; }
+.ff-pp span { display: grid; line-height: 1.25; }
+.ff-pp small { color: var(--ff-muted); font-size: 12px; }
+
+/* Bell and my tasks in the sidebar */
+.ff-ws > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-bell { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: none; color: var(--ff-side-ink); cursor: pointer; }
+.ff-bell:hover, .ff-bell[aria-current="true"] { background: rgb(255 255 255 / .14); }
+.ff-bell svg { width: 20px; height: 20px; }
+.ff-bell b { position: absolute; top: 1px; right: 0; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--ff-accent); color: #fff; font-size: 10px; line-height: 17px; box-shadow: 0 0 0 2px var(--ff-side); }
+.ff-nav button b.is-over { background: #b42318; }
+.ff-nav button b.is-soft { background: rgb(255 255 255 / .22); }
+.ff-note-item .ff-ava svg { width: 16px; height: 16px; }
+
+/* Settings: longer now, scroll inside */
+.ff-settings { max-height: min(78vh, 40rem); overflow-y: auto; }
+.ff-push-row { gap: 10px; }
+.ff-push-state { font-size: 13px; font-weight: 600; }
+.ff-root .ff-quiet input[type=time] { min-height: 28px; padding: 1px 6px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }

@@ -161,6 +161,8 @@ function import( array $data, string $bundle = '' ): array {
 				'created'     => $t['created'] ?? null,
 				'mentions'    => array_filter( array_map( $user, (array) ( $t['mentions'] ?? array() ) ) ),
 				'attachments' => (array) ( $t['attachments'] ?? array() ),
+				'due'         => (string) ( $t['due'] ?? '' ),
+				'assignees'   => array_values( array_filter( array_map( $user, (array) ( $t['assignees'] ?? array() ) ) ) ),
 				'ref_key'     => $ref,
 			),
 			false

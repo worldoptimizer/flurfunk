@@ -20,7 +20,8 @@
  *   inc/files.php      Flurfunk files: own folder, hidden from the media library until adopted
  *   inc/privacy.php    personal data export/erase, cleanup when users are deleted
  *   inc/settings.php   branding and defaults (name, logo, colours, access)
- *   inc/notify.php     email notifications following each person's preferences
+ *   inc/notify.php     notifications: in-app list, mail, digest, push; due reminders
+ *   inc/push.php       Web Push (VAPID, aes128gcm) without external libraries
  *   inc/rest.php       REST API for the interface (flurfunk/v1)
  *   inc/admin.php      overview app, editor panel, posts list column, OpenStation bits
  *   inc/transfer.php   JSON export and import
@@ -49,6 +50,7 @@ require_once FLURFUNK_DIR . 'inc/targets.php';
 require_once FLURFUNK_DIR . 'inc/files.php';
 require_once FLURFUNK_DIR . 'inc/privacy.php';
 require_once FLURFUNK_DIR . 'inc/settings.php';
+require_once FLURFUNK_DIR . 'inc/push.php';
 require_once FLURFUNK_DIR . 'inc/notify.php';
 require_once FLURFUNK_DIR . 'inc/rest.php';
 require_once FLURFUNK_DIR . 'inc/admin.php';
@@ -69,7 +71,14 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 }
 
 register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
-register_deactivation_hook( __FILE__, static fn () => wp_clear_scheduled_hook( 'flurfunk_cleanup_files' ) );
+register_deactivation_hook(
+	__FILE__,
+	static function (): void {
+		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest' ) as $hook ) {
+			wp_clear_scheduled_hook( $hook );
+		}
+	}
+);
 
 add_action(
 	'init',
