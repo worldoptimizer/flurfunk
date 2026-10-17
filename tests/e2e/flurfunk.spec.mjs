@@ -193,6 +193,54 @@ test.describe( 'team', () => {
 		await expect( page.locator( '.ff-pane .ff-msg .ff-image img' ) ).toBeVisible();
 	} );
 
+	test( 'several images form a gallery that opens in a lightbox', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		test.skip( ! boot.me.upload, 'account cannot upload' );
+		const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+		const up = ( name, type, b64 ) => page.evaluate( async ( [ n, ty, data ] ) => {
+			const r = await fetch( window.flurfunkConfig.fileEndpoint, { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': window.flurfunkConfig.nonce, 'Content-Disposition': 'attachment; filename="' + n + '"', 'Content-Type': ty }, body: Uint8Array.from( atob( data ), ( c ) => c.charCodeAt( 0 ) ) } );
+			return ( await r.json() ).id;
+		}, [ name, type, b64 ] );
+		const ids = [];
+		for ( let i = 1; i <= 3; i++ ) {
+			ids.push( await up( 'e2e-galerie-' + i + '.png', 'image/png', png ) );
+		}
+		for ( let i = 1; i <= 10; i++ ) {
+			ids.push( await up( 'e2e-liste-' + i + '.txt', 'text/plain', btoa( 'Zeile ' + i ) ) );
+		}
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Galerie ' + Date.now(), files: ids } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		const root = page.locator( '.ff-pane .ff-root-msg' );
+		await expect( root.locator( '.ff-gallery .ff-image' ) ).toHaveCount( 3 );
+		await expect( root.locator( '.ff-more-files summary' ) ).toContainText( '4' );
+		await expect( root.locator( '.ff-more-files .ff-file' ) ).toBeHidden();
+		await root.locator( '.ff-more-files summary' ).click();
+		await expect( root.locator( '.ff-more-files .ff-file' ) ).toHaveCount( 4 );
+		await root.locator( '.ff-gallery .ff-image' ).nth( 1 ).click();
+		const box = page.locator( 'dialog.ff-lightbox' );
+		await expect( box ).toBeVisible();
+		await expect( box.locator( 'figcaption' ) ).toContainText( '2/3' );
+		await page.keyboard.press( 'ArrowRight' );
+		await expect( box.locator( 'figcaption' ) ).toContainText( '3/3' );
+		await page.keyboard.press( 'Escape' );
+		await expect( box ).toHaveCount( 0 );
+		await expect( page.locator( '.ff-pane' ) ).toBeVisible(); // Escape closed only the lightbox.
+	} );
+
+	test( 'the media library dialog opens from the composer', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		test.skip( ! boot.me.upload, 'account cannot upload' );
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Mediathek ' + Date.now() } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await page.locator( '.ff-pane [data-ff="library"]' ).click();
+		await expect( page.locator( '.media-modal' ).first() ).toBeVisible();
+		await page.keyboard.press( 'Escape' );
+		await expect( page.locator( '.media-modal' ).first() ).toBeHidden();
+		await expect( page.locator( '.ff-pane' ) ).toBeVisible();
+	} );
+
 	test( 'on a phone the back button returns to the list', async ( { page } ) => {
 		await page.setViewportSize( { width: 400, height: 800 } );
 		await openApp( page );

@@ -51,6 +51,9 @@ function enqueue(): void {
 	wp_enqueue_style( 'flurfunk', FLURFUNK_URL . 'assets/app.css', array(), (string) filemtime( FLURFUNK_DIR . 'assets/app.css' ) );
 	wp_enqueue_script( 'flurfunk', FLURFUNK_URL . 'assets/app.js', array(), (string) filemtime( FLURFUNK_DIR . 'assets/app.js' ), true );
 	wp_add_inline_script( 'flurfunk', 'window.flurfunkConfig = ' . wp_json_encode( config() ) . ';', 'before' );
+	if ( current_user_can( 'upload_files' ) ) {
+		wp_enqueue_media(); // "From media library" in the composer.
+	}
 }
 
 add_action(

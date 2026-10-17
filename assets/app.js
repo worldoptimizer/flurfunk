@@ -106,6 +106,7 @@
 		clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7"/></svg>',
 		file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>',
 		doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M6 3h8l4 4v14H6zM9 12h6M9 16h6"/></svg>',
+		image: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="9" r="1.5" fill="currentColor"/></svg>',
 		bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg>',
 		chev: '<svg class="ff-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
 		gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>',
@@ -214,30 +215,42 @@
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};
 	const cards = ( list ) => ( list && list.length ? '<div class="ff-cards">' + list.map( ( a ) => card( a ) ).join( '' ) + '</div>' : '' );
-	// Images as previews, audio and video as players, everything else as a link.
+	// Images as previews (several as a gallery, all open in the lightbox), audio and video as
+	// players, everything else as a link; long lists of files fold away.
 	const files = ( list ) => {
-		const items = ( list || [] ).map( ( f ) => {
+		const all = list || [];
+		const adoptBtn = ( f ) => ( false === f.library && boot && boot.me.upload ? '<button type="button" class="ff-adopt" data-ff="adopt" data-fid="' + f.id + '" title="' + esc( t( 'Only in Flurfunk so far. Adding it keeps the file where it is.' ) ) + '">' + esc( t( 'Add to media library' ) ) + '</button>' : '' );
+		// The media library title if someone set one, otherwise the file name.
+		const nameOf = ( f ) => ( f.title && f.title !== String( f.name ).replace( /\.[^.]+$/, '' ) ? f.title : f.name );
+		const isImage = ( f ) => ! f.missing && f.url && String( f.type || '' ).startsWith( 'image/' );
+		const images = all.filter( isImage );
+		const box = ( f, src, tile ) => '<a class="ff-media ff-image' + ( tile ? ' is-tile' : '' ) + '" href="' + esc( f.url ) + '" data-ff="lightbox" data-name="' + esc( nameOf( f ) ) + '" target="_blank" rel="noopener"'
+			+ ( ! tile && f.width && f.height ? ' style="aspect-ratio:' + f.width + '/' + f.height + '"' : '' ) + '><img src="' + esc( src ) + '" alt="' + esc( nameOf( f ) ) + '" loading="lazy"></a>';
+		let gallery = '';
+		if ( 1 === images.length ) {
+			gallery = '<span class="ff-media-wrap">' + box( images[ 0 ], images[ 0 ].preview || images[ 0 ].url ) + adoptBtn( images[ 0 ] ) + '</span>';
+		} else if ( images.length ) {
+			gallery = '<div class="ff-gallery">' + images.map( ( f ) => box( f, f.thumb || f.preview || f.url, true ) ).join( '' ) + '</div>';
+		}
+		const rest = all.filter( ( f ) => ! isImage( f ) ).map( ( f ) => {
 			const type = String( f.type || '' );
-			const adopt = false === f.library && boot && boot.me.upload ? '<button type="button" class="ff-adopt" data-ff="adopt" data-fid="' + f.id + '" title="' + esc( t( 'Only in Flurfunk so far. Adding it keeps the file where it is.' ) ) + '">' + esc( t( 'Add to media library' ) ) + '</button>' : '';
-			// The media library title if someone set one, otherwise the file name.
-			const name = f.title && f.title !== String( f.name ).replace( /\.[^.]+$/, '' ) ? f.title : f.name;
-			const label = esc( name ) + ' <small>· ' + size( f.size ) + '</small>';
+			const label = esc( nameOf( f ) ) + ' <small>· ' + size( f.size ) + '</small>';
 			if ( f.missing || ! f.url ) {
 				return '<span class="ff-file is-missing">' + icon.file + esc( f.name ) + ' <small>· ' + esc( t( 'no longer available' ) ) + '</small></span>';
 			}
-			if ( type.startsWith( 'image/' ) ) {
-				const ratio = f.width && f.height ? ' style="aspect-ratio:' + f.width + '/' + f.height + '"' : '';
-				return '<span class="ff-media-wrap"><a class="ff-media ff-image" href="' + esc( f.url ) + '" target="_blank" rel="noopener"' + ratio + '><img src="' + esc( f.preview || f.url ) + '" alt="' + esc( name ) + '" loading="lazy"></a>' + adopt + '</span>';
-			}
 			if ( type.startsWith( 'audio/' ) ) {
-				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio>' + adopt + '</figure>';
+				return '<figure class="ff-media ff-audio"><figcaption>' + label + '</figcaption><audio controls preload="none" src="' + esc( f.url ) + '"></audio>' + adoptBtn( f ) + '</figure>';
 			}
 			if ( type.startsWith( 'video/' ) ) {
-				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption>' + adopt + '</figure>';
+				return '<figure class="ff-media ff-video"><video controls preload="metadata" src="' + esc( f.url ) + '"></video><figcaption>' + label + '</figcaption>' + adoptBtn( f ) + '</figure>';
 			}
-			return '<span class="ff-media-wrap"><a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>' + adopt + '</span>';
+			return '<span class="ff-media-wrap"><a class="ff-file" href="' + esc( f.url ) + '" download target="_blank" rel="noopener">' + icon.file + label + '</a>' + adoptBtn( f ) + '</span>';
 		} );
-		return items.length ? '<div class="ff-files">' + items.join( '' ) + '</div>' : '';
+		const SHOW = 6;
+		const listed = rest.length > SHOW + 2
+			? rest.slice( 0, SHOW ).join( '' ) + '<details class="ff-more-files"><summary>' + esc( t( '%s more files', rest.length - SHOW ) ) + '</summary><div class="ff-files">' + rest.slice( SHOW ).join( '' ) + '</div></details>'
+			: rest.join( '' );
+		return gallery || listed ? '<div class="ff-files">' + gallery + listed + '</div>' : '';
 	};
 
 	/* ------------------------------------------------------------------ pieces */
@@ -770,6 +783,59 @@
 	 *
 	 * @param {Object} o key, label, placeholder, submitLabel, extra (HTML for the row), onSubmit(payload, el).
 	 */
+	/* ------------------------------------------------------------------ lightbox */
+
+	// Is a lightbox or WordPress's media dialog open? Then Escape belongs to it.
+	const overlayOpen = () => !! document.querySelector( 'dialog.ff-lightbox[open]' ) || [ ...document.querySelectorAll( '.media-modal' ) ].some( ( m ) => null !== m.offsetParent );
+	const lightbox = ( links, start ) => {
+		const dlg = document.createElement( 'dialog' );
+		dlg.className = 'ff-lightbox';
+		dlg.setAttribute( 'aria-label', t( 'Image' ) );
+		let i = start;
+		const show = () => {
+			const a = links[ i ];
+			dlg.innerHTML = '<figure><img src="' + esc( a.href ) + '" alt="' + esc( a.dataset.name || '' ) + '"><figcaption><span>' + esc( a.dataset.name || '' ) + ( links.length > 1 ? ' · ' + ( i + 1 ) + '/' + links.length : '' ) + '</span>'
+				+ '<a href="' + esc( a.href ) + '" download target="_blank" rel="noopener">' + esc( t( 'Download' ) ) + '</a></figcaption></figure>'
+				+ ( links.length > 1 ? '<button type="button" class="ff-lb-prev" data-lb="-1" aria-label="' + esc( t( 'Previous image' ) ) + '">‹</button><button type="button" class="ff-lb-next" data-lb="1" aria-label="' + esc( t( 'Next image' ) ) + '">›</button>' : '' )
+				+ '<button type="button" class="ff-lb-close" data-lb="close" aria-label="' + esc( t( 'Close' ) ) + '">×</button>';
+		};
+		const step = ( d ) => {
+			i = ( i + d + links.length ) % links.length;
+			show();
+		};
+		dlg.addEventListener( 'click', ( e ) => {
+			const b = e.target.closest( '[data-lb]' );
+			if ( b ) {
+				return 'close' === b.dataset.lb ? dlg.close() : step( +b.dataset.lb );
+			}
+			if ( e.target === dlg || 'FIGURE' === e.target.tagName ) {
+				dlg.close(); // A click next to the image.
+			}
+		} );
+		dlg.addEventListener( 'keydown', ( e ) => {
+			if ( 'ArrowRight' === e.key || 'ArrowLeft' === e.key ) {
+				step( 'ArrowRight' === e.key ? 1 : -1 );
+			} else if ( 'Escape' === e.key ) {
+				e.preventDefault();
+				dlg.close();
+			}
+		} );
+		dlg.addEventListener( 'close', () => dlg.remove() );
+		show();
+		document.body.appendChild( dlg );
+		dlg.showModal();
+		$( '.ff-lb-close', dlg ).focus();
+	};
+	document.addEventListener( 'click', ( e ) => {
+		const a = e.target.closest && e.target.closest( 'a[data-ff="lightbox"]' );
+		if ( ! a || e.metaKey || e.ctrlKey || e.shiftKey || 0 !== e.button ) {
+			return; // Modifier clicks still open the file in a new tab.
+		}
+		e.preventDefault();
+		const group = [ ...( a.closest( '.ff-files' ) || a.parentNode ).querySelectorAll( 'a[data-ff="lightbox"]' ) ];
+		lightbox( group, Math.max( 0, group.indexOf( a ) ) );
+	} );
+
 	const composer = ( o ) => {
 		const el = document.createElement( 'form' );
 		el.className = 'ff-compose' + ( o.className ? ' ' + o.className : '' );
@@ -781,6 +847,7 @@
 			+ '<div class="ff-menu-slot"></div><div class="ff-pending"></div>'
 			+ '<div class="ff-row"><div class="ff-left">'
 			+ ( boot.me.upload ? '<label class="ff-link ff-upload">' + icon.clip + '<span>' + esc( t( 'Attach file' ) ) + '</span><input type="file" multiple hidden></label>' : '' )
+			+ ( boot.me.upload && window.wp && window.wp.media ? '<button type="button" class="ff-link ff-upload" data-ff="library">' + icon.image + '<span>' + esc( t( 'From media library' ) ) + '</span></button>' : '' )
 			+ ( o.extra || '' ) + '</div>'
 			+ '<span class="ff-hint">' + esc( t( 'Ctrl+Enter sends' ) ) + '</span>'
 			+ '<button type="submit" class="ff-send">' + esc( o.submitLabel || t( 'Send' ) ) + '</button></div>'
@@ -794,7 +861,7 @@
 
 		const showPending = () => {
 			pend.innerHTML = ( state.atts.length ? '<div class="ff-cards">' + state.atts.map( ( a, i ) => card( a, i ) ).join( '' ) + '</div>' : '' )
-				+ state.files.map( ( f, i ) => '<span class="ff-file is-pending">' + icon.file + esc( f.name ) + ( f.uploading ? ' <small>' + esc( t( 'uploading …' ) ) + '</small>' : '' ) + '<button type="button" class="ff-x" data-ff="file-x" data-i="' + i + '" aria-label="' + esc( t( 'Remove file' ) ) + '">×</button></span>' ).join( '' );
+				+ state.files.map( ( f, i ) => '<span class="ff-file is-pending">' + ( f.thumb ? '<img class="ff-pend-thumb" src="' + esc( f.thumb ) + '" alt="">' : icon.file ) + esc( f.name ) + ( f.uploading ? ' <small>' + esc( t( 'uploading …' ) ) + '</small>' : '' ) + '<button type="button" class="ff-x" data-ff="file-x" data-i="' + i + '" aria-label="' + esc( t( 'Remove file' ) ) + '">×</button></span>' ).join( '' );
 		};
 		const before = () => ta.value.slice( 0, ta.selectionStart );
 		const replaceBefore = ( re, text ) => {
@@ -913,13 +980,26 @@
 			} else if ( 'file-x' === act ) {
 				state.files.splice( +b.dataset.i, 1 );
 				showPending();
+			} else if ( 'library' === act ) {
+				// WordPress's own media dialog; the file stays where it is, the message refers to it.
+				const frame = window.wp.media( { title: t( 'Attach from the media library' ), multiple: 'add', button: { text: t( 'Attach' ) } } );
+				frame.on( 'select', () => {
+					frame.state().get( 'selection' ).toJSON().forEach( ( a ) => {
+						if ( ! state.files.some( ( f ) => f.id === a.id ) ) {
+							state.files.push( { id: a.id, name: a.filename, size: a.filesizeInBytes, thumb: 'image' === a.type ? ( ( a.sizes && a.sizes.thumbnail ) || a ).url : '' } );
+						}
+					} );
+					showPending();
+					ta.focus();
+				} );
+				frame.open();
 			}
 		} );
 		const upload = $( 'input[type=file]', el );
 		if ( upload ) {
 			upload.addEventListener( 'change', () => {
 				[ ...upload.files ].forEach( ( f ) => {
-					const entry = { name: f.name, size: f.size, uploading: true };
+					const entry = { name: f.name, size: f.size, uploading: true, thumb: /^image\//.test( f.type ) ? URL.createObjectURL( f ) : '' };
 					state.files.push( entry );
 					showPending();
 					fetch( cfg.fileEndpoint, {
@@ -1600,7 +1680,7 @@
 		} );
 		// Escape closes the open thread even when nothing inside the app has focus.
 		document.addEventListener( 'keydown', ( e ) => {
-			if ( 'Escape' !== e.key || ! ui.thread || e.defaultPrevented || ui.settings || root.contains( e.target ) || ( e.target.closest && e.target.closest( 'input, textarea, select, [contenteditable]' ) ) ) {
+			if ( 'Escape' !== e.key || ! ui.thread || e.defaultPrevented || ui.settings || overlayOpen() || root.contains( e.target ) || ( e.target.closest && e.target.closest( 'input, textarea, select, [contenteditable]' ) ) ) {
 				return;
 			}
 			closeThread();
@@ -1625,7 +1705,7 @@
 				ui.settings = false;
 				renderNav();
 				$( '.ff-me-tile', nav ).focus();
-			} else if ( 'Escape' === e.key && ui.thread && ! e.defaultPrevented && ! e.target.closest( '.ff-compose, .ff-edit, .ff-pop, .ff-menu' ) ) {
+			} else if ( 'Escape' === e.key && ui.thread && ! e.defaultPrevented && ! overlayOpen() && ! e.target.closest( '.ff-compose, .ff-edit, .ff-pop, .ff-menu' ) ) {
 				const id = ui.thread;
 				closeThread();
 				const post = feed.querySelector( '.ff-post[data-id="' + id + '"]' );

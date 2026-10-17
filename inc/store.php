@@ -837,7 +837,7 @@ function refresh_card( int $attachment_id ) {
  */
 function files( array $ids, int $user_id, bool $check ): array {
 	$out = array();
-	foreach ( array_slice( $ids, 0, 10 ) as $f ) {
+	foreach ( array_slice( $ids, 0, (int) apply_filters( 'flurfunk_max_files', 50 ) ) as $f ) {
 		if ( ! $check && is_array( $f ) ) {
 			$out[] = $f;
 			continue;
@@ -883,6 +883,10 @@ function file_view( array $f ): array {
 			$f['preview'] = $img[0];
 			$f['width']   = (int) $img[1];
 			$f['height']  = (int) $img[2];
+		}
+		$thumb = wp_get_attachment_image_src( $id, 'thumbnail' );
+		if ( $thumb ) {
+			$f['thumb'] = $thumb[0];
 		}
 	}
 	return $f;
