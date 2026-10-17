@@ -24,19 +24,44 @@ self.addEventListener( 'push', ( e ) => {
 	);
 } );
 
+// Full-screen app address (inc/standalone.php) and a note that it was opened as an installed app.
+const APP = new URL( self.location.href ).searchParams.get( 'app' ) || '';
+const INSTALLED = new URL( 'installed', self.location.href ).href;
+
+self.addEventListener( 'message', ( e ) => {
+	if ( e.data && 'installed' === e.data.flurfunk ) {
+		e.waitUntil( caches.open( 'flurfunk' ).then( ( c ) => c.put( INSTALLED, new Response( '1' ) ) ) );
+	}
+} );
+
+// The same view in the full-screen app: wp-admin's ?page=flurfunk&view=… becomes /flurfunk/?view=…
+const inApp = ( url ) => {
+	const view = new URL( url ).searchParams.get( 'view' );
+	const to = new URL( APP );
+	if ( view ) {
+		to.searchParams.set( 'view', view );
+	}
+	return to.href;
+};
+
 self.addEventListener( 'notificationclick', ( e ) => {
 	e.notification.close();
 	const url = ( e.notification.data && e.notification.data.url ) || '';
 	e.waitUntil(
-		self.clients.matchAll( { type: 'window', includeUncontrolled: true } ).then( ( list ) => {
+		self.clients.matchAll( { type: 'window', includeUncontrolled: true } ).then( async ( list ) => {
 			// Prefer an open Flurfunk window: focus it and let it open the thread.
 			for ( const c of list ) {
-				if ( c.url.includes( 'page=flurfunk' ) && 'focus' in c ) {
+				if ( ( c.url.includes( 'page=flurfunk' ) || ( APP && c.url.startsWith( APP ) ) ) && 'focus' in c ) {
 					c.postMessage( { flurfunk: 'open', url } );
 					return c.focus();
 				}
 			}
-			return url ? self.clients.openWindow( url ) : undefined;
+			if ( ! url ) {
+				return undefined;
+			}
+			// On a device with the home screen app, open that (on iOS the only place with push).
+			const installed = APP && url.includes( 'page=flurfunk' ) && ( await caches.match( INSTALLED ).catch( () => null ) );
+			return self.clients.openWindow( installed ? inApp( url ) : url );
 		} )
 	);
 } );
