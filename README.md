@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://worldoptimizer.github.io/flurfunk/"><img src="docs/assets/og.png" alt="Flurfunk: team conversations inside WordPress. Channels, threads and tasks next to your posts." width="100%"></a>
+  <a href="https://worldoptimizer.github.io/flurfunk/"><img src="docs/assets/cover.png" alt="Flurfunk: team conversations inside WordPress. Channels, threads and tasks next to your posts." width="100%"></a>
 </p>
 
 <p align="center">
