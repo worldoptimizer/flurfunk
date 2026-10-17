@@ -1345,9 +1345,10 @@
 			+ '<p class="ff-who"><b>' + esc( n.headline ) + '</b> <span>' + esc( when( n.created ) ) + ( n.channel ? ' · #' + esc( chName( n.channel ) ) : '' ) + '</span></p>'
 			+ '<p class="ff-title">' + esc( n.topic ) + '</p>'
 			+ ( n.text && n.text !== n.topic ? '<p class="ff-preview">' + preview( n.text ) + '</p>' : '' ) + '</div></article>';
-		const boardCard = ( th ) => '<article class="ff-tcard' + ( th.unread ? ' is-unread' : '' ) + '" draggable="true" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + ' – ' + esc( laneLabel( th.status ) ) + '" aria-describedby="ff-board-help">'
+		const boardCard = ( th ) => '<article class="ff-tcard' + ( th.unread ? ' is-unread' : '' ) + ( ui.thread === th.id ? ' is-current' : '' ) + '" draggable="true" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + ' – ' + esc( laneLabel( th.status ) ) + '" aria-describedby="ff-board-help">'
 			+ '<h3>' + esc( th.title || ( th.body || '' ).split( '\n' )[ 0 ].slice( 0, 120 ) ) + '</h3>'
 			+ '<p class="ff-tcard-meta"><span>#' + esc( chName( th.channel ) ) + '</span>' + dueChip( th ) + ( th.replies ? '<span>' + esc( 1 === th.replies ? t( '1 reply' ) : t( '%s replies', th.replies ) ) + '</span>' : '' ) + '</p>'
+			+ ( th.last && th.last.text ? '<p class="ff-tcard-last"><b>' + esc( person( th.last.author ).name.split( ' ' )[ 0 ] ) + ':</b> ' + esc( th.last.text ) + '</p>' : '' )
 			+ ( th.assignees && th.assignees.length ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' )
 			+ '</article>';
 		const renderBoard = () => {
@@ -1438,6 +1439,7 @@
 		} );
 		const renderFeed = () => {
 			feed.classList.toggle( 'is-board', !! viewInfo().board );
+			app.classList.toggle( 'is-board', !! viewInfo().board ); // The thread opens as a drawer over the board.
 			feed.setAttribute( 'aria-live', viewInfo().board ? 'off' : 'polite' ); // Moves are announced on their own.
 			if ( viewInfo().board ) {
 				if ( ! ui.dragging ) {
@@ -1574,7 +1576,7 @@
 		const openThread = async ( id, preset ) => {
 			ui.thread = id;
 			syncUrl();
-			feed.querySelectorAll( '.ff-post' ).forEach( ( p ) => p.classList.toggle( 'is-current', +p.dataset.id === id ) );
+			feed.querySelectorAll( '.ff-post, .ff-tcard' ).forEach( ( p ) => p.classList.toggle( 'is-current', +p.dataset.id === id ) );
 			try {
 				const th = preset && preset.messages ? preset : await api( 'threads/' + id );
 				ui.current = th;

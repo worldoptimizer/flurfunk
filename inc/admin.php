@@ -55,6 +55,14 @@ function config(): array {
 }
 
 /**
+ * The admin menu icon: Flurfunk's mark as an SVG WordPress can recolour (filter flurfunk_menu_icon).
+ */
+function menu_icon(): string {
+	$svg = (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-menu.svg' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	return (string) apply_filters( 'flurfunk_menu_icon', 'data:image/svg+xml;base64,' . base64_encode( $svg ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+}
+
+/**
  * Load the app's script and styles.
  */
 function enqueue(): void {
@@ -74,7 +82,7 @@ add_action(
 		}
 		$n     = \Flurfunk\Notify\prefs( get_current_user_id() )['badge'] ? Store\counts( get_current_user_id() )['total'] : 0;
 		$badge = $n ? ' <span class="awaiting-mod count-' . $n . '"><span class="pending-count">' . number_format_i18n( $n ) . '</span></span>' : '';
-		$hook  = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', 'dashicons-format-chat', 3 );
+		$hook  = add_menu_page( __( 'Flurfunk', 'flurfunk' ), esc_html__( 'Flurfunk', 'flurfunk' ) . $badge, 'read', PAGE, __NAMESPACE__ . '\\render', menu_icon(), 3 );
 		add_action( 'load-' . $hook, __NAMESPACE__ . '\\load_page' );
 	}
 );
@@ -187,7 +195,7 @@ add_action(
 			'flurfunk_openstation_icon',
 			array(
 				'title'    => __( 'Flurfunk', 'flurfunk' ),
-				'icon'     => 'dashicons-format-chat',
+				'icon_svg' => (string) file_get_contents( FLURFUNK_DIR . 'assets/brand/flurfunk-app-icon.svg' ), // phpcs:ignore WordPress.WP.AlternativeFunctions
 				'url'      => url(),
 				'position' => 50,
 			)

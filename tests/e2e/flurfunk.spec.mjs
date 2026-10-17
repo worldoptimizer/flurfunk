@@ -587,7 +587,11 @@ test.describe( 'team', () => {
 		await page.keyboard.press( 'Alt+ArrowRight' );
 		await expect.poll( async () => ( await api( page, 'threads/' + b.id + '?peek=1' ) ).status ).toBe( 'waiting' );
 		await expect( card( b ) ).toBeFocused();
+		const wide = ( await page.locator( '.ff-board' ).boundingBox() ).width;
 		await card( b ).click();
+		await expect( page.locator( '.ff-pane' ) ).toBeVisible();
+		expect( Math.abs( ( await page.locator( '.ff-board' ).boundingBox() ).width - wide ) ).toBeLessThan( 2 ); // A drawer, the board keeps its size.
+		await expect( card( b ) ).toHaveClass( /is-current/ );
 		await page.locator( '.ff-pane select[data-ff="status"]' ).selectOption( 'done' );
 		await expect.poll( async () => ( await api( page, 'threads/' + b.id + '?peek=1' ) ).status ).toBe( 'done' );
 		await expect( page.locator( '.ff-pane .ff-event', { hasText: /Rückfrage|question/ } ) ).toHaveCount( 1 );

@@ -431,12 +431,15 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 @media (max-width: 700px) { .ff-lightbox figure { padding: 56px 8px 16px; } .ff-lb-prev, .ff-lb-next { top: auto; bottom: 12px; transform: none; } }
 
 /* Board: one column per state; cards move by drag and drop or Alt+arrow keys. */
-.ff-feed.is-board { padding: 12px; overflow-x: auto; }
-.ff-board { display: grid; grid-template-columns: repeat(4, minmax(14rem, 1fr)); gap: 12px; align-items: start; min-height: 100%; }
-.ff-lane { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 12rem; padding: 10px; border: 1px solid var(--ff-line); border-radius: 10px; background: var(--ff-soft); }
+/* Each column scrolls on its own, so the board stays in the window and drop targets stay in view. */
+.ff-feed.is-board { display: flex; padding: 12px; overflow-x: auto; overflow-y: hidden; }
+.ff-board { display: grid; flex: 1; grid-template-columns: repeat(4, minmax(12rem, 1fr)); gap: 12px; align-items: stretch; min-height: 0; height: 100%; }
+.ff-lane { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; padding: 10px; border: 1px solid var(--ff-line); border-radius: 10px; background: var(--ff-soft); }
+.ff-lane-cards { flex: 1; min-height: 4rem; overflow-y: auto; overscroll-behavior: contain; padding: 2px; margin: -2px; }
 .ff-lane.is-over { border-color: var(--ff-accent); background: color-mix(in srgb, var(--ff-accent) 8%, var(--ff-soft)); }
 .ff-root .ff-lane h2 { display: flex; justify-content: space-between; margin: 0 2px 2px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ff-muted); }
 .ff-lane-cards { display: flex; flex-direction: column; gap: 8px; }
+.ff-lane-cards > .ff-tcard { flex: none; }
 .ff-lane-empty { margin: 0; padding: 12px 4px; color: var(--ff-muted); font-size: 13px; }
 .ff-tcard { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--ff-line); border-radius: 8px; background: var(--ff-paper); cursor: grab; }
 .ff-tcard:hover { border-color: color-mix(in srgb, var(--ff-ink) 30%, var(--ff-line)); }
@@ -454,3 +457,13 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 	.ff-board { grid-template-columns: repeat(4, 82vw); scroll-snap-type: x mandatory; }
 	.ff-lane { scroll-snap-align: start; }
 }
+
+/* On the board a thread opens as a drawer over the columns instead of squeezing them. */
+.ff-app.is-board { position: relative; }
+.ff-app.is-board.has-pane { grid-template-columns: var(--ff-nav-w) minmax(0, 1fr); }
+.ff-app.is-board.has-pane .ff-main { border-right: 0; }
+.ff-app.is-board .ff-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(var(--ff-pane-w), 92%); z-index: 6; background: var(--ff-paper); border-left: 1px solid var(--ff-line); box-shadow: -12px 0 32px rgb(0 0 0 / .18); }
+.ff-tcard.is-current { border-color: var(--ff-accent); box-shadow: 0 0 0 1px var(--ff-accent); }
+.ff-tcard-last { margin: 0; color: var(--ff-muted); font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.ff-tcard-last b { color: var(--ff-ink); font-weight: 600; }
+@media (max-width: 700px) { .ff-app.is-board .ff-pane { position: static; width: auto; box-shadow: none; border-left: 0; } }
