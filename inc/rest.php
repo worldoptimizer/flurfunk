@@ -12,6 +12,7 @@
  *   POST threads/<id>/status       open | done | ''
  *   POST threads/<id>/edit         title, body (author or manager)
  *   POST threads/<id>/follow       mode: follow | mute | default
+ *   POST threads/<id>/remind       when: hour | tomorrow | monday | none | ISO time
  *   POST threads/<id>/task         due (Y-m-d or ''), assignees (user IDs)
  *   POST messages/<id>             new text (author or manager)
  *   DELETE messages/<id>           remove (a note stays in its place)
@@ -63,6 +64,27 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\get_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/messages', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\add_message', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route(
+		NS,
+		'/threads/(?P<id>\d+)/remind',
+		array(
+			'methods'             => 'POST',
+			'callback'            => static function ( WP_REST_Request $r ) {
+				$t = Store\thread_row( (int) $r['id'] );
+				if ( ! $t || ! Access\can_see( $t ) ) {
+					return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+				}
+				$at = Store\remind_time( (string) ( $r->get_json_params()['when'] ?? '' ), get_current_user_id() );
+				if ( false === $at ) {
+					return new \WP_Error( 'flurfunk_invalid', __( 'Please choose a time within the next year.', 'flurfunk' ), array( 'status' => 400 ) );
+				}
+				Store\set_reminder( (int) $r['id'], get_current_user_id(), $at );
+				return array( 'remind' => Store\iso( $at ) );
+			},
+			'permission_callback' => $auth,
+			'args'                => $id,
+		)
+	);
 	register_rest_route(
 		NS,
 		'/threads/(?P<id>\d+)/follow',

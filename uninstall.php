@@ -12,6 +12,7 @@ $flurfunk_settings = (array) get_option( 'flurfunk_settings', array() );
 wp_clear_scheduled_hook( 'flurfunk_cleanup_files' );
 wp_clear_scheduled_hook( 'flurfunk_due' );
 wp_clear_scheduled_hook( 'flurfunk_digest' );
+wp_clear_scheduled_hook( 'flurfunk_remind' );
 delete_option( 'flurfunk_vapid' );
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	global $wpdb;

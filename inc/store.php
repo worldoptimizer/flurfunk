@@ -603,6 +603,63 @@ function set_follow( int $thread_id, int $user_id, int $mode ): void {
 }
 
 /**
+ * When should a person be reminded of a thread?
+ *
+ * @param string $when    hour | tomorrow | monday | none | ISO 8601 time.
+ * @param int    $user_id User (their hour for "tomorrow" and "monday").
+ * @return string|null|false Database time, null = no reminder, false = invalid.
+ */
+function remind_time( string $when, int $user_id ) {
+	if ( 'none' === $when || '' === $when ) {
+		return null;
+	}
+	$tz   = wp_timezone();
+	$hour = \Flurfunk\Notify\prefs( $user_id )['hour'];
+	$at   = new \DateTimeImmutable( 'now', $tz );
+	if ( 'hour' === $when ) {
+		$at = $at->modify( '+1 hour' );
+	} elseif ( 'tomorrow' === $when ) {
+		$at = $at->modify( 'tomorrow' )->setTime( $hour, 0 );
+	} elseif ( 'monday' === $when ) {
+		$at = $at->modify( 'next monday' )->setTime( $hour, 0 );
+	} else {
+		$t = strtotime( $when );
+		if ( false === $t || $t < time() - 60 || $t > time() + 366 * DAY_IN_SECONDS ) {
+			return false;
+		}
+		return gmdate( 'Y-m-d H:i:s', $t );
+	}
+	return gmdate( 'Y-m-d H:i:s', $at->getTimestamp() );
+}
+
+/**
+ * Set or clear a person's reminder for a thread.
+ *
+ * @param int         $thread_id Thread.
+ * @param int         $user_id   User.
+ * @param string|null $at        Database time or null.
+ */
+function set_reminder( int $thread_id, int $user_id, ?string $at ): void {
+	global $wpdb;
+	if ( null === $at ) {
+		$wpdb->query( $wpdb->prepare( 'UPDATE ' . table( 'reads' ) . ' SET remind_at = NULL WHERE user_id = %d AND thread_id = %d', $user_id, $thread_id ) ); // phpcs:ignore WordPress.DB
+		return;
+	}
+	$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen, remind_at) VALUES (%d, %d, 0, %s, %s) ON DUPLICATE KEY UPDATE remind_at = VALUES(remind_at)', $user_id, $thread_id, now(), $at ) ); // phpcs:ignore WordPress.DB
+}
+
+/**
+ * A person's reminder for a thread (database time) or null.
+ *
+ * @param int $thread_id Thread.
+ * @param int $user_id   User.
+ */
+function reminder( int $thread_id, int $user_id ): ?string {
+	global $wpdb;
+	return $wpdb->get_var( $wpdb->prepare( 'SELECT remind_at FROM ' . table( 'reads' ) . ' WHERE user_id = %d AND thread_id = %d', $user_id, $thread_id ) ) ?: null; // phpcs:ignore WordPress.DB
+}
+
+/**
  * Follow modes of a thread: user => 1 (follow) or -1 (mute).
  *
  * @param int $thread_id Thread.
@@ -1108,6 +1165,7 @@ function full_thread( int $id, int $user_id ) {
 		'older'    => max( 0, $total - count( $messages ) ),
 		'read'     => read_state( array( $id ), $user_id )[ $id ] ?? 0,
 		'follow'   => follows( $id )[ $user_id ] ?? 0,
+		'remind'   => iso( reminder( $id, $user_id ) ),
 		'audience' => audience( $t ),
 	);
 }

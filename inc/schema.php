@@ -11,7 +11,7 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const OPTION     = 'flurfunk_db_version';
 
 /**
@@ -133,8 +133,10 @@ CREATE TABLE " . table( 'reads' ) . " (
   last_message_id bigint(20) unsigned NOT NULL DEFAULT 0,
   seen datetime NOT NULL,
   follow tinyint(4) NOT NULL DEFAULT 0,
+  remind_at datetime DEFAULT NULL,
   PRIMARY KEY  (user_id,thread_id),
-  KEY thread (thread_id)
+  KEY thread (thread_id),
+  KEY remind (remind_at)
 ) $c;
 CREATE TABLE " . table( 'attachments' ) . " (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

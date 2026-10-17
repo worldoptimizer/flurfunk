@@ -1311,13 +1311,22 @@
 		};
 
 		/* thread pane */
+		const remindSelect = ( th ) => {
+			const h = String( boot.me.prefs.hour ?? 7 ) + ':00';
+			const set = th.remind ? new Date( th.remind ) : null;
+			const opts = ( set
+				? [ [ '', t( 'Reminder: %s', set.toLocaleString( locale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } ) ) ], [ 'none', t( 'No reminder' ) ] ]
+				: [ [ '', t( 'Remind me …' ) ] ] ).concat( [ [ 'hour', t( 'In an hour' ) ], [ 'tomorrow', t( 'Tomorrow, %s', h ) ], [ 'monday', t( 'Next Monday, %s', h ) ] ] );
+			return '<select class="ff-remind' + ( set ? ' is-set' : '' ) + '" data-ff="remind" aria-label="' + esc( t( 'Remind me about this thread' ) ) + '">'
+				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '">' + esc( l ) + '</option>' ).join( '' ) + '</select>';
+		};
 		const renderPane = ( th ) => {
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
 			const follow = th.follow || 0;
 			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
 				+ '<span class="ff-follow"><button type="button" class="ff-link" data-ff="follow" data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '" title="' + esc( t( 'Get notified about every reply' ) ) + '">' + esc( 1 === follow ? t( 'Following' ) : t( 'Follow' ) ) + '</button>'
-				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button></span>'
+				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button>' + remindSelect( th ) + '</span>'
 				+ '<button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
@@ -1623,6 +1632,13 @@
 				ui.current = await api( 'threads/' + ui.thread + '/status', { method: 'POST', body: { status: el.checked ? 'done' : 'open' } } );
 				renderPane( ui.current );
 				refresh();
+			} else if ( 'remind' === el.dataset.ff && ui.current ) {
+				if ( el.value ) {
+					const r = await api( 'threads/' + ui.current.id + '/remind', { method: 'POST', body: { when: el.value } } );
+					ui.current.remind = r.remind;
+					renderPane( ui.current );
+					announce( r.remind ? t( 'Reminder set' ) : t( 'Reminder removed' ) );
+				}
 			} else if ( 'channel-notify' === el.dataset.ff ) {
 				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { channel: { slug: el.dataset.slug, level: el.value } } } );
 				announce( t( 'Saved' ) );

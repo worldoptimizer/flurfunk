@@ -74,7 +74,7 @@ register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
-		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest' ) as $hook ) { // phpcs:ignore
+		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) { // phpcs:ignore
 			wp_clear_scheduled_hook( $hook );
 		}
 	}

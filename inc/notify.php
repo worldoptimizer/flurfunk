@@ -33,11 +33,12 @@ use function Flurfunk\Schema\table;
 defined( 'ABSPATH' ) || exit;
 
 const PREFS    = 'flurfunk_prefs';
-const PERSONAL = array( 'mention', 'assigned', 'due', 'reply', 'done', 'channel' );
-const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
+const PERSONAL = array( 'mention', 'assigned', 'due', 'remind', 'reply', 'done', 'channel' );
+const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'remind' => 4, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
 const KEYS     = array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels' );
 const DIGEST   = 'flurfunk_digest';
 const DUE      = 'flurfunk_due';
+const REMIND   = 'flurfunk_remind';
 
 /**
  * Preferences of a person.
@@ -310,6 +311,10 @@ function words( array $n ): array {
 			$head = $t->due_date < wp_date( 'Y-m-d' ) ? __( 'Overdue task', 'flurfunk' ) : __( 'Task due today', 'flurfunk' );
 			$text = trim( $t->title . "\n\n" . $t->body );
 			break;
+		case 'remind':
+			$head = __( 'Reminder', 'flurfunk' );
+			$text = $topic;
+			break;
 		case 'done':
 			/* translators: %s: person */
 			$head = sprintf( __( '%s ticked off a task', 'flurfunk' ), $who );
@@ -562,3 +567,48 @@ function prune(): int {
 	return $n;
 }
 add_action( 'flurfunk_cleanup_files', __NAMESPACE__ . '\\prune' );
+
+/*
+ * Reminders a person set on a thread ("remind me tomorrow"): checked every five minutes.
+ */
+add_filter(
+	'cron_schedules',
+	static function ( array $s ): array {
+		$s['flurfunk_5min'] = array(
+			'interval' => 5 * MINUTE_IN_SECONDS,
+			'display'  => 'Flurfunk: every 5 minutes',
+		);
+		return $s;
+	}
+);
+add_action(
+	'init',
+	static function (): void {
+		if ( ! wp_next_scheduled( REMIND ) ) {
+			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'flurfunk_5min', REMIND );
+		}
+	}
+);
+add_action( REMIND, __NAMESPACE__ . '\\send_reminders' );
+
+/**
+ * Send the reminders that are due.
+ *
+ * @return int Sent reminders.
+ */
+function send_reminders(): int {
+	global $wpdb;
+	$r    = table( 'reads' );
+	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.*, r.user_id reminded, r.remind_at FROM $r r JOIN " . table( 'threads' ) . ' t ON t.id = r.thread_id WHERE r.remind_at IS NOT NULL AND r.remind_at <= %s ORDER BY r.remind_at LIMIT 200', Store\now() ) ); // phpcs:ignore WordPress.DB
+	$n    = 0;
+	foreach ( $rows as $row ) {
+		// Claim it first, so two overlapping runs never send the same reminder twice.
+		$claimed = $wpdb->query( $wpdb->prepare( "UPDATE $r SET remind_at = NULL WHERE user_id = %d AND thread_id = %d AND remind_at = %s", $row->reminded, $row->id, $row->remind_at ) ); // phpcs:ignore WordPress.DB
+		if ( $claimed && Access\can_see( $row, (int) $row->reminded ) ) {
+			dispatch( $row, 0, array( (int) $row->reminded => 'remind' ), 0 );
+			++$n;
+		}
+	}
+	deliver();
+	return $n;
+}
