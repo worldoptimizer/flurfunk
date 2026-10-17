@@ -208,10 +208,11 @@ test.describe( 'team', () => {
 		for ( let i = 1; i <= 10; i++ ) {
 			ids.push( await up( 'e2e-liste-' + i + '.txt', 'text/plain', btoa( 'Zeile ' + i ) ) );
 		}
-		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Galerie ' + Date.now(), files: ids } );
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Galerie ' + Date.now() } );
+		await api( page, 'threads/' + th.id + '/messages', { body: 'Anhänge', files: ids } );
 		await openApp( page );
 		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
-		const root = page.locator( '.ff-pane .ff-root-msg' );
+		const root = page.locator( '.ff-pane .ff-msg', { hasText: 'Anhänge' } );
 		await expect( root.locator( '.ff-gallery .ff-image' ) ).toHaveCount( 3 );
 		await expect( root.locator( '.ff-more-files summary' ) ).toContainText( '4' );
 		await expect( root.locator( '.ff-more-files .ff-file' ) ).toBeHidden();
