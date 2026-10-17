@@ -1,14 +1,24 @@
-<h1>
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/flurfunk-lockup-dark.svg">
-    <img src="assets/brand/flurfunk-lockup.svg" alt="Flurfunk" width="260">
-  </picture>
-</h1>
+<p align="center">
+  <a href="https://worldoptimizer.github.io/flurfunk/"><img src="docs/assets/og.png" alt="Flurfunk: team conversations inside WordPress. Channels, threads and tasks next to your posts." width="100%"></a>
+</p>
 
-[![License: GPL v2 or later](https://img.shields.io/badge/license-GPL--2.0--or--later-1d1d1f)](LICENSE)
-![WordPress 6.5+](https://img.shields.io/badge/WordPress-6.5%2B-1d1d1f)
-![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-1d1d1f)
-![No build step](https://img.shields.io/badge/build-none-ffc93c)
+<p align="center">
+  <a href="https://worldoptimizer.github.io/flurfunk/"><b>Website</b></a> ·
+  <a href="docs/installation.md"><b>Install</b></a> ·
+  <a href="docs/user-guide.md"><b>User guide</b></a> ·
+  <a href="docs/developers.md"><b>Developers</b></a> ·
+  <a href="docs/examples.md"><b>Examples</b></a>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-231b12" alt="License: GPL-2.0-or-later"></a>
+  <img src="https://img.shields.io/badge/WordPress-6.5%2B-231b12" alt="WordPress 6.5+">
+  <img src="https://img.shields.io/badge/PHP-8.1%2B-231b12" alt="PHP 8.1+">
+  <img src="https://img.shields.io/badge/build-none-ffc93c" alt="No build step">
+  <a href="https://github.com/worldoptimizer/flurfunk/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-8b5a1b" alt="Release v0.1.0"></a>
+</p>
+
+# Flurfunk
 
 Team conversations inside WordPress. Channels, threads and tasks, attachable to posts, with
 @mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and
