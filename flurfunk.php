@@ -24,6 +24,7 @@
  *   inc/push.php       Web Push (VAPID, aes128gcm) without external libraries
  *   inc/rest.php       REST API for the interface (flurfunk/v1)
  *   inc/admin.php      overview app, editor panel, posts list column, OpenStation bits
+ *   inc/standalone.php full-screen app outside wp-admin (/flurfunk/), web app manifest
  *   inc/transfer.php   JSON export and import
  *   inc/cli.php        wp flurfunk …
  *   integrations/      optional cards for other plugins (MailerPress), loaded only when present
@@ -54,6 +55,7 @@ require_once FLURFUNK_DIR . 'inc/push.php';
 require_once FLURFUNK_DIR . 'inc/notify.php';
 require_once FLURFUNK_DIR . 'inc/rest.php';
 require_once FLURFUNK_DIR . 'inc/admin.php';
+require_once FLURFUNK_DIR . 'inc/standalone.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
 
 // Optional integrations with other plugins, each only when that plugin is active.
@@ -71,12 +73,17 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 }
 
 register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
+// The next request flushes the rewrite rules, once ours are registered (inc/standalone.php).
+register_activation_hook( __FILE__, static fn () => delete_option( 'flurfunk_rewrite' ) );
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
 		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) { // phpcs:ignore
 			wp_clear_scheduled_hook( $hook );
 		}
+		// WordPress rebuilds the rules on the next request, without the /flurfunk/ address.
+		delete_option( 'flurfunk_rewrite' );
+		delete_option( 'rewrite_rules' );
 	}
 );
 
@@ -136,4 +143,13 @@ function flurfunk_unread_count( int $user_id = 0 ): int {
  */
 function flurfunk_url( string $view = '' ): string {
 	return Flurfunk\Admin\url( $view );
+}
+
+/**
+ * URL of the full-screen app outside wp-admin (installable on a phone's home screen).
+ *
+ * @param string $view e.g. "channel:general", "thread:5".
+ */
+function flurfunk_app_url( string $view = '' ): string {
+	return Flurfunk\Standalone\url( $view );
 }

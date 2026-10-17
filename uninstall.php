@@ -14,6 +14,7 @@ wp_clear_scheduled_hook( 'flurfunk_due' );
 wp_clear_scheduled_hook( 'flurfunk_digest' );
 wp_clear_scheduled_hook( 'flurfunk_remind' );
 delete_option( 'flurfunk_vapid' );
+delete_option( 'flurfunk_rewrite' );
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	global $wpdb;
 	foreach ( $wpdb->get_col( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_flurfunk_file'" ) as $flurfunk_id ) { // phpcs:ignore WordPress.DB
