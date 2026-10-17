@@ -338,6 +338,7 @@
 .ff-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .ff-head-text { min-width: 0; }
 .ff-head-tools { display: flex; align-items: center; gap: 12px; }
+.ff-root .ff-chan-notify { min-height: 32px; max-width: 16rem; padding: 2px 8px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); font: inherit; font-size: 13px; }
 .ff-root .ff-search input { width: 14rem; max-width: 40vw; min-height: 32px; padding: 4px 10px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }
 @media (max-width: 700px) { .ff-head-tools { width: 100%; } .ff-root .ff-search input { width: 100%; max-width: none; } .ff-search { flex: 1; } }
 

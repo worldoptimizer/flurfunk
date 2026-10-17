@@ -126,7 +126,7 @@ function forget( int $uid ): void {
 	$wpdb->delete( table( 'notifications' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
 	$wpdb->delete( table( 'push' ), array( 'user_id' => $uid ) ); // phpcs:ignore WordPress.DB
 	delete_user_meta( $uid, \Flurfunk\Notify\PREFS );
-	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) as $k ) {
+	foreach ( \Flurfunk\Notify\KEYS as $k ) {
 		delete_user_meta( $uid, \Flurfunk\Notify\PREFS . '_' . $k );
 	}
 }

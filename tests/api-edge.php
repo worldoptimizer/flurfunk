@@ -378,6 +378,17 @@ $check( '"everything" gets mail without mention', in_array( $team2, $m, true ) &
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'mentions' ) );
 list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Ohne Erwähnung' ) ) );
 $check( '"mentions" gets nothing for unrelated threads', ! isset( $notes[ $team2 ] ) && ! in_array( $team2, $m, true ), array( $notes, $m ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'channel' => array( 'slug' => 'ff-test', 'level' => 'all' ) ) );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Kanal folgen' ) ) );
+$check( 'a channel set to "every post" notifies and mails even with "mentions"', 'channel' === ( $notes[ $team2 ] ?? '' ) && in_array( $team2, $m, true ), array( $notes, $m ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'all', 'channel' => array( 'slug' => 'ff-test', 'level' => 'mentions' ) ) );
+list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Kanal leise' ) ) );
+$check( 'a channel set to "only mentions" stays quiet even with "everything"', ! isset( $notes[ $team2 ] ) && ! in_array( $team2, $m, true ), array( $notes, $m ) );
+list( $notes ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => "Leise, aber <@$team2>" ) ) );
+$check( '… but mentions still get through', 'mention' === ( $notes[ $team2 ] ?? '' ), $notes );
+$check( 'channel levels are validated', ! isset( Flurfunk\Notify\save_prefs( $team2, array( 'channel' => array( 'slug' => 'x', 'level' => 'loud' ) ) )['channels']['x'] ) );
+Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'mentions', 'channel' => array( 'slug' => 'ff-test', 'level' => 'default' ) ) );
+$check( '"default" removes the channel setting', ! isset( Flurfunk\Notify\prefs( $team2 )['channels']['ff-test'] ) );
 list( $notes, $m ) = $flush( fn () => Store\add_message( $t2['id'], array( 'body' => 'Weiter geht es' ) ) );
 $check( 'guest gets a reply notification in a thread about their post', 'reply' === ( $notes[ $guest ] ?? '' ), $notes );
 $check( 'nobody is notified about their own message', ! isset( $notes[ $team ] ) && ! in_array( $team, $m, true ) );

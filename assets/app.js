@@ -1201,10 +1201,17 @@
 			const c = boot.counts;
 			return v.channel ? c.channels[ v.channel ] || 0 : v.target ? c.targets[ v.target.type + ':' + v.target.id ] || 0 : c.total;
 		};
+		const channelNotify = ( slug ) => {
+			const cur = ( boot.me.prefs.channels || {} )[ slug ] || 'default';
+			const opts = [ [ 'default', t( 'Notify: as usual' ) ], [ 'all', t( 'Notify: every new post' ) ], [ 'mentions', t( 'Notify: only mentions' ) ] ];
+			return '<select class="ff-chan-notify" data-ff="channel-notify" data-slug="' + esc( slug ) + '" aria-label="' + esc( t( 'Notifications for this channel' ) ) + '">'
+				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '"' + ( cur === v ? ' selected' : '' ) + '>' + esc( l ) + '</option>' ).join( '' ) + '</select>';
+		};
 		const renderHead = () => {
 			const v = viewInfo();
 			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p></div>'
 				+ '<div class="ff-head-tools">' + ( v.notifications ? ( boot.counts.notifications ? '<button type="button" class="ff-link" data-ff="notes-read">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' ) : unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
+				+ ( v.channel ? channelNotify( v.channel ) : '' )
 				+ '<form class="ff-search" role="search"><input type="search" name="q" value="' + esc( v.search || '' ) + '" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Search conversations' ) ) + '"></form></div>';
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
@@ -1616,6 +1623,9 @@
 				ui.current = await api( 'threads/' + ui.thread + '/status', { method: 'POST', body: { status: el.checked ? 'done' : 'open' } } );
 				renderPane( ui.current );
 				refresh();
+			} else if ( 'channel-notify' === el.dataset.ff ) {
+				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { channel: { slug: el.dataset.slug, level: el.value } } } );
+				announce( t( 'Saved' ) );
 			} else if ( 'pref' === el.dataset.ff ) {
 				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { [ el.dataset.pref ]: 'checkbox' === el.type ? el.checked : el.value } } );
 				updateBadge( boot.counts.total );

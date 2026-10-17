@@ -20,7 +20,7 @@
  *   POST cards/<id>/refresh        fetch a fresh snapshot for a card
  *   POST files                     upload a Flurfunk file (raw body, Content-Disposition: filename)
  *   POST files/<id>/adopt          add a Flurfunk file to the media library
- *   POST me/prefs                  theme, avatar, mail, push, quiet, badge
+ *   POST me/prefs                  theme, avatar, mail, push, quiet, badge, hour, channel {slug, level}
  *   GET  notifications             the person's notifications (before, limit)
  *   POST notifications             mark read ({ ids } or { all: true })
  *   POST me/push / DELETE me/push  subscribe / unsubscribe this browser; POST me/push/test

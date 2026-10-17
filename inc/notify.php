@@ -33,8 +33,9 @@ use function Flurfunk\Schema\table;
 defined( 'ABSPATH' ) || exit;
 
 const PREFS    = 'flurfunk_prefs';
-const PERSONAL = array( 'mention', 'assigned', 'due', 'reply', 'done' );
-const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'done' => 3, 'reply' => 2, 'message' => 1 );
+const PERSONAL = array( 'mention', 'assigned', 'due', 'reply', 'done', 'channel' );
+const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
+const KEYS     = array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels' );
 const DIGEST   = 'flurfunk_digest';
 const DUE      = 'flurfunk_due';
 
@@ -47,7 +48,7 @@ function prefs( int $user_id ): array {
 	// Each preference is its own meta entry (flurfunk_pref_<key>), so two settings changed at the
 	// same moment can't overwrite each other; the older combined entry still counts as fallback.
 	$p = (array) get_user_meta( $user_id, PREFS, true );
-	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) as $k ) {
+	foreach ( KEYS as $k ) {
 		$v = get_user_meta( $user_id, PREFS . '_' . $k, true );
 		if ( '' !== $v || metadata_exists( 'user', $user_id, PREFS . '_' . $k ) ) {
 			$p[ $k ] = 'badge' === $k ? (bool) $v : $v;
@@ -62,6 +63,8 @@ function prefs( int $user_id ): array {
 		'quiet'  => preg_match( '/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/', $quiet ) ? $quiet : '',
 		'badge'  => isset( $p['badge'] ) ? (bool) $p['badge'] : true,
 		'hour'   => isset( $p['hour'] ) && '' !== $p['hour'] && (int) $p['hour'] >= 0 && (int) $p['hour'] <= 23 ? (int) $p['hour'] : 7,
+		// Per channel (slug): all = every new thread and reply, mentions = only what concerns me.
+		'channels' => array_filter( is_array( $p['channels'] ?? null ) ? $p['channels'] : array(), static fn ( $v, $k ) => is_string( $k ) && in_array( $v, array( 'all', 'mentions' ), true ), ARRAY_FILTER_USE_BOTH ),
 	);
 }
 
@@ -72,7 +75,22 @@ function prefs( int $user_id ): array {
  * @param array $in      Changes.
  */
 function save_prefs( int $user_id, array $in ): array {
-	foreach ( array_intersect_key( $in, array_flip( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) ) ) as $k => $v ) {
+	if ( isset( $in['channel'] ) && is_array( $in['channel'] ) ) {
+		// { slug, level: all|mentions|default } changes one channel.
+		$all  = prefs( $user_id )['channels'];
+		$slug = sanitize_key( (string) ( $in['channel']['slug'] ?? '' ) );
+		if ( '' !== $slug ) {
+			$level = (string) ( $in['channel']['level'] ?? '' );
+			if ( in_array( $level, array( 'all', 'mentions' ), true ) ) {
+				$all[ $slug ] = $level;
+			} else {
+				unset( $all[ $slug ] );
+			}
+			update_user_meta( $user_id, PREFS . '_channels', $all );
+		}
+	}
+	unset( $in['channels'], $in['channel'] );
+	foreach ( array_intersect_key( $in, array_flip( KEYS ) ) as $k => $v ) {
 		update_user_meta( $user_id, PREFS . '_' . $k, 'badge' === $k ? ( $v ? '1' : '0' ) : sanitize_text_field( (string) $v ) );
 	}
 	return prefs( $user_id );
@@ -153,6 +171,8 @@ function event( object $thread, int $message_id ): void {
 		$participants   = array_merge( $participants, Store\assignees( (int) $thread->id ) );
 	}
 	$follow = Store\follows( (int) $thread->id );
+	$ch     = Store\channel( (int) $thread->channel_id );
+	$slug   = $ch ? (string) $ch->slug : '';
 	$to     = array();
 	foreach ( Store\people() as $p ) {
 		$uid = (int) $p['id'];
@@ -166,8 +186,11 @@ function event( object $thread, int $message_id ): void {
 		} elseif ( in_array( $uid, $participants, true ) || 1 === ( $follow[ $uid ] ?? 0 ) ) {
 			$to[ $uid ] = 'reply';
 		} else {
-			$pr = prefs( $uid );
-			if ( 'all' === $pr['mail'] || 'all' === $pr['push'] ) {
+			$pr    = prefs( $uid );
+			$level = $pr['channels'][ $slug ] ?? '';
+			if ( 'all' === $level ) {
+				$to[ $uid ] = 'channel';
+			} elseif ( 'mentions' !== $level && ( 'all' === $pr['mail'] || 'all' === $pr['push'] ) ) {
 				$to[ $uid ] = 'message';
 			}
 		}

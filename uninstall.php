@@ -24,7 +24,7 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 	delete_option( 'flurfunk_rev' );
 	delete_option( 'flurfunk_bot_default' );
 	delete_metadata( 'user', 0, 'flurfunk_prefs', '', true );
-	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) as $flurfunk_k ) {
+	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels' ) as $flurfunk_k ) {
 		delete_metadata( 'user', 0, 'flurfunk_prefs_' . $flurfunk_k, '', true );
 	}
 	delete_metadata( 'user', 0, 'flurfunk_rev', '', true );
