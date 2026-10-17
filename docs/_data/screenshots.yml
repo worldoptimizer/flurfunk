@@ -1,7 +1,7 @@
 # Pixel sizes of the screenshots, so docs pages can reserve their space (see _layouts/doc.html).
 - { src: "assets/screenshot-board-drawer.png", width: 1440, height: 900 }
 - { src: "assets/screenshot-board.png", width: 1440, height: 900 }
-- { src: "assets/screenshot-card.png", width: 1040, height: 480 }
+- { src: "assets/screenshot-card.png", width: 1030, height: 500 }
 - { src: "assets/screenshot-editor-panel.png", width: 1440, height: 1106 }
 - { src: "assets/screenshot-fullscreen.png", width: 1440, height: 900 }
 - { src: "assets/screenshot-lightbox.png", width: 1024, height: 640 }
@@ -9,5 +9,5 @@
 - { src: "assets/screenshot-overview-dark.png", width: 1440, height: 900 }
 - { src: "assets/screenshot-overview.png", width: 1440, height: 900 }
 # Used as raw <img> with a display width in user-guide.md: only the matching height is added.
-- { raw: "assets/screenshot-settings.png", height: 719 }
+- { raw: "assets/screenshot-settings.png", height: 767 }
 - { raw: "assets/screenshot-mobile.png", height: 844 }
