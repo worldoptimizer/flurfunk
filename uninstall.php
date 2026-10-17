@@ -1,7 +1,8 @@
 <?php
 /**
- * Uninstall: drop the tables and remove Flurfunk files only if the site chose not to keep the
- * conversations (Settings → Flurfunk → Data). Files already added to the media library stay.
+ * Uninstall: drop the tables, remove Flurfunk files and the assistant accounts only if the site
+ * chose not to keep the conversations (Settings → Flurfunk → Data). Files already added to the
+ * media library stay.
  *
  * @package Flurfunk
  */
@@ -18,18 +19,38 @@ delete_option( 'flurfunk_welcome' );
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	delete_option( 'flurfunk_vapid' ); // Kept with the data, so push subscriptions keep working after a reinstall.
 	global $wpdb;
-	foreach ( $wpdb->get_col( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_flurfunk_file'" ) as $flurfunk_id ) { // phpcs:ignore WordPress.DB
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- runs once on uninstall.
+	foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT post_id FROM %i WHERE meta_key = %s', $wpdb->postmeta, '_flurfunk_file' ) ) as $flurfunk_id ) {
 		wp_delete_attachment( (int) $flurfunk_id, true );
 	}
 	require_once __DIR__ . '/inc/schema.php';
 	Flurfunk\Schema\drop();
+
+	// Assistant accounts exist only for Flurfunk. Their conversations are gone with the tables and
+	// their Flurfunk files above; anything they put into the media library goes to an administrator.
+	require_once ABSPATH . 'wp-admin/includes/user.php';
+	$flurfunk_admins = get_users(
+		array(
+			'role'   => 'administrator',
+			'number' => 1,
+			'fields' => 'ID',
+		)
+	);
+	foreach ( get_users( array( 'meta_key' => 'flurfunk_bot', 'fields' => 'ID' ) ) as $flurfunk_bot ) { // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- a handful of accounts, once on uninstall.
+		$flurfunk_owns = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE post_author = %d', $wpdb->posts, $flurfunk_bot ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- runs once on uninstall.
+		wp_delete_user( (int) $flurfunk_bot, $flurfunk_owns && $flurfunk_admins ? (int) $flurfunk_admins[0] : null );
+	}
+
 	delete_option( 'flurfunk_settings' );
 	delete_option( 'flurfunk_rev' );
 	delete_option( 'flurfunk_bot_default' );
+	delete_option( 'flurfunk_welcome_thread' );
 	delete_metadata( 'user', 0, 'flurfunk_prefs', '', true );
 	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels', 'pause' ) as $flurfunk_k ) {
 		delete_metadata( 'user', 0, 'flurfunk_prefs_' . $flurfunk_k, '', true );
 	}
 	delete_metadata( 'user', 0, 'flurfunk_rev', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_bot', '', true );
+	delete_metadata( 'user', 0, 'flurfunk_digest_day', '', true );
+	delete_metadata( 'user', 0, 'flurfunk_digest_last', '', true );
 }
