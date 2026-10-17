@@ -10,6 +10,7 @@ cat > enc.php <<PHP
 <?php
 define( 'ABSPATH', '/' ); define( 'DAY_IN_SECONDS', 86400 ); define( 'HOUR_IN_SECONDS', 3600 );
 function wp_json_encode( \$v ) { return json_encode( \$v ); }
+function add_action() {}
 require '$OLDPWD/../../inc/push.php';
 file_put_contents( 'body.bin', Flurfunk\Push\encrypt( '{"title":"Hallo","body":"Prüfung ✓"}', '$P', '$A' ) );
 \$key = Flurfunk\Push\new_key(); openssl_pkey_export( \$key, \$pem ); openssl_sign( 'abc', \$sig, \$pem, OPENSSL_ALGO_SHA256 );
