@@ -1,0 +1,109 @@
+<div class="hero-demo">
+  <p class="visually-hidden">Illustration: the Flurfunk app in wp-admin. A sidebar with channels, a thread list in the editorial channel, and an open thread where teammates reply, mention each other and move a new task across the board.</p>
+  <div class="app" aria-hidden="true" data-demo>
+    <div class="app-bar">
+      <span class="app-dots"><i></i><i></i><i></i></span>
+      <span class="app-url">example.com/wp-admin/admin.php?page=flurfunk</span>
+    </div>
+    <div class="app-body">
+
+      <aside class="app-side">
+        <div class="side-ws">
+          <span class="ws-logo"></span>
+          <b>Flurfunk</b>
+          <span class="side-bell">
+            <svg viewBox="0 0 16 16"><path d="M8 1.8a4.2 4.2 0 0 0-4.2 4.2v2.6L2.6 10.8v.9h10.8v-.9l-1.2-2.2V6A4.2 4.2 0 0 0 8 1.8zM6.4 12.6a1.6 1.6 0 0 0 3.2 0z"/></svg>
+            <i class="bell-dot"></i>
+          </span>
+        </div>
+        <ul class="side-nav">
+          <li><svg viewBox="0 0 16 16"><path d="M2 3h12v1.6H2zm0 4.2h12v1.6H2zm0 4.2h8v1.6H2z"/></svg>All threads</li>
+          <li><svg viewBox="0 0 16 16"><path d="M8 1.5a6.5 6.5 0 1 0 3.6 11.9l-.8-1.3A5 5 0 1 1 13 8v.7c0 .8-.5 1.3-1.1 1.3s-1.1-.5-1.1-1.3V5h-1.4v.6A3 3 0 1 0 10 10.3a2.5 2.5 0 0 0 4.5-1.6V8A6.5 6.5 0 0 0 8 1.5zm0 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>Mentions<span class="side-badge badge-mention">1</span></li>
+          <li><svg viewBox="0 0 16 16"><path d="M6.6 11.4 3.2 8l1.1-1.1 2.3 2.3 5.1-5.1 1.1 1.1z"/></svg>My tasks</li>
+          <li><svg viewBox="0 0 16 16"><path d="M2 2.5h3.4v11H2zm4.3 0h3.4v7H6.3zm4.3 0H14v9h-3.4z"/></svg>Board</li>
+        </ul>
+        <p class="side-label">Channels</p>
+        <ul class="side-ch">
+          <li><span class="hash">#</span>general</li>
+          <li class="is-active"><span class="hash">#</span>editorial</li>
+          <li class="ch-tech"><span class="hash">#</span>tech<span class="side-badge badge-tech">3</span></li>
+        </ul>
+        <div class="side-user">
+          <span class="av av-mp">MP<i class="presence"></i></span>
+          <span class="side-user-name"><b>Mia Park</b><small>Editor</small></span>
+        </div>
+      </aside>
+
+      <section class="app-main">
+        <header class="main-head">
+          <span class="main-title"><span class="hash">#</span>editorial</span>
+          <span class="main-people"><span class="av av-ak">AK</span><span class="av av-tb">TB</span><span class="av av-mp">MP</span></span>
+        </header>
+        <ol class="tlist">
+          <li class="trow is-selected">
+            <span class="av av-ak">AK</span>
+            <span class="trow-body">
+              <span class="trow-top"><b>Autumn issue: cover story</b><time>9:12</time></span>
+              <span class="trow-text">Draft is in. @Mia Park can you check…</span>
+              <span class="trow-meta">
+                <span class="swap replies"><span class="v0">No replies yet</span><span class="v1">1 reply</span><span class="v2">2 replies</span></span>
+              </span>
+            </span>
+          </li>
+          <li class="trow">
+            <span class="av av-tb">TB</span>
+            <span class="trow-body">
+              <span class="trow-top"><b>Photo rights for the interview</b><time>8:47</time></span>
+              <span class="trow-text">Agency confirmed print and web.</span>
+              <span class="trow-meta"><span class="meta-files">2 files</span><span class="meta-sep">·</span>4 replies</span>
+            </span>
+          </li>
+          <li class="trow trow-new">
+            <span class="av av-ak">AK</span>
+            <span class="trow-body">
+              <span class="trow-top"><b>Newsletter goes out Thursday</b><time>9:20</time></span>
+              <span class="trow-text">Task for Tom Berger · due Thu</span>
+              <span class="trow-meta">
+                <span class="swap chip"><span class="v0 chip-open">Open</span><span class="v1 chip-doing">In progress</span><span class="v2 chip-done">Done</span></span>
+              </span>
+            </span>
+          </li>
+        </ol>
+        <div class="board">
+          <div class="board-col"><span>Open</span></div>
+          <div class="board-col"><span>In progress</span></div>
+          <div class="board-col"><span>Done</span></div>
+          <div class="board-card">Newsletter Thursday</div>
+        </div>
+      </section>
+
+      <section class="app-thread">
+        <header class="thread-head"><b>Autumn issue: cover story</b><small># editorial · task due Fri</small></header>
+        <div class="msg">
+          <span class="av av-ak">AK</span>
+          <div><p class="msg-who"><b>Ana Klein</b><time>9:12</time></p>
+          <p>Draft is in. <span class="mention">@Mia Park</span> can you check the intro by Friday?</p></div>
+        </div>
+        <div class="slot">
+          <div class="typing typing-1"><span class="av av-mp">MP</span><span class="dots"><i></i><i></i><i></i></span></div>
+          <div class="msg reply-1">
+            <span class="av av-mp">MP</span>
+            <div><p class="msg-who"><b>Mia Park</b><time>9:15</time></p>
+            <p>On it. Two photo options for the opener:</p>
+            <span class="thumbs"><i></i><i></i></span></div>
+          </div>
+        </div>
+        <div class="slot">
+          <div class="typing typing-2"><span class="av av-tb">TB</span><span class="dots"><i></i><i></i><i></i></span></div>
+          <div class="msg reply-2">
+            <span class="av av-tb">TB</span>
+            <div><p class="msg-who"><b>Tom Berger</b><time>9:17</time></p>
+            <p>Rights for both are cleared.</p></div>
+          </div>
+        </div>
+        <div class="composer">Reply to the thread…</div>
+      </section>
+
+    </div>
+  </div>
+</div>

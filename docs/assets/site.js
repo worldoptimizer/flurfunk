@@ -1,12 +1,44 @@
-// Flurfunk docs: mobile nav toggle and heading anchor links. No dependencies.
+// Flurfunk docs: theme toggle, mobile nav, heading anchors, hero demo. No dependencies.
 (function () {
   'use strict';
+
+  var root = document.documentElement;
+  var STORE = 'flurfunk-theme';
 
   function ready(fn) {
     if (document.readyState !== 'loading') { fn(); } else { document.addEventListener('DOMContentLoaded', fn); }
   }
 
+  function media(q) {
+    return window.matchMedia ? window.matchMedia(q) : { matches: false };
+  }
+
+  // Dark is the default; light comes from the system or the visitor's choice.
+  function currentTheme() {
+    var set = root.getAttribute('data-theme');
+    if (set === 'light' || set === 'dark') { return set; }
+    return media('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  }
+
   ready(function () {
+    // Theme toggle
+    var themeBtn = document.querySelector('.theme-toggle');
+    if (themeBtn) {
+      var label = function () {
+        var next = currentTheme() === 'dark' ? 'light' : 'dark';
+        themeBtn.setAttribute('aria-label', 'Switch to ' + next + ' theme');
+        themeBtn.setAttribute('title', 'Switch to ' + next + ' theme');
+      };
+      label();
+      themeBtn.addEventListener('click', function () {
+        var next = currentTheme() === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem(STORE, next); } catch (e) { /* storage blocked: still switch for this page */ }
+        label();
+      });
+    }
+
+    // Mobile nav
     var toggle = document.querySelector('.nav-toggle');
     var nav = document.getElementById('site-nav');
     if (toggle && nav) {
@@ -26,8 +58,7 @@
     }
 
     // A small "#" link after each h2/h3 with an id, so sections can be linked.
-    var headings = document.querySelectorAll('.prose h2[id], .prose h3[id]');
-    Array.prototype.forEach.call(headings, function (h) {
+    Array.prototype.forEach.call(document.querySelectorAll('.prose h2[id], .prose h3[id]'), function (h) {
       var a = document.createElement('a');
       a.className = 'heading-anchor';
       a.href = '#' + h.id;
@@ -41,5 +72,81 @@
       var hide = function () { img.classList.add('is-missing'); };
       if (img.complete && img.naturalWidth === 0) { hide(); } else { img.addEventListener('error', hide); }
     });
+
+    initDemo(document.querySelector('[data-demo]'));
   });
+
+  // Hero demo: adds step classes over time; CSS does the rest.
+  // Without JS or with reduced motion the app keeps its static end state.
+  function initDemo(app) {
+    if (!app) { return; }
+    var steps = [
+      [700, 's-mention'],
+      [1900, 's-typing1'],
+      [3600, 's-reply1'],
+      [4900, 's-typing2'],
+      [6500, 's-reply2'],
+      [8000, 's-newthread'],
+      [9300, 's-tech'],
+      [11000, 's-progress'],
+      [13400, 's-done']
+    ];
+    var LOOP = 20000;
+    var timers = [];
+    var reduce = media('(prefers-reduced-motion: reduce)');
+    var visible = true;
+    var running = false;
+
+    function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+    function clearSteps() { steps.forEach(function (s) { app.classList.remove(s[1]); }); }
+
+    function cycle(first) {
+      clearTimers();
+      if (first) {
+        // Jump to the start state without fading out the end state first.
+        app.classList.add('no-anim');
+        clearSteps();
+        void app.offsetWidth;
+        app.classList.remove('no-anim');
+      } else {
+        clearSteps(); // fades everything back to the start state
+      }
+      var offset = first ? 0 : 700;
+      steps.forEach(function (s) {
+        timers.push(setTimeout(function () { app.classList.add(s[1]); }, s[0] + offset));
+      });
+      timers.push(setTimeout(function () { cycle(false); }, LOOP));
+    }
+
+    function start() {
+      if (running || reduce.matches || !visible || document.hidden) { return; }
+      running = true;
+      app.classList.add('is-playing');
+      cycle(true);
+    }
+
+    function stop() {
+      clearTimers();
+      running = false;
+      app.classList.add('no-anim');
+      app.classList.remove('is-playing');
+      clearSteps();
+      void app.offsetWidth;
+      app.classList.remove('no-anim');
+    }
+
+    if (reduce.addEventListener) {
+      reduce.addEventListener('change', function () { if (reduce.matches) { stop(); } else { start(); } });
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { stop(); } else { start(); }
+    });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible) { start(); } else { stop(); }
+      }).observe(app);
+    }
+    start();
+  }
 })();
