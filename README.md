@@ -137,8 +137,8 @@ Threads can hang on a post (built in) or on anything a plugin registers:
 ```php
 flurfunk_register_target( 'dossier', array(
 	'label'  => 'Dossier',
-	'search' => fn ( string $q, int $user_id ) => array( array( 'id' => 12, 'title' => 'Balkan', 'subtitle' => '38 posts' ) ),
-	'info'   => fn ( int $id ) => array( 'title' => 'Balkan', 'url' => admin_url( '…' ) ), // null = gone
+	'search' => fn ( string $q, int $user_id ) => array( array( 'id' => 12, 'title' => 'Travel', 'subtitle' => '12 posts' ) ),
+	'info'   => fn ( int $id ) => array( 'title' => 'Travel', 'url' => admin_url( '…' ) ), // null = gone
 	'can'    => fn ( int $user_id, int $id ) => true,                                       // default: team only
 ) );
 ```

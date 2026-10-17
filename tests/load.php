@@ -1,7 +1,7 @@
 <?php
 /**
  * Load test: 2000 threads, 20000 messages in a temporary channel; times the main queries and
- * removes everything again. Run: wp eval-file tests/load.php (uses users 156, 41, 2, 159 – adapt).
+ * removes everything again. Run: wp eval-file tests/load.php (uses up to four editors or admins of the site).
  *
  * @package Flurfunk
  */
@@ -10,7 +10,11 @@
 global $wpdb;
 $P = $wpdb->prefix . 'flurfunk_';
 $ch = Flurfunk\Store\ensure_channel( 'ff-load', array( 'name' => 'Last', 'access_guests' => 'own-posts' ), true );
-$people = array( 156, 41, 2, 159 );
+$people = array_map( 'intval', get_users( array( 'role__in' => array( 'administrator', 'editor' ), 'fields' => 'ID', 'number' => 4 ) ) );
+if ( count( $people ) < 2 ) {
+	WP_CLI::error( 'Needs at least two editors or admins.' );
+}
+$reader = $people[1];
 $t0 = microtime( true );
 $now = time();
 // 2000 threads in batches
@@ -34,15 +38,15 @@ foreach ( array_chunk( $ids, 100 ) as $chunk ) {
 	}
 	$wpdb->query( "INSERT INTO {$P}messages (thread_id, type, author_id, body, status, files, created) VALUES " . implode( ',', $vals ) );
 }
-// some notifications for 41
+// some notifications for the reader
 $vals = array();
 foreach ( array_slice( $ids, 0, 1000 ) as $tid ) {
-	$vals[] = $wpdb->prepare( '(%d,%d,%d,%s,%d,%s)', 41, $tid, 0, 'reply', 156, gmdate( 'Y-m-d H:i:s' ) );
+	$vals[] = $wpdb->prepare( '(%d,%d,%d,%s,%d,%s)', $reader, $tid, 0, 'reply', $people[0], gmdate( 'Y-m-d H:i:s' ) );
 }
 $wpdb->query( "INSERT INTO {$P}notifications (user_id, thread_id, message_id, kind, actor_id, created) VALUES " . implode( ',', $vals ) );
 printf( "seeded %d threads, %d messages in %.1fs\n", count( $ids ), $wpdb->get_var( "SELECT COUNT(*) FROM {$P}messages m JOIN {$P}threads t ON t.id=m.thread_id WHERE t.channel_id=$ch" ), microtime( true ) - $t0 );
 Flurfunk\Store\bump();
-wp_set_current_user( 41 );
+wp_set_current_user( $reader );
 $time = function ( $label, $fn ) {
 	$t = microtime( true );
 	$r = $fn();
@@ -54,8 +58,8 @@ $req = function ( $m, $path, $params = array() ) {
 	foreach ( $params as $k => $v ) $r->set_param( $k, $v );
 	return rest_do_request( $r )->get_data();
 };
-$time( 'counts (cold)', fn () => Flurfunk\Store\counts( 41 ) );
-$time( 'counts (cached)', fn () => Flurfunk\Store\counts( 41 ) );
+$time( 'counts (cold)', fn () => Flurfunk\Store\counts( $reader ) );
+$time( 'counts (cached)', fn () => Flurfunk\Store\counts( $reader ) );
 $time( 'bootstrap', fn () => $req( 'GET', 'bootstrap' ) );
 $time( 'list all threads (40)', fn () => $req( 'GET', 'threads', array( 'view' => 'all', 'limit' => 40 ) ) );
 $time( 'list channel (40)', fn () => $req( 'GET', 'threads', array( 'channel' => 'ff-load', 'limit' => 40 ) ) );
@@ -64,7 +68,7 @@ $time( 'open tasks', fn () => $req( 'GET', 'threads', array( 'view' => 'tasks', 
 $time( 'search in replies', fn () => $req( 'GET', 'threads', array( 'q' => 'Antwort 7 zu ' . $ids[1500], 'limit' => 40 ) ) );
 $time( 'open a thread', fn () => $req( 'GET', 'threads/' . $ids[100] ) );
 $time( 'notifications (30)', fn () => $req( 'GET', 'notifications', array( 'limit' => 30 ) ) );
-$time( 'mark channel read', fn () => Flurfunk\Store\mark_all_read( 41, 'ff-load' ) );
+$time( 'mark channel read', fn () => Flurfunk\Store\mark_all_read( $reader, 'ff-load' ) );
 $time( 'export everything', fn () => count( Flurfunk\Transfer\export()['threads'] ) );
 // clean up
 $in = implode( ',', array_map( 'intval', $ids ) );
