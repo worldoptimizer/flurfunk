@@ -8,6 +8,8 @@ desktop.
 - **Overview** (`wp-admin/admin.php?page=flurfunk`): sidebar with channels, mentions, open
   tasks and posts with conversations; thread list; thread pane. Your name sits at the bottom of
   the sidebar and opens your settings (light/dark, which mails you get, unread badge).
+- **Full screen** (`/flurfunk/`): the same app without the admin bar and menu, installable as an
+  app on a phone's home screen (see below).
 - **Editor panel** "Conversations" for the configured post types.
 - **Posts list column** with the number of conversations and open tasks.
 - **Embeds**: threads next to any element on an admin screen (e.g. a checklist).
@@ -72,8 +74,30 @@ name at the bottom of the sidebar:
 
 Push needs HTTPS and PHP's OpenSSL extension (standard); keys (VAPID) are created
 automatically, no external service or library. On iPhone/iPad, push works once Flurfunk is
-added to the home screen (the page ships a web app manifest). The service worker only receives
-pushes; it controls no pages.
+added to the home screen (see *Full screen and home screen app*). The service worker only
+receives pushes; it controls no pages.
+
+## Full screen and home screen app
+
+`https://example.com/flurfunk/` shows Flurfunk on its own page: no theme, no admin bar, no admin
+menu, the app fills the screen (also around notches). Logged-out visitors are sent to the login
+and come back; logged-in people without access get a 403. "Open full screen" in your settings
+(click your name) leads there, "Back to WordPress" returns. Without pretty permalinks the
+address is `/?flurfunk_app=1`, which always works. Change the slug with the `flurfunk_app_slug`
+filter; the rewrite rules are flushed once after activation, an update or a new slug.
+
+The page carries a web app manifest (start and scope: that address, standalone display, name
+and sidebar colour from the settings, the site icon or logo – or Flurfunk's own icon – at 192
+and 512 px). To install it:
+
+- **iPhone/iPad** (Safari): open the address, Share → *Add to Home Screen*. Open Flurfunk from
+  the icon, then turn on push in your settings – iOS only delivers push to home screen apps,
+  and that app has its own login.
+- **Android** (Chrome): open the address, menu → *Install app* / *Add to Home screen*.
+
+Once push was turned on in (or the app opened from) the home screen app, tapping a notification
+opens the thread there instead of in wp-admin. Links to WordPress (e.g. "Open post") leave the
+app's scope, so phones show them with a small browser bar on top of the app.
 
 ## People and access
 
@@ -151,6 +175,7 @@ The "Attached to" picker searches all registered types. Guests only ever see the
 - `flurfunk_ensure_channel( $slug, $args )` – create a channel your plugin needs.
 - `flurfunk_unread_count( $user_id )` – for badges elsewhere.
 - `flurfunk_url( $view )` – link into the app (`channel:news`, `target:post:12`, `thread:5`).
+- `flurfunk_app_url( $view )` – the same view in the full-screen app.
 
 ### Filters
 
@@ -172,6 +197,8 @@ The "Attached to" picker searches all registered types. Guests only ever see the
 | `flurfunk_rate_limit` | messages per minute and person (default 30, admins exempt) |
 | `flurfunk_thread_limit` | messages loaded per thread (default 300) |
 | `flurfunk_openstation_icon` | desktop icon arguments (false = none) |
+| `flurfunk_app_slug` | address of the full-screen app (default `flurfunk`) |
+| `flurfunk_manifest` | web app manifest (name, colours, icons …) |
 
 ### Actions
 
@@ -216,7 +243,8 @@ Optional cards for other plugins live in `integrations/` and load only when that
   read state, paging, editing, targets, mails, export/import. Works on staging, cleans up after itself.
 - `tests/e2e` – Playwright against a running site (`FF_BASE`, `FF_TEAM`, `FF_TEAM_PASS`, `FF_TEAM2`,
   `FF_TEAM2_PASS`, `FF_GUEST`, `FF_GUEST_PASS`, optional `FF_QUERY`): layout at several widths,
-  escaping, mentions, slash menu, picker, edit/delete, drafts, expired nonce, logout, accessibility.
+  escaping, mentions, slash menu, picker, edit/delete, drafts, expired nonce, logout, accessibility,
+  the full-screen page and its manifest.
 
 - `tests/push/run.sh` – Web Push crypto checked against Node (decrypt, ES256 signature).
 - `node tests/format.test.cjs` – the text formatter.
