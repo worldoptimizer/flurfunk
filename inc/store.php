@@ -3,7 +3,7 @@
  * Reading and writing. To the outside (interface, export) there is only the format "flurfunk/1":
  *
  *   thread  { id, channel, ref_key, target: {type,id}|null, title|null, body, author, created,
- *             status: 'open'|'done'|null, resolved: {by,at}|null, mentions[], attachments[] }
+ *             status: 'open'|'doing'|'waiting'|'done'|null, resolved: {by,at}|null, mentions[], attachments[] }
  *   message { id, type: 'message'|'status', author, created, text, mentions[], files[],
  *             attachments[], status?, edited }
  *   Text: plain text, mentions as <@ID>. Times in UTC (ISO 8601).
@@ -17,6 +17,10 @@ use Flurfunk\Access;
 use function Flurfunk\Schema\table;
 
 defined( 'ABSPATH' ) || exit;
+
+// Task states: open → doing (in progress) → waiting (needs an answer) → done.
+const STATUSES = array( 'open', 'doing', 'waiting', 'done' );
+const ACTIVE   = array( 'open', 'doing', 'waiting' );
 
 const MAX_TEXT = 20000;
 
@@ -370,7 +374,7 @@ function create_thread( array $args, bool $check = true ) {
 			'title'         => $title,
 			'body'          => $body,
 			'author_id'     => $author,
-			'status'        => in_array( $status, array( 'open', 'done' ), true ) ? $status : '',
+			'status'        => in_array( $status, STATUSES, true ) ? $status : '',
 			'resolved_by'   => (int) ( $args['resolved']['by'] ?? 0 ),
 			'resolved_at'   => mysql( $args['resolved']['at'] ?? null ),
 			'created'       => $created,
@@ -475,7 +479,7 @@ function set_status( int $thread_id, string $status ) {
 	if ( ! $thread || ! Access\can_see( $thread, $user ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
 	}
-	if ( ! in_array( $status, array( 'open', 'done', '' ), true ) || ! apply_filters( 'flurfunk_can_resolve', true, $thread, $user ) ) {
+	if ( ! in_array( $status, array_merge( STATUSES, array( '' ) ), true ) || ! apply_filters( 'flurfunk_can_resolve', true, $thread, $user ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot change this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
 	if ( $thread->status === $status ) {
@@ -1254,10 +1258,10 @@ function list_threads( int $user_id, array $args = array() ): array {
 		$where[] = $wpdb->prepare( 't.ref_key LIKE %s', $wpdb->esc_like( (string) $args['ref_prefix'] ) . '%' );
 	}
 	if ( 'tasks' === $view ) {
-		$where[] = "t.status = 'open'";
+		$where[] = "t.status IN ( 'open', 'doing', 'waiting' )";
 	}
 	if ( 'mine' === $view ) {
-		$where[] = $wpdb->prepare( "t.status = 'open' AND t.id IN ( SELECT thread_id FROM " . table( 'assignees' ) . ' WHERE user_id = %d )', $user_id );
+		$where[] = $wpdb->prepare( "t.status IN ( 'open', 'doing', 'waiting' ) AND t.id IN ( SELECT thread_id FROM " . table( 'assignees' ) . ' WHERE user_id = %d )', $user_id );
 	}
 	$q = trim( (string) ( $args['q'] ?? '' ) );
 	if ( '' !== $q ) {
@@ -1267,11 +1271,18 @@ function list_threads( int $user_id, array $args = array() ): array {
 	if ( 'mentions' === $view ) {
 		$where[] = $wpdb->prepare( 't.id IN (SELECT thread_id FROM ' . table( 'mentions' ) . ' WHERE user_id = %d)', $user_id );
 	}
+	if ( 'board' === $view ) {
+		// Every task, ticked-off ones only from the last two weeks.
+		$where[] = $wpdb->prepare( "( t.status IN ( 'open', 'doing', 'waiting' ) OR ( t.status = 'done' AND t.resolved_at >= %s ) )", gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'flurfunk_board_done_days', 14 ) * DAY_IN_SECONDS ) );
+	}
+	if ( ! empty( $args['person'] ) ) {
+		$where[] = $wpdb->prepare( 't.id IN ( SELECT thread_id FROM ' . table( 'assignees' ) . ' WHERE user_id = %d )', (int) $args['person'] );
+	}
 	if ( ! empty( $args['before'] ) && mysql( (string) $args['before'] ) ) {
 		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
 	}
 	$limit = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
-	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( in_array( $view, array( 'mine', 'tasks' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' );
+	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' );
 	$rows  = $wpdb->get_results( "SELECT t.* FROM $t t WHERE " . implode( ' AND ', $where ) . " ORDER BY $order LIMIT $limit" ); // phpcs:ignore WordPress.DB
 	return summarize( $rows, $user_id );
 }
@@ -1382,8 +1393,9 @@ function counts( int $user_id ): array {
 		}
 		$out['total']    += $n;
 		$out['mentions'] += $row->mentioned && $n ? 1 : 0;
-		$out['tasks']    += 'open' === $row->status ? 1 : 0;
-		if ( 'open' === $row->status && $row->mine ) {
+		$active           = in_array( $row->status, ACTIVE, true );
+		$out['tasks']    += $active ? 1 : 0;
+		if ( $active && $row->mine ) {
 			++$out['mine'];
 			$out['overdue'] += $row->due_date && $row->due_date < $today ? 1 : 0;
 		}

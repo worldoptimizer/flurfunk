@@ -260,7 +260,13 @@
 	const targetChip = ( th ) => ( th.target && ! th.target.title ? '<span class="ff-target is-gone">' + icon.doc + '<span>' + esc( t( 'deleted' ) ) + '</span></span>' : th.target && th.target.title
 		? '<a class="ff-target" href="' + esc( th.target.url ) + '" target="_top" data-ff="target" data-type="' + esc( th.target.type ) + '" data-id="' + th.target.id + '" title="' + esc( t( 'Conversations about this post' ) ) + '">' + icon.doc + '<span>' + esc( th.target.title ) + '</span></a>'
 		: '' );
-	const statusPill = ( th ) => ( 'done' === th.status ? '<span class="ff-pill is-done">' + esc( t( 'done' ) ) + '</span>' : 'open' === th.status ? '<span class="ff-pill is-open">' + esc( t( 'open' ) ) + '</span>' : '' );
+	const LANES = [ 'open', 'doing', 'waiting', 'done' ];
+	const laneLabel = ( st ) => ( { open: t( 'Open' ), doing: t( 'In progress' ), waiting: t( 'Question' ), done: t( 'Done' ) } )[ st ] || '';
+	const active = ( th ) => [ 'open', 'doing', 'waiting' ].includes( th.status );
+	const statusPill = ( th ) => ( 'done' === th.status ? '<span class="ff-pill is-done">' + esc( t( 'done' ) ) + '</span>'
+		: 'open' === th.status ? '<span class="ff-pill is-open">' + esc( t( 'open' ) ) + '</span>'
+			: 'doing' === th.status ? '<span class="ff-pill is-doing">' + esc( t( 'in progress' ) ) + '</span>'
+				: 'waiting' === th.status ? '<span class="ff-pill is-waiting">' + esc( t( 'question' ) ) + '</span>' : '' );
 	const audiencePill = ( th ) => ( boot && 'team' === boot.me.kind && th.audience && th.audience.length ? '<span class="ff-pill is-seen">' + esc( t( '%s can read this', th.audience.join( ', ' ) ) ) + '</span>' : '' );
 	const pad2 = ( n ) => String( n ).padStart( 2, '0' );
 	const today = () => {
@@ -269,7 +275,7 @@
 	};
 	const fmtDate = ( ymd ) => new Date( ymd + 'T12:00:00' ).toLocaleDateString( locale(), { weekday: 'short', day: 'numeric', month: 'short' } );
 	const dueChip = ( th ) => {
-		if ( ! th.due || 'open' !== th.status ) {
+		if ( ! th.due || ! active( th ) ) {
 			return '';
 		}
 		const d = today();
@@ -278,7 +284,7 @@
 		return '<span class="ff-due' + cls + '">' + esc( txt ) + '</span>';
 	};
 	const names = ( ids ) => ( ids || [] ).map( ( id ) => person( id ).name ).join( ', ' );
-	const assigneeStack = ( th ) => ( th.assignees && th.assignees.length && 'open' === th.status ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' );
+	const assigneeStack = ( th ) => ( th.assignees && th.assignees.length && active( th ) ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' );
 	// Responsible people and due date of a task, editable in place.
 	const taskControls = ( th ) => {
 		if ( null === th.status || undefined === th.status ) {
@@ -368,6 +374,7 @@
 		document.addEventListener( 'mousedown', outside );
 		q.focus();
 	};
+	const statusSelect = ( th ) => '<select class="ff-status-sel is-' + esc( th.status ) + '" data-ff="status" aria-label="' + esc( t( 'State' ) ) + '">' + LANES.map( ( st ) => '<option value="' + st + '"' + ( st === th.status ? ' selected' : '' ) + '>' + esc( laneLabel( st ) ) + '</option>' ).join( '' ) + '</select>';
 	const doneBox = ( th, extra ) => ( null === th.status || undefined === th.status ? '' : '<label class="ff-state"><input type="checkbox" data-ff="done"' + ( extra || '' ) + ( 'done' === th.status ? ' checked' : '' ) + '> ' + esc( t( 'Done' ) ) + '</label>' );
 
 	const summary = ( th, expanded, act ) => {
@@ -421,7 +428,7 @@
 			}
 			if ( 'status' === m.type ) {
 				const name = esc( person( m.author ).name );
-				const text = 'done' === m.status ? t( '%s marked this as done', name ) : 'open' === m.status ? t( '%s reopened this', name ) : t( '%s removed the task', name );
+				const text = 'done' === m.status ? t( '%s marked this as done', name ) : 'open' === m.status ? t( '%s reopened this', name ) : 'doing' === m.status ? t( '%s is working on this', name ) : 'waiting' === m.status ? t( '%s has a question about this', name ) : t( '%s removed the task', name );
 				html += '<li class="ff-event' + ( 'done' === m.status ? ' is-done' : '' ) + '">' + ( 'done' === m.status ? '✓ ' : '↺ ' ) + text + ' · ' + esc( when( m.created ) ) + '</li>';
 				prev = null;
 				return;
@@ -1139,6 +1146,9 @@
 			if ( 'tasks' === kind ) {
 				return { title: t( 'Open tasks' ), sub: t( 'Everything not ticked off yet' ), args: { view: 'tasks' } };
 			}
+			if ( 'board' === kind ) {
+				return { title: t( 'Board' ), sub: t( 'Tasks by state. Drag cards to move them.' ), args: { view: 'board', limit: 200, channel: ui.boardChannel || undefined, person: ui.boardPerson || undefined }, board: true };
+			}
 			if ( 'mine' === kind ) {
 				return { title: t( 'My tasks' ), sub: t( 'Assigned to you, by due date' ), args: { view: 'mine' } };
 			}
@@ -1243,6 +1253,7 @@
 				+ btn( 'mentions', '@', t( 'Mentions' ), c.mentions )
 				+ btn( 'mine', '✓', t( 'My tasks' ), c.mine || 0, c.overdue ? t( '%s overdue', c.overdue ) : '' ).replace( '<b>', c.overdue ? '<b class="is-over">' : '<b class="is-soft">' )
 				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 )
+				+ btn( 'board', '▦', t( 'Board' ), 0 )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
 				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
@@ -1300,11 +1311,16 @@
 			return '<select class="ff-chan-notify" data-ff="channel-notify" data-slug="' + esc( slug ) + '" aria-label="' + esc( t( 'Notifications for this channel' ) ) + '">'
 				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '"' + ( cur === v ? ' selected' : '' ) + '>' + esc( l ) + '</option>' ).join( '' ) + '</select>';
 		};
+		const boardFilters = () => '<select data-ff="board-filter" data-key="boardChannel" aria-label="' + esc( t( 'Channel' ) ) + '"><option value="">' + esc( t( 'All channels' ) ) + '</option>'
+			+ boot.channels.map( ( c ) => '<option value="' + esc( c.id ) + '"' + ( ui.boardChannel === c.id ? ' selected' : '' ) + '>#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>'
+			+ '<select data-ff="board-filter" data-key="boardPerson" aria-label="' + esc( t( 'Responsible' ) ) + '"><option value="">' + esc( t( 'Everyone' ) ) + '</option>'
+			+ boot.people.filter( ( p ) => 'team' === p.kind && ! p.bot ).map( ( p ) => '<option value="' + p.id + '"' + ( String( ui.boardPerson ) === String( p.id ) ? ' selected' : '' ) + '>' + esc( p.id === boot.me.id ? t( 'Me' ) : p.name ) + '</option>' ).join( '' ) + '</select>';
 		const renderHead = () => {
 			const v = viewInfo();
 			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p></div>'
 				+ '<div class="ff-head-tools">' + ( v.notifications ? ( boot.counts.notifications ? '<button type="button" class="ff-link" data-ff="notes-read">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' ) : unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
 				+ ( v.channel ? channelNotify( v.channel ) : '' )
+				+ ( v.board ? boardFilters() : '' )
 				+ '<form class="ff-search" role="search"><input type="search" name="q" value="' + esc( v.search || '' ) + '" placeholder="' + esc( t( 'Search …' ) ) + '" aria-label="' + esc( t( 'Search conversations' ) ) + '"></form></div>';
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
@@ -1320,7 +1336,97 @@
 			+ '<p class="ff-who"><b>' + esc( n.headline ) + '</b> <span>' + esc( when( n.created ) ) + ( n.channel ? ' · #' + esc( chName( n.channel ) ) : '' ) + '</span></p>'
 			+ '<p class="ff-title">' + esc( n.topic ) + '</p>'
 			+ ( n.text && n.text !== n.topic ? '<p class="ff-preview">' + preview( n.text ) + '</p>' : '' ) + '</div></article>';
+		const boardCard = ( th ) => '<article class="ff-tcard' + ( th.unread ? ' is-unread' : '' ) + '" draggable="true" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + ' – ' + esc( laneLabel( th.status ) ) + '" aria-describedby="ff-board-help">'
+			+ '<h3>' + esc( th.title || ( th.body || '' ).split( '\n' )[ 0 ].slice( 0, 120 ) ) + '</h3>'
+			+ '<p class="ff-tcard-meta"><span>#' + esc( chName( th.channel ) ) + '</span>' + dueChip( th ) + ( th.replies ? '<span>' + esc( 1 === th.replies ? t( '1 reply' ) : t( '%s replies', th.replies ) ) + '</span>' : '' ) + '</p>'
+			+ ( th.assignees && th.assignees.length ? '<span class="ff-stack ff-assignees" title="' + esc( t( 'Responsible: %s', names( th.assignees ) ) ) + '">' + th.assignees.slice( 0, 4 ).map( ( id ) => ava( id ) ).join( '' ) + '</span>' : '' )
+			+ '</article>';
+		const renderBoard = () => {
+			const by = Object.fromEntries( LANES.map( ( st ) => [ st, ui.list.filter( ( th ) => th.status === st ) ] ) );
+			feed.innerHTML = '<p id="ff-board-help" class="screen-reader-text">' + esc( t( 'Alt and arrow keys move a card to the next or previous column.' ) ) + '</p><div class="ff-board">'
+				+ LANES.map( ( st ) => '<section class="ff-lane is-' + st + '" data-status="' + st + '" aria-label="' + esc( laneLabel( st ) ) + '"><h2>' + esc( laneLabel( st ) ) + ' <span>' + by[ st ].length + '</span></h2>'
+					+ '<div class="ff-lane-cards">' + ( by[ st ].length ? by[ st ].map( boardCard ).join( '' ) : '<p class="ff-lane-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'Nothing here' ) ) + '</p>' ) + '</div></section>' ).join( '' )
+				+ '</div>';
+		};
+		// Move a card: shown at once, saved in the background, put back if that fails.
+		const moveCard = async ( id, status ) => {
+			const th = ui.list.find( ( x ) => x.id === id );
+			if ( ! th || th.status === status ) {
+				return;
+			}
+			const was = th.status;
+			th.status = status;
+			renderBoard();
+			const el = feed.querySelector( '.ff-tcard[data-id="' + id + '"]' );
+			if ( el ) {
+				el.focus();
+			}
+			announce( t( 'Moved to %s', laneLabel( status ) ) );
+			try {
+				await api( 'threads/' + id + '/status', { method: 'POST', body: { status } } );
+				refresh();
+			} catch ( x ) {
+				th.status = was;
+				renderBoard();
+				announce( x.message );
+			}
+		};
+		feed.addEventListener( 'dragstart', ( e ) => {
+			const card = e.target.closest && e.target.closest( '.ff-tcard' );
+			if ( card ) {
+				ui.dragging = true;
+				e.dataTransfer.setData( 'text/plain', card.dataset.id );
+				e.dataTransfer.effectAllowed = 'move';
+				card.classList.add( 'is-dragging' );
+			}
+		} );
+		feed.addEventListener( 'dragend', ( e ) => {
+			ui.dragging = false;
+			if ( e.target.classList ) {
+				e.target.classList.remove( 'is-dragging' );
+			}
+			feed.querySelectorAll( '.ff-lane.is-over' ).forEach( ( l ) => l.classList.remove( 'is-over' ) );
+		} );
+		feed.addEventListener( 'dragover', ( e ) => {
+			const lane = e.target.closest && e.target.closest( '.ff-lane' );
+			if ( lane && ui.dragging ) {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'move';
+				feed.querySelectorAll( '.ff-lane.is-over' ).forEach( ( l ) => l !== lane && l.classList.remove( 'is-over' ) );
+				lane.classList.add( 'is-over' );
+			}
+		} );
+		feed.addEventListener( 'drop', ( e ) => {
+			const lane = e.target.closest && e.target.closest( '.ff-lane' );
+			if ( lane ) {
+				e.preventDefault();
+				ui.dragging = false;
+				moveCard( +e.dataTransfer.getData( 'text/plain' ), lane.dataset.status );
+			}
+		} );
+		feed.addEventListener( 'keydown', ( e ) => {
+			const card = e.target.closest && e.target.closest( '.ff-tcard' );
+			if ( card && e.altKey && ( 'ArrowRight' === e.key || 'ArrowLeft' === e.key ) ) {
+				e.preventDefault();
+				const th = ui.list.find( ( x ) => x.id === +card.dataset.id );
+				const next = LANES[ LANES.indexOf( th.status ) + ( 'ArrowRight' === e.key ? 1 : -1 ) ];
+				if ( next ) {
+					moveCard( th.id, next );
+				}
+			} else if ( card && e.target === card && ( 'Enter' === e.key || ' ' === e.key ) ) {
+				e.preventDefault();
+				card.click();
+			}
+		} );
 		const renderFeed = () => {
+			feed.classList.toggle( 'is-board', !! viewInfo().board );
+			feed.setAttribute( 'aria-live', viewInfo().board ? 'off' : 'polite' ); // Moves are announced on their own.
+			if ( viewInfo().board ) {
+				if ( ! ui.dragging ) {
+					renderBoard();
+				}
+				return;
+			}
 			if ( viewInfo().notifications ) {
 				feed.innerHTML = ui.notes && ui.notes.length
 					? ui.notes.map( noteHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older notifications' ) ) + '</button>' : '' )
@@ -1356,7 +1462,7 @@
 		/* composer for new threads */
 		const renderComposer = () => {
 			const v = viewInfo();
-			if ( v.notifications ) {
+			if ( v.notifications || v.board ) {
 				slot.replaceChildren();
 				return;
 			}
@@ -1426,7 +1532,7 @@
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ cards( th.attachments ) + targetChip( th )
 				+ taskControls( th )
-				+ '<div class="ff-root-row">' + statusPill( th ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
+				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
 			const c = composer( {
 				key: 'thread:' + th.id,
@@ -1736,6 +1842,16 @@
 					renderPane( ui.current );
 					announce( r.remind ? t( 'Reminder set' ) : t( 'Reminder removed' ) );
 				}
+			} else if ( 'status' === el.dataset.ff && ui.current ) {
+				ui.current = await api( 'threads/' + ui.current.id + '/status', { method: 'POST', body: { status: el.value } } );
+				renderPane( ui.current );
+				refresh();
+			} else if ( 'board-filter' === el.dataset.ff ) {
+				ui[ el.dataset.key ] = el.value;
+				ui.list = [];
+				ui.loading = true;
+				renderFeed();
+				loadList();
 			} else if ( 'channel-notify' === el.dataset.ff ) {
 				boot.me.prefs = await api( 'me/prefs', { method: 'POST', body: { channel: { slug: el.dataset.slug, level: el.value } } } );
 				announce( t( 'Saved' ) );

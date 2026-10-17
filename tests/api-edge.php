@@ -483,6 +483,23 @@ if ( $bot_id ) {
 $check( 'up to 50 files per message', 50 === count( Store\files( array_fill( 0, 60, $lib ), $team2, true ) ) );
 wp_delete_attachment( $lib, true );
 
+WP_CLI::log( 'Board states' );
+$as( $team );
+list( $s, $bt ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'title' => 'Board', 'body' => 'x', 'task' => true, 'assignees' => array( $team2 ) ) );
+list( $s ) = $req( 'POST', 'threads/' . $bt['id'] . '/status', array( 'status' => 'doing' ) );
+$check( '"in progress" is a state', 200 === $s && 'doing' === Store\thread_row( $bt['id'] )->status );
+$ids = wp_list_pluck( Store\list_threads( $team, array( 'view' => 'tasks', 'limit' => 200 ) ), 'id' );
+$check( 'tasks in progress still count as open tasks', in_array( (int) $bt['id'], array_map( 'intval', $ids ), true ) );
+list( $notes ) = $flush( fn () => Store\set_status( $bt['id'], 'waiting' ) );
+$check( '"question" notifies the responsible people', 'waiting' === ( $notes[ $team2 ] ?? '' ), $notes );
+list( $s ) = $req( 'POST', 'threads/' . $bt['id'] . '/status', array( 'status' => 'party' ) );
+$check( 'unknown states are refused', 403 === $s || 400 === $s, $s );
+Store\set_status( $bt['id'], 'done' );
+$board = wp_list_pluck( Store\list_threads( $team, array( 'view' => 'board', 'limit' => 200 ) ), 'id' );
+$check( 'the board shows recently ticked-off tasks', in_array( (int) $bt['id'], array_map( 'intval', $board ), true ) );
+$mine = wp_list_pluck( Store\list_threads( $team, array( 'view' => 'board', 'person' => $team2, 'limit' => 200 ) ), 'id' );
+$check( 'the board filters by person', in_array( (int) $bt['id'], array_map( 'intval', $mine ), true ) && ! in_array( (int) $t2['id'], array_map( 'intval', $mine ), true ) );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );

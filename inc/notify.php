@@ -33,8 +33,8 @@ use function Flurfunk\Schema\table;
 defined( 'ABSPATH' ) || exit;
 
 const PREFS    = 'flurfunk_prefs';
-const PERSONAL = array( 'mention', 'assigned', 'due', 'remind', 'reply', 'done', 'channel' );
-const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'remind' => 4, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
+const PERSONAL = array( 'mention', 'assigned', 'due', 'remind', 'waiting', 'reply', 'done', 'channel' );
+const PRIORITY = array( 'mention' => 6, 'assigned' => 5, 'due' => 4, 'remind' => 4, 'waiting' => 3, 'done' => 3, 'reply' => 2, 'channel' => 2, 'message' => 1 );
 const KEYS     = array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels', 'pause' );
 const DIGEST   = 'flurfunk_digest';
 const DUE      = 'flurfunk_due';
@@ -150,10 +150,11 @@ add_action(
 add_action(
 	'flurfunk_status_changed',
 	static function ( object $t, string $status, int $actor ): void {
-		if ( 'done' !== $status ) {
+		if ( 'done' !== $status && 'waiting' !== $status ) {
 			return;
 		}
-		$to = array_fill_keys( array_merge( array( (int) $t->author_id ), Store\assignees( (int) $t->id ) ), 'done' );
+		// Ticked off, or someone needs an answer: tell whoever started it and the responsible people.
+		$to = array_fill_keys( array_merge( array( (int) $t->author_id ), Store\assignees( (int) $t->id ) ), $status );
 		unset( $to[ $actor ] );
 		dispatch( $t, 0, $to, $actor );
 	},
@@ -327,6 +328,11 @@ function words( array $n ): array {
 			$head = __( 'Reminder', 'flurfunk' );
 			$text = $topic;
 			break;
+		case 'waiting':
+			/* translators: %s: person */
+			$head = sprintf( __( '%s has a question about a task', 'flurfunk' ), $who );
+			$text = $topic;
+			break;
 		case 'done':
 			/* translators: %s: person */
 			$head = sprintf( __( '%s ticked off a task', 'flurfunk' ), $who );
@@ -421,7 +427,7 @@ add_action( DIGEST, __NAMESPACE__ . '\\send_digests' );
 function remind_due( bool $force = false ): int {
 	global $wpdb;
 	$today = wp_date( 'Y-m-d' );
-	$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT t.*, a.user_id assignee FROM ' . table( 'threads' ) . ' t JOIN ' . table( 'assignees' ) . " a ON a.thread_id = t.id WHERE t.status = 'open' AND t.due_date IS NOT NULL AND t.due_date <= %s", $today ) ); // phpcs:ignore WordPress.DB
+	$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT t.*, a.user_id assignee FROM ' . table( 'threads' ) . ' t JOIN ' . table( 'assignees' ) . " a ON a.thread_id = t.id WHERE t.status IN ( 'open', 'doing', 'waiting' ) AND t.due_date IS NOT NULL AND t.due_date <= %s", $today ) ); // phpcs:ignore WordPress.DB
 	$n     = 0;
 	foreach ( $rows as $r ) {
 		$done = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . " WHERE kind = 'due' AND thread_id = %d AND user_id = %d AND created >= %s", $r->id, $r->assignee, get_gmt_from_date( $today . ' 00:00:00' ) ) ); // phpcs:ignore WordPress.DB

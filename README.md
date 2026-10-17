@@ -53,6 +53,7 @@ One dispatcher, several channels. What counts:
 | remind | the reminder you set on a thread |
 | reply | new message in a thread you started, wrote in, are responsible for or follow |
 | done | a task you started or are responsible for was ticked off |
+| waiting | someone set a task you started or are responsible for to "question" |
 | channel | a new post in a channel set to "every post" |
 | message | anything else you can see – only if you chose "everything" |
 

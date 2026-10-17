@@ -4,12 +4,12 @@
  *
  *   GET  bootstrap                 me, people, channels, providers, counts, look
  *   GET  counts                    unread numbers
- *   GET  threads                   list (view, channel, target, ref_prefix, before, limit, order, q)
+ *   GET  threads                   list (view: all|mentions|tasks|mine|board, channel, target, ref_prefix, before, limit, order, q, person)
  *   POST read                      mark all as read ({ channel } optional)
  *   POST threads                   new thread (with ref_key: returns the existing one if present)
  *   GET  threads/<id>              thread with messages; marks it read
  *   POST threads/<id>/messages     reply
- *   POST threads/<id>/status       open | done | ''
+ *   POST threads/<id>/status       open | doing | waiting | done | ''
  *   POST threads/<id>/edit         title, body (author or manager)
  *   POST threads/<id>/follow       mode: follow | mute | default
  *   POST threads/<id>/remind       when: hour | tomorrow | monday | none | ISO time
@@ -279,7 +279,7 @@ function decorate( array $t ): array {
  * @param WP_REST_Request $r Request.
  */
 function list_threads( WP_REST_Request $r ): array {
-	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'limit', 'order', 'q' ) ) );
+	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'limit', 'order', 'q', 'person' ) ) );
 	return array_map( __NAMESPACE__ . '\\decorate', Store\list_threads( get_current_user_id(), array_map( 'sanitize_text_field', $args ) ) );
 }
 

@@ -570,6 +570,31 @@ test.describe( 'team', () => {
 		await expect.poll( async () => ( await api( page, 'bootstrap' ) ).me.prefs.channels.general ).toBeUndefined();
 	} );
 
+	test( 'board: lanes by state, drag and drop, keyboard, state menu in the thread', async ( { page } ) => {
+		const stamp = Date.now();
+		const a = await api( page, 'threads', { channel: 'general', title: 'e2e Board A ' + stamp, body: 'x', task: true } );
+		const b = await api( page, 'threads', { channel: 'general', title: 'e2e Board B ' + stamp, body: 'y', task: true } );
+		await api( page, 'threads/' + b.id + '/status', { status: 'doing' } );
+		await page.locator( '.ff-nav [data-view="board"]' ).click();
+		const card = ( th ) => page.locator( `.ff-tcard[data-id="${ th.id }"]` );
+		await expect( page.locator( '.ff-lane[data-status="open"]' ).locator( card( a ) ) ).toBeVisible();
+		await expect( page.locator( '.ff-lane[data-status="doing"]' ).locator( card( b ) ) ).toBeVisible();
+		await expect( page.locator( '.ff-compose-slot .ff-compose' ) ).toHaveCount( 0 );
+		await card( a ).dragTo( page.locator( '.ff-lane[data-status="waiting"]' ) );
+		await expect( page.locator( '.ff-lane[data-status="waiting"]' ).locator( card( a ) ) ).toBeVisible();
+		await expect.poll( async () => ( await api( page, 'threads/' + a.id + '?peek=1' ) ).status ).toBe( 'waiting' );
+		await card( b ).focus();
+		await page.keyboard.press( 'Alt+ArrowRight' );
+		await expect.poll( async () => ( await api( page, 'threads/' + b.id + '?peek=1' ) ).status ).toBe( 'waiting' );
+		await expect( card( b ) ).toBeFocused();
+		await card( b ).click();
+		await page.locator( '.ff-pane select[data-ff="status"]' ).selectOption( 'done' );
+		await expect.poll( async () => ( await api( page, 'threads/' + b.id + '?peek=1' ) ).status ).toBe( 'done' );
+		await expect( page.locator( '.ff-pane .ff-event', { hasText: /Rückfrage|question/ } ) ).toHaveCount( 1 );
+		await expect( page.locator( '.ff-lane[data-status="done"]' ).locator( card( b ) ) ).toBeVisible();
+		expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth + 1 ) ).toBe( true );
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];
