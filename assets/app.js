@@ -1176,6 +1176,7 @@
 				+ '<h3>' + esc( t( 'Profile picture' ) ) + '</h3><div class="ff-seg">' + pic.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="avatar" data-val="' + v + '" aria-pressed="' + ( p.avatar === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>'
 				+ '<p class="ff-meta">' + esc( t( 'Your picture from your profile or Gravatar. Without one, your initials show.' ) ) + '</p>'
 				+ '<h3>' + esc( t( 'Email me' ) ) + '</h3>' + mail.map( ( [ v, l ] ) => '<label><input type="radio" name="ff-mail" data-ff="pref" data-pref="mail" value="' + v + '"' + ( p.mail === v ? ' checked' : '' ) + '> ' + esc( l ) + '</label>' ).join( '' )
+				+ '<label class="ff-hour">' + esc( t( 'Daily summary and task reminders at' ) ) + ' <select data-ff="pref" data-pref="hour">' + Array.from( { length: 24 }, ( _, h ) => '<option value="' + h + '"' + ( p.hour === h ? ' selected' : '' ) + '>' + pad2( h ) + ':00</option>' ).join( '' ) + '</select></label>'
 				+ '<h3>' + esc( t( 'Push notifications' ) ) + '</h3>' + pushBox
 				+ ( 'on' === ps ? '<div class="ff-seg">' + push.map( ( [ v, l ] ) => '<button type="button" data-ff="pref" data-pref="push" data-val="' + v + '" aria-pressed="' + ( p.push === v ) + '">' + esc( l ) + '</button>' ).join( '' ) + '</div>' : '' )
 				+ '<label><input type="checkbox" data-ff="quiet-on"' + ( p.quiet ? ' checked' : '' ) + '> ' + esc( t( 'Quiet hours (no push)' ) ) + '</label>'
@@ -1298,7 +1299,11 @@
 		const renderPane = ( th ) => {
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
-			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2><button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
+			const follow = th.follow || 0;
+			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
+				+ '<span class="ff-follow"><button type="button" class="ff-link" data-ff="follow" data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '" title="' + esc( t( 'Get notified about every reply' ) ) + '">' + esc( 1 === follow ? t( 'Following' ) : t( 'Follow' ) ) + '</button>'
+				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button></span>'
+				+ '<button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
@@ -1482,6 +1487,10 @@
 				}
 				applyLook( root );
 				renderNav();
+			} else if ( 'follow' === act && ui.current ) {
+				const r = await api( 'threads/' + ui.current.id + '/follow', { method: 'POST', body: { mode: el.dataset.mode } } );
+				ui.current.follow = r.follow;
+				renderPane( ui.current );
 			} else if ( 'open-note' === act ) {
 				const nid = +el.dataset.nid;
 				api( 'notifications', { method: 'POST', body: { ids: [ nid ] } } ).then( ( c ) => {

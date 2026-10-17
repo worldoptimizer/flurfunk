@@ -388,3 +388,6 @@
 .ff-push-row { gap: 10px; }
 .ff-push-state { font-size: 13px; font-weight: 600; }
 .ff-root .ff-quiet input[type=time] { min-height: 28px; padding: 1px 6px; border: 1px solid var(--ff-line); border-radius: 6px; background: var(--ff-paper); color: var(--ff-ink); }
+.ff-follow { display: inline-flex; gap: 10px; margin-left: auto; margin-right: 6px; }
+.ff-follow [aria-pressed="true"] { color: var(--ff-ink); text-decoration: underline; text-underline-offset: 3px; }
+.ff-root .ff-hour select { min-height: 28px; padding: 0 22px 0 6px; border: 1px solid var(--ff-line); border-radius: 6px; background-color: var(--ff-paper); color: var(--ff-ink); }

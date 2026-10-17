@@ -11,6 +11,7 @@
  *   POST threads/<id>/messages     reply
  *   POST threads/<id>/status       open | done | ''
  *   POST threads/<id>/edit         title, body (author or manager)
+ *   POST threads/<id>/follow       mode: follow | mute | default
  *   POST threads/<id>/task         due (Y-m-d or ''), assignees (user IDs)
  *   POST messages/<id>             new text (author or manager)
  *   DELETE messages/<id>           remove (a note stays in its place)
@@ -62,6 +63,24 @@ function routes(): void {
 	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)', array( 'methods' => 'GET', 'callback' => __NAMESPACE__ . '\\get_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/messages', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\add_message', 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route(
+		NS,
+		'/threads/(?P<id>\d+)/follow',
+		array(
+			'methods'             => 'POST',
+			'callback'            => static function ( WP_REST_Request $r ) {
+				$t = Store\thread_row( (int) $r['id'] );
+				if ( ! $t || ! Access\can_see( $t ) ) {
+					return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+				}
+				$mode = array( 'follow' => 1, 'mute' => -1 )[ (string) ( $r->get_json_params()['mode'] ?? '' ) ] ?? 0;
+				Store\set_follow( (int) $r['id'], get_current_user_id(), $mode );
+				return array( 'follow' => $mode );
+			},
+			'permission_callback' => $auth,
+			'args'                => $id,
+		)
+	);
 	register_rest_route( NS, '/threads/(?P<id>\d+)/task', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_task', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/edit', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\edit_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route(

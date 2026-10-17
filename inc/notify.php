@@ -15,6 +15,8 @@
  *   mail   mentions (personal kinds) | all | digest (one mail a day) | none
  *   push   mentions | all | none   – only for browsers that subscribed (inc/push.php)
  *   quiet  "22:00-07:00": no push in that window (in the site's time zone)
+ *   hour   0–23: when the daily digest and due reminders arrive (default 7)
+ * Per thread: follow (every reply) or mute (only mentions and tasks).
  *
  * Filters: flurfunk_notify_recipients (user => kind, per event), flurfunk_mail (false = skip),
  * flurfunk_push_payload.
@@ -45,7 +47,7 @@ function prefs( int $user_id ): array {
 	// Each preference is its own meta entry (flurfunk_pref_<key>), so two settings changed at the
 	// same moment can't overwrite each other; the older combined entry still counts as fallback.
 	$p = (array) get_user_meta( $user_id, PREFS, true );
-	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge' ) as $k ) {
+	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) as $k ) {
 		$v = get_user_meta( $user_id, PREFS . '_' . $k, true );
 		if ( '' !== $v || metadata_exists( 'user', $user_id, PREFS . '_' . $k ) ) {
 			$p[ $k ] = 'badge' === $k ? (bool) $v : $v;
@@ -59,6 +61,7 @@ function prefs( int $user_id ): array {
 		'push'   => in_array( $p['push'] ?? '', array( 'mentions', 'all', 'none' ), true ) ? $p['push'] : 'mentions',
 		'quiet'  => preg_match( '/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/', $quiet ) ? $quiet : '',
 		'badge'  => isset( $p['badge'] ) ? (bool) $p['badge'] : true,
+		'hour'   => isset( $p['hour'] ) && '' !== $p['hour'] && (int) $p['hour'] >= 0 && (int) $p['hour'] <= 23 ? (int) $p['hour'] : 7,
 	);
 }
 
@@ -69,7 +72,7 @@ function prefs( int $user_id ): array {
  * @param array $in      Changes.
  */
 function save_prefs( int $user_id, array $in ): array {
-	foreach ( array_intersect_key( $in, array_flip( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge' ) ) ) as $k => $v ) {
+	foreach ( array_intersect_key( $in, array_flip( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour' ) ) ) as $k => $v ) {
 		update_user_meta( $user_id, PREFS . '_' . $k, 'badge' === $k ? ( $v ? '1' : '0' ) : sanitize_text_field( (string) $v ) );
 	}
 	return prefs( $user_id );
@@ -149,7 +152,8 @@ function event( object $thread, int $message_id ): void {
 		$participants[] = (int) $thread->author_id;
 		$participants   = array_merge( $participants, Store\assignees( (int) $thread->id ) );
 	}
-	$to = array();
+	$follow = Store\follows( (int) $thread->id );
+	$to     = array();
 	foreach ( Store\people() as $p ) {
 		$uid = (int) $p['id'];
 		if ( $uid === $sender || ! Access\can_see( $thread, $uid ) ) {
@@ -157,7 +161,9 @@ function event( object $thread, int $message_id ): void {
 		}
 		if ( in_array( $uid, $mentioned, true ) ) {
 			$to[ $uid ] = 'mention';
-		} elseif ( in_array( $uid, $participants, true ) ) {
+		} elseif ( -1 === ( $follow[ $uid ] ?? 0 ) ) {
+			continue; // Muted: only mentions (and tasks, see flurfunk_assigned) get through.
+		} elseif ( in_array( $uid, $participants, true ) || 1 === ( $follow[ $uid ] ?? 0 ) ) {
 			$to[ $uid ] = 'reply';
 		} else {
 			$pr = prefs( $uid );
@@ -340,19 +346,30 @@ function payload( array $n ): array {
 }
 
 /*
- * Daily jobs: due reminders and digests, at 7:00 site time.
+ * Due reminders and digests: an hourly job, each person at their own hour (default 7:00).
  */
 add_action(
 	'init',
 	static function (): void {
 		foreach ( array( DUE, DIGEST ) as $hook ) {
-			if ( ! wp_next_scheduled( $hook ) ) {
-				$next = new \DateTime( 'tomorrow 07:00', wp_timezone() );
-				wp_schedule_event( $next->getTimestamp(), 'daily', $hook );
+			if ( 'hourly' !== wp_get_schedule( $hook ) ) {
+				wp_clear_scheduled_hook( $hook );
+				$next = new \DateTime( 'now', wp_timezone() );
+				$next->setTime( (int) $next->format( 'H' ) + 1, 0, 30 );
+				wp_schedule_event( $next->getTimestamp(), 'hourly', $hook );
 			}
 		}
 	}
 );
+
+/**
+ * Is it this person's hour for daily mails and reminders?
+ *
+ * @param int $user_id User.
+ */
+function is_their_hour( int $user_id ): bool {
+	return (int) wp_date( 'G' ) === prefs( $user_id )['hour'];
+}
 add_action( DUE, __NAMESPACE__ . '\\remind_due' );
 add_action( DIGEST, __NAMESPACE__ . '\\send_digests' );
 
@@ -361,14 +378,14 @@ add_action( DIGEST, __NAMESPACE__ . '\\send_digests' );
  *
  * @return int Reminders created.
  */
-function remind_due(): int {
+function remind_due( bool $force = false ): int {
 	global $wpdb;
 	$today = wp_date( 'Y-m-d' );
 	$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT t.*, a.user_id assignee FROM ' . table( 'threads' ) . ' t JOIN ' . table( 'assignees' ) . " a ON a.thread_id = t.id WHERE t.status = 'open' AND t.due_date IS NOT NULL AND t.due_date <= %s", $today ) ); // phpcs:ignore WordPress.DB
 	$n     = 0;
 	foreach ( $rows as $r ) {
 		$done = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . table( 'notifications' ) . " WHERE kind = 'due' AND thread_id = %d AND user_id = %d AND created >= %s", $r->id, $r->assignee, get_gmt_from_date( $today . ' 00:00:00' ) ) ); // phpcs:ignore WordPress.DB
-		if ( ! $done && Access\can_see( $r, (int) $r->assignee ) ) {
+		if ( ! $done && ( $force || is_their_hour( (int) $r->assignee ) ) && Access\can_see( $r, (int) $r->assignee ) ) {
 			dispatch( $r, 0, array( (int) $r->assignee => 'due' ), 0 );
 			++$n;
 		}
@@ -382,12 +399,12 @@ function remind_due(): int {
  *
  * @return int Mails sent.
  */
-function send_digests(): int {
+function send_digests( bool $force = false ): int {
 	global $wpdb;
 	$sent = 0;
 	foreach ( Store\people() as $p ) {
 		$uid = (int) $p['id'];
-		if ( 'digest' !== prefs( $uid )['mail'] ) {
+		if ( 'digest' !== prefs( $uid )['mail'] || ( ! $force && ! is_their_hour( $uid ) ) ) {
 			continue;
 		}
 		$since = (string) get_user_meta( $uid, 'flurfunk_digest_last', true ) ?: gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );

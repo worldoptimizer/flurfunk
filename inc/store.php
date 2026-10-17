@@ -589,6 +589,35 @@ function edit_thread( int $thread_id, array $args ) {
 }
 
 /**
+ * Follow (1), mute (-1) or reset (0) a thread for a person. Followers hear about every reply;
+ * muted threads stay quiet except for mentions and tasks.
+ *
+ * @param int $thread_id Thread.
+ * @param int $user_id   User.
+ * @param int $mode      1, -1 or 0.
+ */
+function set_follow( int $thread_id, int $user_id, int $mode ): void {
+	global $wpdb;
+	$mode = max( -1, min( 1, $mode ) );
+	$wpdb->query( $wpdb->prepare( 'INSERT INTO ' . table( 'reads' ) . ' (user_id, thread_id, last_message_id, seen, follow) VALUES (%d, %d, 0, %s, %d) ON DUPLICATE KEY UPDATE follow = VALUES(follow)', $user_id, $thread_id, now(), $mode ) ); // phpcs:ignore WordPress.DB
+}
+
+/**
+ * Follow modes of a thread: user => 1 (follow) or -1 (mute).
+ *
+ * @param int $thread_id Thread.
+ * @return array<int,int>
+ */
+function follows( int $thread_id ): array {
+	global $wpdb;
+	$out = array();
+	foreach ( $wpdb->get_results( $wpdb->prepare( 'SELECT user_id, follow FROM ' . table( 'reads' ) . ' WHERE thread_id = %d AND follow <> 0', $thread_id ) ) as $r ) { // phpcs:ignore WordPress.DB
+		$out[ (int) $r->user_id ] = (int) $r->follow;
+	}
+	return $out;
+}
+
+/**
  * Mark everything a person can see as read, optionally only in one channel.
  *
  * @param int    $user_id User.
@@ -1071,6 +1100,7 @@ function full_thread( int $id, int $user_id ) {
 		'messages' => $messages,
 		'older'    => max( 0, $total - count( $messages ) ),
 		'read'     => read_state( array( $id ), $user_id )[ $id ] ?? 0,
+		'follow'   => follows( $id )[ $user_id ] ?? 0,
 		'audience' => audience( $t ),
 	);
 }
