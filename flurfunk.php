@@ -82,7 +82,7 @@ register_activation_hook( __FILE__, static fn () => delete_option( 'flurfunk_rew
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
-		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) { // phpcs:ignore
+		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) {
 			wp_clear_scheduled_hook( $hook );
 		}
 		// WordPress rebuilds the rules on the next request, without the /flurfunk/ address.

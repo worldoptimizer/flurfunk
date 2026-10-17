@@ -16,6 +16,9 @@ namespace Flurfunk\Integrations\MailerPress;
 
 defined( 'ABSPATH' ) || exit;
 
+// MailerPress's tables have no read API for this. Every query below is prepared.
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
 /**
  * Table name.
  *
@@ -86,7 +89,7 @@ add_action(
 function search( string $q ): array {
 	global $wpdb;
 	$like = '%' . $wpdb->esc_like( $q ) . '%';
-	$rows = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT campaign_id, name, subject, status, config FROM ' . table( 'campaigns' ) . " WHERE campaign_type IN ('newsletter','ab_test') AND status <> 'trash' AND ( name LIKE %s OR subject LIKE %s ) ORDER BY updated_at DESC LIMIT 12", $like, $like ) ); // phpcs:ignore WordPress.DB
+	$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT campaign_id, name, subject, status, config FROM %i WHERE campaign_type IN ('newsletter','ab_test') AND status <> 'trash' AND ( name LIKE %s OR subject LIKE %s ) ORDER BY updated_at DESC LIMIT 12", table( 'campaigns' ), $like, $like ) );
 	return array_map(
 		static fn ( $c ) => array(
 			'ref'      => array( 'id' => (int) $c->campaign_id ),
@@ -104,7 +107,7 @@ function search( string $q ): array {
  */
 function snapshot( array $ref ): ?array {
 	global $wpdb;
-	$c = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'campaigns' ) . ' WHERE campaign_id = %d', (int) ( $ref['id'] ?? 0 ) ) ); // phpcs:ignore WordPress.DB
+	$c = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE campaign_id = %d', table( 'campaigns' ), (int) ( $ref['id'] ?? 0 ) ) );
 	if ( ! $c || 'trash' === $c->status ) {
 		return null;
 	}
@@ -113,9 +116,8 @@ function snapshot( array $ref ): ?array {
 	$meta  = array();
 	$count = 0;
 	if ( $lists ) {
-		$in    = implode( ',', $lists );
-		$names = (array) $wpdb->get_col( 'SELECT name FROM ' . table( 'lists' ) . " WHERE list_id IN ($in)" ); // phpcs:ignore WordPress.DB
-		$count = (int) $wpdb->get_var( 'SELECT COUNT(DISTINCT c.contact_id) FROM ' . table( 'contact_lists' ) . ' cl JOIN ' . table( 'contact' ) . " c ON c.contact_id = cl.contact_id WHERE cl.list_id IN ($in) AND c.subscription_status = 'subscribed'" ); // phpcs:ignore WordPress.DB
+		$names = (array) $wpdb->get_col( $wpdb->prepare( 'SELECT name FROM %i WHERE list_id IN (' . implode( ',', array_fill( 0, count( $lists ), '%d' ) ) . ')', array_merge( array( table( 'lists' ) ), $lists ) ) );
+		$count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(DISTINCT c.contact_id) FROM %i cl JOIN %i c ON c.contact_id = cl.contact_id WHERE cl.list_id IN (' . implode( ',', array_fill( 0, count( $lists ), '%d' ) ) . ") AND c.subscription_status = 'subscribed'", array_merge( array( table( 'contact_lists' ), table( 'contact' ) ), $lists ) ) );
 		if ( $names ) {
 			/* translators: %s: list names */
 			$meta[] = sprintf( __( 'List: %s', 'flurfunk' ), implode( ', ', $names ) );
@@ -128,7 +130,7 @@ function snapshot( array $ref ): ?array {
 		'value' => number_format_i18n( $count ),
 		'label' => __( 'subscribed recipients', 'flurfunk' ),
 	);
-	$stats = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . table( 'campaign_stats' ) . ' WHERE campaign_id = %d ORDER BY id DESC LIMIT 1', $c->campaign_id ) ); // phpcs:ignore WordPress.DB
+	$stats = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE campaign_id = %d ORDER BY id DESC LIMIT 1', table( 'campaign_stats' ), $c->campaign_id ) );
 	if ( $stats && (int) $stats->total_sent ) {
 		$metric = array(
 			'value' => number_format_i18n( (int) $stats->total_sent ),

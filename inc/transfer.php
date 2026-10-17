@@ -36,14 +36,16 @@ function export( string $bundle = '' ): array {
 			);
 		}
 	};
-	$rows  = (array) $wpdb->get_results( 'SELECT * FROM ' . table( 'threads' ) . ' ORDER BY id' ); // phpcs:ignore WordPress.DB
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own tables, read once for the export.
+	$rows  = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY id', table( 'threads' ) ) );
 	$ids   = array_map( static fn ( $r ) => (int) $r->id, $rows );
 	$atts  = Store\attachments_for( $ids );
 	$ments = Store\mentions_for( $ids );
 	$reads = array();
-	foreach ( (array) $wpdb->get_results( 'SELECT * FROM ' . table( 'reads' ) ) as $r ) { // phpcs:ignore WordPress.DB
+	foreach ( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i', table( 'reads' ) ) ) as $r ) {
 		$reads[ (int) $r->thread_id ][ (int) $r->user_id ] = (int) $r->last_message_id;
 	}
+	// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$threads = array();
 	foreach ( $rows as $r ) {
 		$t             = Store\format_thread( $r, $atts, $ments );
@@ -106,7 +108,7 @@ function import( array $data, string $bundle = '' ): array {
 			return $plain;
 		}
 		if ( ! isset( $stored[ $rel ] ) ) {
-			$id = \Flurfunk\Files\store( $plain['name'] ?: wp_basename( $rel ), (string) file_get_contents( $bundle . '/' . $rel ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$id = \Flurfunk\Files\store( $plain['name'] ?: wp_basename( $rel ), (string) file_get_contents( $bundle . '/' . $rel ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file from the unpacked export.
 			if ( is_wp_error( $id ) ) {
 				return $plain;
 			}

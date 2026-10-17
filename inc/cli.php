@@ -38,13 +38,13 @@ class Command {
 			}
 			wp_mkdir_p( $dir );
 			$data = \Flurfunk\Transfer\export( $dir );
-			file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- WP-CLI writes to the path the user named.
 			WP_CLI::success( sprintf( 'Exported %d threads with files to %s', count( $data['threads'] ), $dir ) );
 			return;
 		}
 		$json = (string) wp_json_encode( \Flurfunk\Transfer\export(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
 		if ( ! empty( $args[0] ) ) {
-			file_put_contents( $args[0], $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			file_put_contents( $args[0], $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- WP-CLI writes to the path the user named.
 			WP_CLI::success( 'Exported to ' . $args[0] );
 			return;
 		}
@@ -67,7 +67,7 @@ class Command {
 			$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
 			wp_set_current_user( (int) ( $admins[0] ?? 0 ) ); // Files are stored in someone's name.
 		}
-		$data = json_decode( (string) file_get_contents( $bundle ? $bundle . '/flurfunk.json' : $args[0] ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		$data = json_decode( (string) file_get_contents( $bundle ? $bundle . '/flurfunk.json' : $args[0] ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file the user named.
 		if ( ! is_array( $data ) ) {
 			WP_CLI::error( 'Not a JSON file.' );
 		}
@@ -91,7 +91,7 @@ class Command {
 				'team'    => $c->access_team,
 				'guests'  => $c->access_guests,
 				'active'  => $c->archived ? 'no' : 'yes',
-				'threads' => (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . \Flurfunk\Schema\table( 'threads' ) . ' WHERE channel_id = %d', $c->id ) ), // phpcs:ignore WordPress.DB
+				'threads' => (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE channel_id = %d', \Flurfunk\Schema\table( 'threads' ), $c->id ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- our own table, a one-off command.
 			);
 		}
 		WP_CLI\Utils\format_items( 'table', $rows, array( 'channel', 'name', 'team', 'guests', 'active', 'threads' ) );
@@ -240,7 +240,7 @@ class Command {
 			if ( ! is_readable( $path ) ) {
 				WP_CLI::error( "Cannot read $path" );
 			}
-			$id = \Flurfunk\Files\store( wp_basename( $path ), (string) file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$id = \Flurfunk\Files\store( wp_basename( $path ), (string) file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file the user named.
 			if ( is_wp_error( $id ) ) {
 				WP_CLI::error( $id );
 			}
