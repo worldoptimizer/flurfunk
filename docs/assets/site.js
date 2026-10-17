@@ -19,11 +19,9 @@
     Array.prototype.forEach.call((scope || document).querySelectorAll(selector), fn);
   }
 
-  // Dark is the default; light comes from the system or the visitor's choice.
+  // Light is the default; dark only when the visitor picked it.
   function currentTheme() {
-    var set = root.getAttribute('data-theme');
-    if (set === 'light' || set === 'dark') { return set; }
-    return media('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   }
 
   function initTheme() {
@@ -35,8 +33,6 @@
       btn.setAttribute('title', 'Switch to ' + next + ' theme');
     };
     label();
-    var sys = media('(prefers-color-scheme: light)');
-    if (sys.addEventListener) { sys.addEventListener('change', label); }
     btn.addEventListener('click', function () {
       var next = currentTheme() === 'dark' ? 'light' : 'dark';
       root.setAttribute('data-theme', next);
@@ -178,12 +174,10 @@
   // Without JS or with reduced motion every mock keeps its static end state.
   var SCRIPTS = {
     hero: {
-      loop: 21000,
+      loop: 17000,
       steps: [
-        [700, 's-mention'], [1900, 's-typing1'], [3500, 's-reply1'], [4500, 's-pick'],
-        [5000, 's-lightbox'], [6900, 's-lbclose'], [7500, 's-typing2'], [8900, 's-reply2'],
-        [10100, 's-newthread'], [11300, 's-tech'], [12200, 's-progress'], [14400, 's-toastoff'],
-        [14800, 's-done']
+        [900, 's-typing'], [2900, 's-msg'], [3700, 's-mention'], [5400, 's-pick'],
+        [5900, 's-lightbox'], [8100, 's-lbclose'], [9300, 's-done']
       ]
     },
     board: {

@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#121415">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f2ea">
   <script>
     (function () {
       var d = document.documentElement;
       d.classList.add('js');
       try {
         var t = localStorage.getItem('flurfunk-theme');
-        if (t === 'light' || t === 'dark') { d.setAttribute('data-theme', t); }
+        if (t === 'dark') { d.setAttribute('data-theme', 'dark'); }
       } catch (e) {}
     })();
   </script>

@@ -18,12 +18,12 @@ const out = path.join(__dirname, '..', 'docs', 'assets', 'og.png');
 
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, colorScheme: 'dark', reducedMotion: 'reduce' });
+  const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, reducedMotion: 'reduce' });
   await page.goto(base, { waitUntil: 'networkidle' });
-  const app = await page.locator('.app').evaluate((el) => el.outerHTML);
+  const app = await page.locator('.ua').evaluate((el) => el.outerHTML);
   const logo = await page.locator('.brand .logo-mark').evaluate((el) => el.outerHTML);
 
-  await page.setContent(`<!doctype html><html data-theme="dark"><head>
+  await page.setContent(`<!doctype html><html><head>
     <base href="${base}">
     <link rel="stylesheet" href="assets/site.css">
     <link rel="stylesheet" href="assets/home.css">
@@ -31,15 +31,15 @@ const out = path.join(__dirname, '..', 'docs', 'assets', 'og.png');
       html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
       body {
         position: relative;
-        background: radial-gradient(40rem 26rem at 85% 70%, rgb(255 201 60 / 9%), transparent 70%), #121415;
+        background: radial-gradient(40rem 26rem at 85% 70%, rgb(255 201 60 / 28%), transparent 70%), #f7f2ea;
       }
       .og-text { position: absolute; left: 72px; top: 92px; width: 430px; }
       .og-text .logo-mark { width: 64px; height: 64px; }
       .og-text .logo-word { font-size: 46px; }
-      .og-text p { margin: 34px 0 0; font-family: var(--font-serif); font-size: 34px; line-height: 1.25; color: #f3f0ea; }
-      .og-text small { display: block; margin-top: 28px; color: #a7adab; font: 600 17px/1.4 var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; }
-      .og-app { position: absolute; left: 560px; top: 120px; }
-      .og-app .app { font-size: 12.5px; margin: 0; }
+      .og-text p { margin: 34px 0 0; font-family: var(--font-serif); font-size: 34px; line-height: 1.25; color: #231b12; }
+      .og-text small { display: block; margin-top: 28px; color: #6b5d4c; font: 600 17px/1.4 var(--font-sans); letter-spacing: 0.08em; text-transform: uppercase; }
+      .og-app { position: absolute; left: 540px; top: 96px; }
+      .og-app .ua { font-size: 10.5px; margin: 0; transform: none; }
     </style></head><body>
     <div class="og-text">
       <span class="logo">${logo}<span class="logo-word">Flurfunk</span></span>
