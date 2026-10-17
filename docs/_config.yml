@@ -1,0 +1,76 @@
+# Jekyll configuration for the Flurfunk project website (GitHub Pages).
+# The Markdown files in this folder stay plain and readable on GitHub;
+# this file, _layouts/ and assets/ only add the website around them.
+
+title: Flurfunk
+description: Team conversations inside WordPress. Channels, threads and tasks next to the posts they are about.
+baseurl: "/flurfunk"
+repository: worldoptimizer/flurfunk
+github_url: https://github.com/worldoptimizer/flurfunk
+author: Max Ziebell
+lang: en
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+  syntax_highlighter: rouge
+highlighter: rouge
+
+# All of these are on the GitHub Pages allow list. Listing them keeps a local
+# `jekyll build` close to what GitHub builds.
+plugins:
+  - jekyll-relative-links      # turns links like installation.md into installation.html
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+  - jekyll-default-layout
+  - jekyll-seo-tag
+
+relative_links:
+  enabled: true
+  collections: false
+
+optional_front_matter:
+  remove_originals: true   # do not publish the raw .md files next to the HTML
+
+titles_from_headings:
+  enabled: true
+  strip_title: false
+
+# Top navigation, in order.
+nav:
+  - title: Overview
+    url: /
+  - title: Installation
+    url: /installation.html
+  - title: User guide
+    url: /user-guide.html
+  - title: Developers
+    url: /developers.html
+  - title: Examples
+    url: /examples.html
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  - scope:
+      path: "index.md"
+    values:
+      hero: true
+      pitch: Your team’s conversations, right where the work happens. Channels, threads and tasks inside WordPress, with no outside service.
+      # Set to assets/cover.png once that image exists; the hero only shows it when set.
+      cover:
+      cover_alt: The Flurfunk overview in wp-admin
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - node_modules
+  - "*.sh"
+  - "*.py"
+  - "*.log"
+  - "_drafts"
+  - "_internal"
