@@ -28,6 +28,19 @@ if ( ! $team || ! $team2 || ! $guest ) {
 
 $fails = 0;
 $runs  = 0;
+// Posts the run creates. Other plugins on the site may start threads about them (e.g. their own
+// review workflows); the cleanup removes those too, so a run leaves no tasks behind.
+$test_posts = array();
+add_action(
+	'wp_insert_post',
+	static function ( int $id, $post, bool $update ) use ( &$test_posts ) {
+		if ( ! $update ) {
+			$test_posts[ $id ] = $id; // Only new posts: an update to an existing post is not ours.
+		}
+	},
+	10,
+	3
+);
 $check = function ( string $name, bool $ok, $detail = '' ) use ( &$fails, &$runs ) {
 	++$runs;
 	if ( ! $ok ) {
@@ -1428,6 +1441,9 @@ WP_CLI::log( 'Clean up' );
 global $wpdb;
 $ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported')" ) );
 $ids = array_values( array_unique( array_merge( $ids, array_filter( array_map( 'intval', $extra_threads ?? array() ) ) ) ) );
+if ( $test_posts ) {
+	$ids = array_values( array_unique( array_merge( $ids, array_map( 'intval', $wpdb->get_col( "SELECT id FROM {$wpdb->prefix}flurfunk_threads WHERE target_type = 'post' AND target_id IN (" . implode( ',', array_map( 'intval', $test_posts ) ) . ')' ) ) ) ) );
+}
 if ( $ids ) {
 	$in = implode( ',', $ids );
 	foreach ( array( 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications' ) as $tb ) {
