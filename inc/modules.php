@@ -40,7 +40,7 @@ defined( 'ABSPATH' ) || exit;
 
 const OPTION   = 'flurfunk_modules';
 const SETTINGS = 'flurfunk_module_settings'; // module ID => key => value.
-const TYPES    = array( 'channel', 'checkbox', 'number', 'text', 'select', 'roles' );
+const TYPES    = array( 'channel', 'checkbox', 'number', 'text', 'select', 'roles', 'users' );
 
 const COMMENTS_CHANNEL = 'comments'; // Own channel of the daily moderation thread.
 
@@ -63,8 +63,9 @@ function &registry(): array {
  *                     (callable), settings_url (string, optional link next to the switch),
  *                     capabilities (cap => label, description, roles; the roles get it once the
  *                     module is on, unless the site already decided), settings (fields: key,
- *                     type channel|checkbox|number|text|select|roles, label, description,
- *                     default, options for select, min/max for number).
+ *                     type channel|checkbox|number|text|select|roles|users, label, description,
+ *                     default, options for select, min/max for number, capability for users:
+ *                     only people with it are offered and kept).
  * @return bool Registered.
  */
 function register( string $id, array $args ): bool {
@@ -103,7 +104,7 @@ function fields( array $list ): array {
 		$key  = sanitize_key( (string) ( $f['key'] ?? '' ) );
 		$type = (string) ( $f['type'] ?? 'text' );
 		if ( '' === $key || ! in_array( $type, TYPES, true ) ) {
-			_doing_it_wrong( __FUNCTION__, esc_html__( 'A Flurfunk module setting needs a key and one of the types channel, checkbox, number, text, select or roles.', 'flurfunk' ), '0.2.0' );
+			_doing_it_wrong( __FUNCTION__, esc_html__( 'A Flurfunk module setting needs a key and one of the types channel, checkbox, number, text, select, roles or users.', 'flurfunk' ), '0.2.0' );
 			continue;
 		}
 		$field = array(
@@ -114,11 +115,13 @@ function fields( array $list ): array {
 			'options'     => array_map( 'strval', (array) ( $f['options'] ?? array() ) ),
 			'min'         => isset( $f['min'] ) && is_numeric( $f['min'] ) ? 0 + $f['min'] : null,
 			'max'         => isset( $f['max'] ) && is_numeric( $f['max'] ) ? 0 + $f['max'] : null,
+			'capability'  => (string) ( $f['capability'] ?? '' ),
 		);
 		$defaults         = array(
 			'checkbox' => false,
 			'number'   => 0,
 			'roles'    => array(),
+			'users'    => array(),
 		);
 		$field['default'] = $f['default'] ?? ( $defaults[ $type ] ?? '' );
 		$out[ $key ]      = $field;
@@ -158,9 +161,24 @@ function sanitize_value( array $f, $raw ) {
 		case 'roles':
 			$roles = array_keys( wp_roles()->get_names() );
 			return array_values( array_intersect( $roles, array_map( 'sanitize_key', array_filter( (array) $raw, 'is_scalar' ) ) ) );
+		case 'users':
+			$ids = array_unique( array_filter( array_map( 'intval', array_filter( (array) $raw, 'is_scalar' ) ) ) );
+			return array_values( array_filter( $ids, static fn ( int $uid ): bool => in_array( $uid, user_choices( $f ), true ) ) );
 		default:
 			return sanitize_text_field( is_scalar( $raw ) ? (string) $raw : '' );
 	}
+}
+
+/**
+ * The people a "users" field offers: everyone with the field's capability (or with access to
+ * Flurfunk), without assistants.
+ *
+ * @param array $f Field.
+ * @return int[]
+ */
+function user_choices( array $f ): array {
+	$ids = array_map( 'intval', get_users( array_filter( array( 'capability' => $f['capability'] ?? '', 'fields' => 'ID', 'number' => 500 ) ) ) );
+	return array_values( array_filter( $ids, static fn ( int $uid ): bool => ! \Flurfunk\Access\is_bot( $uid ) && ( '' !== ( $f['capability'] ?? '' ) || \Flurfunk\Access\can_use( $uid ) ) ) );
 }
 
 /**
@@ -184,7 +202,7 @@ function setting( string $id, string $key ) {
 
 /**
  * Save a module's settings from input. Keys that are not in $in keep their value, except
- * checkboxes and role lists, which a form leaves out when nothing is ticked: pass $complete.
+ * checkboxes and role or people lists, which a form leaves out when nothing is ticked: pass $complete.
  *
  * @param string $id       Module ID.
  * @param array  $in       Key => raw value.
@@ -200,7 +218,7 @@ function save_settings( string $id, array $in, bool $complete = false ): array {
 			$mine[ $key ] = sanitize_value( $f, $in[ $key ] );
 		} elseif ( $complete && 'checkbox' === $f['type'] ) {
 			$mine[ $key ] = false;
-		} elseif ( $complete && 'roles' === $f['type'] ) {
+		} elseif ( $complete && in_array( $f['type'], array( 'roles', 'users' ), true ) ) {
 			$mine[ $key ] = array();
 		}
 	}
@@ -231,6 +249,13 @@ function render_field( string $id, array $f ): void {
 			echo '<span>' . esc_html( $f['label'] ) . ':</span> <input type="hidden" name="' . esc_attr( $name ) . '[]" value="">';
 			foreach ( wp_roles()->get_names() as $role => $label ) {
 				echo '<label style="margin-right:1em"><input type="checkbox" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( $role ) . '"' . checked( in_array( $role, (array) $value, true ), true, false ) . '> ' . esc_html( translate_user_role( $label ) ) . '</label>';
+			}
+			break;
+		case 'users':
+			echo '<span>' . esc_html( $f['label'] ) . ':</span> <input type="hidden" name="' . esc_attr( $name ) . '[]" value="">';
+			foreach ( user_choices( $f ) as $uid ) {
+				$user = get_userdata( $uid );
+				echo '<label style="margin-right:1em;white-space:nowrap"><input type="checkbox" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( (string) $uid ) . '"' . checked( in_array( $uid, array_map( 'intval', (array) $value ), true ), true, false ) . '> ' . esc_html( $user ? $user->display_name : '#' . $uid ) . '</label> ';
 			}
 			break;
 		case 'select':

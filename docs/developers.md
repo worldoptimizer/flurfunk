@@ -911,12 +911,13 @@ the saved value, or the field's `default` while nothing is saved.
 | Field key | Meaning |
 | --- | --- |
 | `key` | required; lower-case letters, digits, `_` and `-` |
-| `type` | `channel`, `checkbox`, `number`, `text`, `select` or `roles`; a field with another type is left out (with a `_doing_it_wrong` notice) |
+| `type` | `channel`, `checkbox`, `number`, `text`, `select`, `roles` or `users` (0.2.1); a field with another type is left out (with a `_doing_it_wrong` notice) |
 | `label` | text next to the field |
 | `description` | optional line under it |
-| `default` | value until the site saves one (defaults: `false`, `0`, `[]` for roles, else `''`) |
+| `default` | value until the site saves one (defaults: `false`, `0`, `[]` for roles and users, else `''`) |
 | `options` | `select` only: `value => label` |
 | `min`, `max` | `number` only: the value is clamped to them |
+| `capability` | `users` only: only people with this capability are offered and kept. Without it: everyone with access to Flurfunk |
 
 | Type | Field | Stored as | Invalid input becomes |
 | --- | --- | --- | --- |
@@ -926,6 +927,7 @@ the saved value, or the field's `default` while nothing is saved.
 | `select` | select | one of the `options` keys | the default |
 | `channel` | select of all channels (inactive ones marked; the default is listed even if it does not exist yet) | channel slug | the default |
 | `roles` | a checkbox per role | list of role names that exist | unknown roles are dropped |
+| `users` | a checkbox per person (assistants are not offered) | list of user IDs | people without the `capability`, assistants and unknown IDs are dropped |
 
 The `flurfunk_module_setting` filter (`$value`, `$module_id`, `$key`) adjusts what
 `flurfunk_module_setting()` returns. `Flurfunk\Modules\save_settings( $id, $values )` saves from

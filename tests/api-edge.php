@@ -31,6 +31,14 @@ $runs  = 0;
 // Posts the run creates. Other plugins on the site may start threads about them (e.g. their own
 // review workflows); the cleanup removes those too, so a run leaves no tasks behind.
 $test_posts = array();
+// The site's assistant posts a lot in the module tests; a run right after another one would hit its
+// per-minute limit. Start those parts with a fresh count.
+$fresh_rate = static function () {
+	$assistant = (int) get_option( 'flurfunk_bot_default' );
+	if ( $assistant ) {
+		delete_transient( 'flurfunk_rate_' . $assistant . '_' . gmdate( 'YmdHi' ) );
+	}
+};
 add_action(
 	'wp_insert_post',
 	static function ( int $id, $post, bool $update ) use ( &$test_posts ) {
@@ -780,6 +788,7 @@ list( $s, $r ) = $req( 'POST', 'cards/' . $cc . '/refresh', array() );
 $check( 'a deleted comment: the card keeps its last state', 409 === $s, $s );
 
 WP_CLI::log( 'Daily moderation thread module' );
+$fresh_rate();
 require_once FLURFUNK_DIR . 'modules/comments-daily.php';
 Flurfunk\Modules\CommentsDaily\register();
 add_filter( 'flurfunk_comments_channel', $to_test = fn () => 'ff-test' );
@@ -795,6 +804,9 @@ if ( $old_day ) {
 $check( 'nothing waiting: no thread', 0 === Flurfunk\Modules\CommentsDaily\run() && ! Store\thread_by_ref( $day_ref ) );
 $q1 = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Fred', 'comment_author_email' => 'fred@secret.example', 'comment_content' => 'First', 'comment_approved' => 0 ) );
 $daily = Flurfunk\Modules\CommentsDaily\run();
+if ( is_wp_error( $daily ) ) {
+	WP_CLI::log( '  (daily run: ' . $daily->get_error_code() . ' ' . $daily->get_error_message() . ')' );
+}
 $dt    = is_int( $daily ) ? Store\full_thread( $daily, $team ) : null;
 $dcard = $dt['attachments'][0]['snapshot'] ?? array();
 $check( 'waiting comments: one thread by the assistant with a table', $dt && Flurfunk\Access\is_bot( $dt['author'] ) && 'ff-test' === $dt['channel'] && array( 'Fred' ) === array_column( $dcard['table']['rows'] ?? array(), 0 ) && ! str_contains( (string) wp_json_encode( $dcard ), 'secret' ), $dcard );
@@ -820,7 +832,7 @@ $grow   = is_int( $gdaily ) ? Store\thread_row( $gdaily ) : null;
 $nomodu = wp_insert_user( array( 'user_login' => 'ff-test-nomod-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
 ( new WP_User( $nomodu ) )->add_cap( 'flurfunk_team' );
 $check( 'the daily thread lands in #comments, posted by the assistant', $grow && 'comments' === Store\channel( (int) $grow->channel_id )->slug && Flurfunk\Access\is_bot( (int) $grow->author_id ), $gdaily );
-$check( '… readable for people who may moderate comments, not for team members who may not, nor guests', Flurfunk\Access\can_see( $grow, $team ) && Flurfunk\Access\can_see( $grow, $team2 ) && ! Flurfunk\Access\can_see( $grow, $nomodu ) && ! Flurfunk\Access\can_see( $grow, $guest ) );
+$check( '… readable for people who may moderate comments, not for team members who may not, nor guests', $grow && Flurfunk\Access\can_see( $grow, $team ) && Flurfunk\Access\can_see( $grow, $team2 ) && ! Flurfunk\Access\can_see( $grow, $nomodu ) && ! Flurfunk\Access\can_see( $grow, $guest ) );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $nomodu );
 $GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily-gated' ), array( 'id' => $gdaily ) );
@@ -838,6 +850,7 @@ $check( 'the daily run is scheduled', (bool) wp_next_scheduled( 'flurfunk_commen
 wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
 
 WP_CLI::log( 'Review requests module' );
+$fresh_rate();
 require_once FLURFUNK_DIR . 'modules/review.php';
 add_filter( 'flurfunk_review_channel', $to_test = fn () => 'ff-test' );
 $as( $guest );
@@ -858,6 +871,21 @@ wp_update_post( array( 'ID' => $rp, 'post_status' => 'publish' ) );
 $rx = Store\full_thread( (int) $rt->id, $team );
 $rm = array_values( array_filter( $rx['messages'], fn ( $m ) => 'message' === $m['type'] ) );
 $check( 'published: a reply and the task is done', 'done' === $rx['status'] && str_contains( (string) ( end( $rm )['text'] ?? '' ), trim( sprintf( __( '%s published it.', 'flurfunk' ), '' ), ' .' ) ), array( $rx['status'], end( $rm ) ) );
+$as( $guest );
+$rp3 = wp_insert_post( array( 'post_title' => 'ff-test review trash', 'post_status' => 'draft', 'post_author' => $guest ) );
+wp_update_post( array( 'ID' => $rp3, 'post_status' => 'pending' ) );
+$as( $team );
+wp_trash_post( $rp3 );
+$check( 'moved to the trash: the task is done', 'done' === Store\thread_by_ref( 'flurfunk-review:' . $rp3 )->status );
+wp_delete_post( $rp3, true );
+$as( $guest );
+$rp4 = wp_insert_post( array( 'post_title' => 'ff-test review delete', 'post_status' => 'draft', 'post_author' => $guest ) );
+wp_update_post( array( 'ID' => $rp4, 'post_status' => 'pending' ) );
+$as( $team );
+wp_delete_post( $rp4, true );
+$rt4 = Store\thread_by_ref( 'flurfunk-review:' . $rp4 );
+$rt4_texts = $rt4 ? array_column( Store\full_thread( (int) $rt4->id, $team )['messages'], 'text' ) : array();
+$check( 'deleted for good: the task is done and says so', $rt4 && 'done' === $rt4->status && in_array( __( 'The post was deleted.', 'flurfunk' ), $rt4_texts, true ), array( $rt4->status ?? null, $rt4_texts ) );
 remove_filter( 'flurfunk_review_channel', $to_test );
 wp_delete_post( $rp, true );
 // The module settings instead of the filters: channel, and nobody assigned.
@@ -900,6 +928,11 @@ update_option( 'flurfunk_modules', $opt );
 
 WP_CLI::log( 'Module settings' );
 $ms_opt = get_option( 'flurfunk_module_settings', null );
+// People for the "users" field: team has the field's capability, team2 does not, the assistant has it but is left out.
+$ms_bot = wp_insert_user( array( 'user_login' => 'ff-test-msbot-' . wp_generate_password( 4, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
+update_user_meta( $ms_bot, 'flurfunk_bot', 1 );
+( new WP_User( $team ) )->add_cap( 'ff_test_people' );
+( new WP_User( $ms_bot ) )->add_cap( 'ff_test_people' );
 $check(
 	'a module with settings registers; a field with an unknown type is left out',
 	@flurfunk_register_module(
@@ -915,18 +948,20 @@ $check(
 				array( 'key' => 'pick', 'type' => 'select', 'label' => 'P', 'default' => 'a', 'options' => array( 'a' => 'A', 'b' => 'B' ) ),
 				array( 'key' => 'ch', 'type' => 'channel', 'label' => 'C', 'default' => 'general' ),
 				array( 'key' => 'who', 'type' => 'roles', 'label' => 'W', 'default' => array( 'editor' ) ),
+				array( 'key' => 'people', 'type' => 'users', 'label' => 'People', 'capability' => 'ff_test_people' ),
 				array( 'key' => 'bad', 'type' => 'colour', 'label' => 'X' ),
 			),
 		)
-	) && ! isset( Flurfunk\Modules\registry()['ff-test/set']['settings']['bad'] ) && 6 === count( Flurfunk\Modules\registry()['ff-test/set']['settings'] )
+	) && ! isset( Flurfunk\Modules\registry()['ff-test/set']['settings']['bad'] ) && 7 === count( Flurfunk\Modules\registry()['ff-test/set']['settings'] )
 );
 $ms = static fn ( string $k ) => flurfunk_module_setting( 'ff-test/set', $k );
-$check( 'unset settings return their defaults', true === $ms( 'on' ) && 5 === $ms( 'n' ) && 'hallo' === $ms( 'txt' ) && 'a' === $ms( 'pick' ) && 'general' === $ms( 'ch' ) && array( 'editor' ) === $ms( 'who' ), array( $ms( 'on' ), $ms( 'n' ), $ms( 'txt' ), $ms( 'pick' ), $ms( 'ch' ), $ms( 'who' ) ) );
+$check( 'unset settings return their defaults', true === $ms( 'on' ) && 5 === $ms( 'n' ) && 'hallo' === $ms( 'txt' ) && 'a' === $ms( 'pick' ) && 'general' === $ms( 'ch' ) && array( 'editor' ) === $ms( 'who' ) && array() === $ms( 'people' ), array( $ms( 'on' ), $ms( 'n' ), $ms( 'txt' ), $ms( 'pick' ), $ms( 'ch' ), $ms( 'who' ) ) );
 $check( 'an unknown key or module gives null', null === $ms( 'nope' ) && null === flurfunk_module_setting( 'ff-test/none', 'n' ) );
-Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '99', 'txt' => '<b>fett</b> <script>x</script>und', 'pick' => 'zzz', 'ch' => 'no-such-channel', 'who' => array( 'editor', 'no-such-role', 'administrator', array( 'x' ) ) ), true );
+Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '99', 'txt' => '<b>fett</b> <script>x</script>und', 'pick' => 'zzz', 'ch' => 'no-such-channel', 'who' => array( 'editor', 'no-such-role', 'administrator', array( 'x' ) ), 'people' => array( (string) $team, $team2, $ms_bot, 999999999, 'x', array( 1 ) ) ), true );
 $check( 'a whole form: a missing checkbox is off, numbers are clamped, text loses markup', false === $ms( 'on' ) && 10 === $ms( 'n' ) && ! str_contains( $ms( 'txt' ), '<' ) && str_contains( $ms( 'txt' ), 'fett' ), array( $ms( 'on' ), $ms( 'n' ), $ms( 'txt' ) ) );
 $who = $ms( 'who' );
 sort( $who );
+$check( 'people: only those with the field\'s capability, no assistants, no unknown IDs', array( $team ) === $ms( 'people' ), $ms( 'people' ) );
 $check( '… unknown choices, channels and roles fall back or are dropped', 'a' === $ms( 'pick' ) && 'general' === $ms( 'ch' ) && array( 'administrator', 'editor' ) === $who, array( $ms( 'pick' ), $ms( 'ch' ), $who ) );
 Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '0', 'pick' => 'b', 'ch' => 'ff-test', 'on' => '1' ) );
 $check( 'valid values are kept; below min becomes min', 1 === $ms( 'n' ) && 'b' === $ms( 'pick' ) && 'ff-test' === $ms( 'ch' ) && true === $ms( 'on' ), array( $ms( 'n' ), $ms( 'pick' ), $ms( 'ch' ), $ms( 'on' ) ) );
@@ -940,9 +975,15 @@ ob_start();
 Flurfunk\Modules\render_section();
 $ms_html = (string) ob_get_clean();
 $check( 'the fields are shown under the switch, with the saved values', str_contains( $ms_html, 'name="module_settings[ff-test/set][n]" value="5"' ) && str_contains( $ms_html, 'name="module_settings[ff-test/set][pick]"' ) && (bool) preg_match( '/<option value="b" selected/', $ms_html ) && str_contains( $ms_html, 'name="module_settings[ff-test/set][who][]" value="administrator" checked' ), substr( $ms_html, 0, 200 ) );
+$check( 'people are offered with their names, only those with the capability', str_contains( $ms_html, 'name="module_settings[ff-test/set][people][]" value="' . $team . '" checked' ) && ! str_contains( $ms_html, 'name="module_settings[ff-test/set][people][]" value="' . $team2 . '"' ) && ! str_contains( $ms_html, 'name="module_settings[ff-test/set][people][]" value="' . $ms_bot . '"' ) );
+Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '3' ), true );
+$check( 'a whole form without people ticked: nobody', array() === $ms( 'people' ) );
 $check( 'the review module shows its channel and assignment settings', str_contains( $ms_html, 'name="module_settings[flurfunk/review][channel]"' ) && str_contains( $ms_html, 'name="module_settings[flurfunk/review][assign]"' ) );
 $reg = &Flurfunk\Modules\registry();
 unset( $reg['ff-test/set'], $reg['ff-test/demo'] );
+( new WP_User( $team ) )->remove_cap( 'ff_test_people' );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $ms_bot );
 unset( $reg );
 null === $ms_opt ? delete_option( 'flurfunk_module_settings' ) : update_option( 'flurfunk_module_settings', $ms_opt );
 

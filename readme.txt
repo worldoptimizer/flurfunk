@@ -101,6 +101,10 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 
 == Changelog ==
 
+= 0.2.1 =
+* New for developers: module settings of the type `users` (pick people, optionally only those with a capability).
+* Changed: review requests are closed when the post is moved to the trash or deleted.
+
 = 0.2.0 =
 * New: Flurfunk's own capabilities (flurfunk_team, flurfunk_guest, flurfunk_moderate, flurfunk_manage) with a permissions matrix under Settings → Flurfunk → Permissions. Role editor plugins can manage them as well. Sites updating from 0.1 keep who had access: the "team" and "guest" settings are turned into role permissions once.
 * New: moderators (flurfunk_moderate; administrators and editors on a fresh site) edit and delete other people's messages. In 0.1 only administrators could.

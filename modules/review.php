@@ -22,6 +22,7 @@ defined( 'ABSPATH' ) || exit;
 const MODULE = 'flurfunk/review';
 
 add_action( 'transition_post_status', __NAMESPACE__ . '\\transition', 10, 3 );
+add_action( 'before_delete_post', __NAMESPACE__ . '\\deleted', 10, 2 );
 
 /**
  * Thread reference for a post.
@@ -98,6 +99,12 @@ function transition( string $new_status, string $old_status, \WP_Post $post ): v
 		);
 		return;
 	}
+	if ( $found && 'trash' === $new_status && 'done' !== $found->status ) {
+		/* translators: %s: person */
+		flurfunk_reply( $ref, sprintf( __( '%s moved it to the trash.', 'flurfunk' ), $who ) );
+		flurfunk_set_status( $ref, 'done' );
+		return;
+	}
 	if ( ! $found || ( 'pending' !== $old_status && 'publish' !== $new_status ) ) {
 		return;
 	}
@@ -112,4 +119,19 @@ function transition( string $new_status, string $old_status, \WP_Post $post ): v
 		flurfunk_reply( $ref, sprintf( __( '%s moved it back to draft.', 'flurfunk' ), $who ) );
 		flurfunk_set_status( $ref, 'waiting' );
 	}
+}
+
+/**
+ * A post deleted for good (without the trash): its open review task is closed.
+ *
+ * @param int      $post_id Post ID.
+ * @param \WP_Post $post    Post.
+ */
+function deleted( int $post_id, \WP_Post $post ): void {
+	$found = Store\thread_by_ref( ref( $post_id ) );
+	if ( ! $found || 'done' === $found->status || wp_is_post_revision( $post ) ) {
+		return;
+	}
+	flurfunk_reply( ref( $post_id ), __( 'The post was deleted.', 'flurfunk' ) );
+	flurfunk_set_status( ref( $post_id ), 'done' );
 }
