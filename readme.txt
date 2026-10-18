@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ Developers extend Flurfunk with providers (slash commands and cards), targets, f
 By default administrators and editors are "team" and see all channels; authors and contributors are "guests" and only see conversations about their own posts; subscribers don't see Flurfunk. Flurfunk has its own capabilities for this (flurfunk_team, flurfunk_guest, plus flurfunk_moderate to edit other people's messages and flurfunk_manage for the settings), which you assign to roles under Settings → Flurfunk → Permissions. Role editor plugins such as Members or User Role Editor can manage them as well, also for single users. What team and guests see is set per channel.
 
 When updating from 0.1, the "team" and "guest" capabilities chosen in the old settings are turned into these role permissions once, so everyone keeps the access they had.
+
+= What are modules? =
+
+Optional parts of Flurfunk that you switch on or off under Settings → Flurfunk → Modules; a module that is off is not loaded at all. Flurfunk brings three: comment cards (/comment, with buttons to approve a comment, mark it as spam or trash it; on by default), a daily thread listing the comments awaiting moderation, and review requests (a task for the people who may publish a post submitted for review). Other plugins can add their own modules, which then show up in the same list.
+
+= Can cards do something on the site? =
+
+Yes. A card can carry buttons (card actions), for example "Approve" on a comment card. They run with the rights of the person who clicks, ask first where something is hard to undo, and write a line into the thread saying who did what. Which roles see a button is decided by a capability, so it can be set in the permissions matrix.
 
 = Push notifications don't work. Why? =
 
@@ -93,5 +101,21 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 
 == Changelog ==
 
+= 0.2.0 =
+* New: Flurfunk's own capabilities (flurfunk_team, flurfunk_guest, flurfunk_moderate, flurfunk_manage) with a permissions matrix under Settings → Flurfunk → Permissions. Role editor plugins can manage them as well. Sites updating from 0.1 keep who had access: the "team" and "guest" settings are turned into role permissions once.
+* New: moderators (flurfunk_moderate; administrators and editors on a fresh site) edit and delete other people's messages. In 0.1 only administrators could.
+* New: modules, switchable under Settings → Flurfunk → Modules or with `wp flurfunk module`. Core modules: comment cards (/comment with Approve, Spam, Trash), a daily moderation thread and review requests.
+* New: card building blocks (status, fields, checklist, progress, people, table, badges, quote) and card actions: buttons on a card that run on the site, with an inline confirmation, one click at a time per card and safe retries.
+* New for developers: flurfunk_post(), flurfunk_reply(), flurfunk_set_status() and flurfunk_as() to post from PHP; flurfunk_register_module() and flurfunk_register_capability(); the flurfunk_card_action, flurfunk_modules, flurfunk_module_on/off actions and the flurfunk_capabilities and flurfunk_module_enabled filters; window.Flurfunk.cardHelpers.
+* Changed: the settings page needs flurfunk_manage (administrators have it) instead of manage_options. Providers without a `capability` are for the team only; guests need `'capability' => 'flurfunk_guest'`.
+* Changed: creating assistant accounts needs the right to create users.
+* Removed: the MailerPress integration.
+* Fixed: imported cards are cleaned like cards made on the site.
+
 = 0.1.0 =
 * First version.
+
+== Upgrade Notice ==
+
+= 0.2.0 =
+Permissions move to Flurfunk's own capabilities. On the first request after the update, the 0.1 "team" and "guest" settings become role permissions once, so everyone keeps their access. Check Settings → Flurfunk → Permissions afterwards.
