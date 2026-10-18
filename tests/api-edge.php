@@ -167,6 +167,38 @@ $r1 = Flurfunk\Transfer\import( $data );
 $r2 = Flurfunk\Transfer\import( $data );
 $check( 'import adds threads once, a second run skips them', $r1['threads'] > 0 && 0 === $r2['threads'] && $r2['skipped'] >= $r1['threads'], array( $r1, $r2 ) );
 $check( 'import never sends mails', ! array_filter( $mails, fn ( $m ) => false === $m ) );
+$r3 = Flurfunk\Transfer\import(
+	array(
+		'format'   => 'flurfunk/1',
+		'site'     => 'https://evil.example/',
+		'channels' => array(),
+		'people'   => array(),
+		'threads'  => array(
+			array(
+				'id'          => 1,
+				'channel'     => 'ff-test',
+				'title'       => 'Imported card',
+				'body'        => '',
+				'attachments' => array(
+					array(
+						'provider' => 'flurfunk/post',
+						'ref'      => array( 'id' => 1 ),
+						'snapshot' => array( 'title' => '<script>x</script>Card', 'url' => 'javascript:alert(1)', 'status' => array( 'label' => 'S', 'tone' => '"><img>' ), 'evil' => 'x', 'actions' => array( 'nope' ) ),
+					),
+				),
+			),
+		),
+	)
+);
+global $wpdb;
+global $wpdb;
+$imp = Store\thread_by_ref( 'import:' . substr( md5( 'https://evil.example/' ), 0, 8 ) . ':1' );
+$isnap = $imp ? json_decode( (string) $wpdb->get_var( $wpdb->prepare( 'SELECT snapshot FROM %i WHERE thread_id = %d', Flurfunk\Schema\table( 'attachments' ), $imp->id ) ), true ) : null;
+$check( 'imported card snapshots are cleaned like any other', 1 === $r3['threads'] && array( 'title' => 'Card', 'status' => array( 'label' => 'S', 'tone' => 'neutral' ), 'actions' => array() ) === $isnap, $isnap );
+if ( $imp ) {
+	$wpdb->delete( Flurfunk\Schema\table( 'attachments' ), array( 'thread_id' => (int) $imp->id ) );
+	$wpdb->delete( Flurfunk\Schema\table( 'threads' ), array( 'id' => (int) $imp->id ) );
+}
 
 WP_CLI::log( 'Edit and delete' );
 $as( $team );

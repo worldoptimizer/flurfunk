@@ -805,7 +805,8 @@ function save_attachments( object $thread, int $message_id, array $list, int $us
 				continue;
 			}
 		} else {
-			$snapshot = is_array( $a['snapshot'] ?? null ) ? $a['snapshot'] : array();
+			// Imported snapshots are untrusted data too: the same building blocks and limits.
+			$snapshot = \Flurfunk\Providers\clean_snapshot( is_array( $a['snapshot'] ?? null ) ? $a['snapshot'] : array(), $provider );
 		}
 		$wpdb->insert(
 			table( 'attachments' ),
