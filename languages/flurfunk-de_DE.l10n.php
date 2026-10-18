@@ -318,6 +318,7 @@ return array(
 		'Sidebar colour' => 'Farbe der Seitenleiste',
 		'Since' => 'Seit',
 		'Someone' => 'Jemand',
+		'Someone else is working on this card. Please try again in a moment.' => 'Gerade arbeitet jemand anderes mit dieser Karte. Bitte gleich noch einmal versuchen.',
 		'Sorry, you are not allowed to do that.' => 'Das darfst du leider nicht.',
 		'Spam' => 'Spam',
 		'Start' => 'Starten',

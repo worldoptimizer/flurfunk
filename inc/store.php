@@ -882,8 +882,14 @@ function card_action( int $attachment_id, string $action, string $key = '' ) {
 	// One action per card at a time: two people clicking at once run one after the other, and
 	// the second sees the state the first left behind.
 	$lock = 'flurfunk_card_' . $attachment_id;
-	$wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) );
+	// 0 = timed out; NULL (an error, or a database without named locks) carries on unlocked.
+	if ( '0' === (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) ) ) {
+		return new \WP_Error( 'flurfunk_busy', __( 'Someone else is working on this card. Please try again in a moment.', 'flurfunk' ), array( 'status' => 409 ) );
+	}
 	try {
+		if ( $once && get_transient( $once ) ) {
+			return (int) $t->id; // The same click arrived twice at once; the first one ran it.
+		}
 		$snapshot = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT snapshot FROM %i WHERE id = %d', table( 'attachments' ), $attachment_id ) );
 		$card     = json_decode( $snapshot, true ) ?: array();
 		$snap     = \Flurfunk\Providers\run_action( (string) $row->provider, $action, (array) json_decode( $row->ref, true ), $card, $user );
@@ -919,14 +925,14 @@ function card_action( int $attachment_id, string $action, string $key = '' ) {
 			)
 		);
 		$mid = (int) $wpdb->insert_id;
+		if ( $once ) {
+			set_transient( $once, (int) $t->id, 10 * MINUTE_IN_SECONDS );
+		}
 	} finally {
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 	}
 	$wpdb->query( $wpdb->prepare( 'UPDATE %i SET last_activity = %s WHERE id = %d', table( 'threads' ), now(), (int) $t->id ) );
 	bump();
-	if ( $once ) {
-		set_transient( $once, (int) $t->id, 10 * MINUTE_IN_SECONDS );
-	}
 	if ( $mid ) {
 		mark_read( (int) $t->id, $user, $mid );
 		do_action( 'flurfunk_card_action', thread_row( (int) $t->id ), $mid, $action, $user, $snap );
