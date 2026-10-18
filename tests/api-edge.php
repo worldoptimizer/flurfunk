@@ -1126,6 +1126,7 @@ $check( 'settings, modules, export and import need flurfunk_manage, not manage_o
 $as( $u_mgr );
 $no = $died( 'flurfunk_caps' );
 ( new WP_User( $u_mgr ) )->add_cap( 'promote_users' );
+wp_set_current_user( 0 ); // Same user again would keep the old user object without the new capability.
 $as( $u_mgr );
 $yes = $died( 'flurfunk_caps' );
 ( new WP_User( $u_mgr ) )->remove_cap( 'promote_users' );
