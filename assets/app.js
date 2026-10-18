@@ -6,6 +6,7 @@
  * window.Flurfunk.mountRefs( root, { prefix, channel } ) threads embedded next to elements carrying
  *                                                        data-flurfunk-ref (e.g. a checklist)
  * window.Flurfunk.registerCard( providerId, ( snapshot, h ) => html )   custom card look
+ * window.Flurfunk.cardHelpers                            the card building blocks (h)
  */
 ( function () {
 	'use strict';
@@ -207,15 +208,16 @@
 		},
 		// Pill in a tone: neutral | positive | warning | critical | info.
 		status: ( label, tone ) => ( label ? '<span class="ff-card-status is-' + ( TONES.includes( tone ) ? tone : 'neutral' ) + '">' + esc( label ) + '</span>' : '' ),
-		// User IDs → avatars and names (people Flurfunk knows; others are left out).
-		people: ( ids ) => {
-			const known = ( ids || [] ).map( ( id ) => person( +id ) ).filter( ( p ) => '?' !== p.name );
+		// User IDs (people Flurfunk knows; others are left out) or { name, avatar } → avatars and names.
+		people: ( list ) => {
+			const known = ( list || [] ).map( ( x ) => ( x && 'object' === typeof x ? { id: 0, name: String( x.name || '?' ), avatar: x.avatar || '', kind: '' } : person( +x ) ) ).filter( ( p ) => '?' !== p.name );
 			if ( ! known.length ) {
 				return '';
 			}
 			const shown = known.slice( 0, 4 ).map( ( p ) => p.name );
 			const text = known.length > 4 ? t( '%1$s and %2$s more', shown.join( ', ' ), known.length - 4 ) : shown.join( ', ' );
-			return '<p class="ff-card-people"><span class="ff-stack">' + known.slice( 0, 6 ).map( ( p ) => ava( p.id ) ).join( '' ) + '</span><span>' + esc( text ) + '</span></p>';
+			const face = ( p ) => ( p.id ? ava( p.id ) : '<span class="ff-ava" aria-hidden="true">' + esc( initials( p.name ) ) + photo( p ) + '</span>' );
+			return '<p class="ff-card-people"><span class="ff-stack">' + known.slice( 0, 6 ).map( face ).join( '' ) + '</span><span>' + esc( text ) + '</span></p>';
 		},
 		// Columns (may be empty) and rows of plain text; scrolls sideways on narrow screens.
 		table: ( columns, rows ) => ( rows && rows.length ? '<div class="ff-card-table" role="region" tabindex="0" aria-label="' + esc( t( 'Table' ) ) + '"><table>'
@@ -2497,6 +2499,8 @@
 		registerCard: ( id, fn ) => {
 			renderers[ id ] = fn;
 		},
+		// The card building blocks, e.g. for drawing cards outside Flurfunk's own views.
+		cardHelpers,
 		api,
 		t,
 		format: rich,
