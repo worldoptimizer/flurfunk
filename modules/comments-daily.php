@@ -5,8 +5,10 @@
  * screen. Nothing is posted on days without waiting comments; running it again on the same
  * day updates that day's card instead of posting again.
  *
- * Filters: flurfunk_comments_channel (slug, default "general"), flurfunk_comments_hour (0–23,
- * site time, default 9).
+ * The channel is the module's setting (Settings → Flurfunk → Modules), by default its own channel
+ * #comments that only people with moderate_comments see (created when the module is switched on,
+ * or on the first run). Filters: flurfunk_comments_channel (slug; overrides the setting),
+ * flurfunk_comments_hour (0–23, site time, default 9).
  *
  * @package Flurfunk
  */
@@ -19,6 +21,7 @@ use function Flurfunk\Schema\table;
 
 defined( 'ABSPATH' ) || exit;
 
+const MODULE   = 'flurfunk/comments-daily';
 const PROVIDER = 'flurfunk/comment-queue';
 const HOOK     = 'flurfunk_comments_daily';
 
@@ -27,7 +30,7 @@ add_action( HOOK, __NAMESPACE__ . '\\run' );
 add_action(
 	'flurfunk_module_off',
 	static function ( string $id ): void {
-		if ( 'flurfunk/comments-daily' === $id ) {
+		if ( MODULE === $id ) {
 			wp_clear_scheduled_hook( HOOK );
 		}
 	}
@@ -153,9 +156,13 @@ function run() {
 	if ( ! $count ) {
 		return 0;
 	}
+	$channel = channel();
+	if ( \Flurfunk\Modules\COMMENTS_CHANNEL === $channel ) {
+		\Flurfunk\Modules\comments_channel(); // Also when the module was switched on in code.
+	}
 	return flurfunk_post(
 		array(
-			'channel'     => sanitize_key( (string) apply_filters( 'flurfunk_comments_channel', 'general' ) ),
+			'channel'     => $channel,
 			'title'       => __( 'Comments awaiting moderation', 'flurfunk' ),
 			/* translators: %s: number */
 			'body'        => sprintf( _n( '%s comment is waiting for approval.', '%s comments are waiting for approval.', $count, 'flurfunk' ), number_format_i18n( $count ) ),
@@ -168,4 +175,12 @@ function run() {
 			'ref_key'     => $ref,
 		)
 	);
+}
+
+/**
+ * Channel of the daily thread: the module setting, unless the filter says otherwise.
+ */
+function channel(): string {
+	$slug = (string) ( flurfunk_module_setting( MODULE, 'channel' ) ?? \Flurfunk\Modules\COMMENTS_CHANNEL );
+	return sanitize_key( (string) apply_filters( 'flurfunk_comments_channel', $slug ) );
 }

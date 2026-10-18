@@ -5,8 +5,9 @@
  * again reopens that thread; publishing it ticks the task off, moving it back to draft marks
  * it as "question". Works for the post types chosen under Settings → Flurfunk.
  *
- * Filters: flurfunk_review_channel (slug, default "general", per post),
- * flurfunk_review_assignees (user IDs, per post).
+ * Module settings (Settings → Flurfunk → Modules): the channel (default #general) and whether
+ * everyone who may publish the post is assigned (default on). Filters, per post, on top of them:
+ * flurfunk_review_channel (slug), flurfunk_review_assignees (user IDs).
  *
  * @package Flurfunk
  */
@@ -17,6 +18,8 @@ use Flurfunk\Access;
 use Flurfunk\Store;
 
 defined( 'ABSPATH' ) || exit;
+
+const MODULE = 'flurfunk/review';
 
 add_action( 'transition_post_status', __NAMESPACE__ . '\\transition', 10, 3 );
 
@@ -39,7 +42,8 @@ function reviewers( \WP_Post $post ): array {
 	$type = get_post_type_object( $post->post_type );
 	$cap  = $type ? (string) $type->cap->publish_posts : 'publish_posts';
 	$ids  = array();
-	foreach ( get_users( array( 'capability' => $cap, 'fields' => 'ID', 'number' => 100 ) ) as $uid ) {
+	$all  = false !== flurfunk_module_setting( MODULE, 'assign' ); // Unset (not registered): on.
+	foreach ( $all ? get_users( array( 'capability' => $cap, 'fields' => 'ID', 'number' => 100 ) ) : array() as $uid ) {
 		$uid = (int) $uid;
 		if ( $uid !== (int) $post->post_author && ! Access\is_bot( $uid ) && Access\can_use( $uid ) && user_can( $uid, 'edit_post', $post->ID ) ) {
 			$ids[] = $uid;
@@ -72,7 +76,7 @@ function transition( string $new_status, string $old_status, \WP_Post $post ): v
 		$author = get_userdata( (int) $post->post_author );
 		flurfunk_post(
 			array(
-				'channel'     => sanitize_key( (string) apply_filters( 'flurfunk_review_channel', 'general', $post ) ),
+				'channel'     => sanitize_key( (string) apply_filters( 'flurfunk_review_channel', (string) ( flurfunk_module_setting( MODULE, 'channel' ) ?? 'general' ), $post ) ),
 				/* translators: %s: post title */
 				'title'       => sprintf( __( 'Review: %s', 'flurfunk' ), html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ) ?: __( '(no title)', 'flurfunk' ) ),
 				/* translators: %s: person */

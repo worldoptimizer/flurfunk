@@ -42,6 +42,8 @@ const OPTION   = 'flurfunk_modules';
 const SETTINGS = 'flurfunk_module_settings'; // module ID => key => value.
 const TYPES    = array( 'channel', 'checkbox', 'number', 'text', 'select', 'roles' );
 
+const COMMENTS_CHANNEL = 'comments'; // Own channel of the daily moderation thread.
+
 /**
  * All registered modules.
  *
@@ -375,10 +377,18 @@ add_action(
 			'flurfunk/comments-daily',
 			array(
 				'label'       => __( 'Daily moderation thread', 'flurfunk' ),
-				'description' => __( 'Once a day, if comments are waiting for approval, a thread in #general lists them.', 'flurfunk' ),
+				'description' => __( 'Once a day, if comments are waiting for approval, a thread lists them. By default in its own channel #comments, which only people who may moderate comments see.', 'flurfunk' ),
 				'group'       => __( 'Core', 'flurfunk' ),
 				'default'     => false,
 				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/comments-daily.php',
+				'settings'    => array(
+					array(
+						'key'     => 'channel',
+						'type'    => 'channel',
+						'label'   => __( 'Channel', 'flurfunk' ),
+						'default' => COMMENTS_CHANNEL,
+					),
+				),
 			)
 		);
 		register(
@@ -389,11 +399,53 @@ add_action(
 				'group'       => __( 'Core', 'flurfunk' ),
 				'default'     => false,
 				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/review.php',
+				'settings'    => array(
+					array(
+						'key'     => 'channel',
+						'type'    => 'channel',
+						'label'   => __( 'Channel', 'flurfunk' ),
+						'default' => 'general',
+					),
+					array(
+						'key'     => 'assign',
+						'type'    => 'checkbox',
+						'label'   => __( 'Assign everyone who may publish', 'flurfunk' ),
+						'default' => true,
+					),
+				),
 			)
 		);
 	},
 	5
 );
+
+// The daily moderation thread brings its own channel, created when the module is switched on.
+add_action(
+	'flurfunk_module_on',
+	static function ( string $id ): void {
+		if ( 'flurfunk/comments-daily' === $id ) {
+			comments_channel();
+		}
+	}
+);
+
+/**
+ * The channel #comments of the daily moderation thread: only for people who may moderate
+ * comments. Created once; afterwards the site decides (name, levels, capability).
+ *
+ * @return int Channel ID.
+ */
+function comments_channel(): int {
+	return \Flurfunk\Store\ensure_channel(
+		COMMENTS_CHANNEL,
+		array(
+			'name'          => __( 'Comments', 'flurfunk' ),
+			'topic'         => __( 'Comments awaiting moderation', 'flurfunk' ),
+			'access_guests' => 'none',
+			'capability'    => 'moderate_comments',
+		)
+	);
+}
 
 // Registration, then loading what is switched on.
 add_action(
