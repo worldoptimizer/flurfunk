@@ -506,9 +506,9 @@ function register_builtin(): void {
 	register(
 		'flurfunk/post',
 		array(
-			'command'  => _x( 'post', 'slash command', 'flurfunk' ),
-			'label'    => __( 'Post', 'flurfunk' ),
-			'hint'     => __( 'Insert a post as a card', 'flurfunk' ),
+			'command'    => _x( 'post', 'slash command', 'flurfunk' ),
+			'label'      => __( 'Post', 'flurfunk' ),
+			'hint'       => __( 'Insert a post as a card', 'flurfunk' ),
 			'search'     => __NAMESPACE__ . '\\search_posts',
 			'snapshot'   => __NAMESPACE__ . '\\post_snapshot',
 			'capability' => \Flurfunk\Caps\GUEST, // Guests get their own posts.
