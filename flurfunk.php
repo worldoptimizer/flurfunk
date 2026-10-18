@@ -30,7 +30,7 @@
  *   inc/data.php       export/import in the settings, welcome after the first activation
  *   inc/cli.php        wp flurfunk …
  *   inc/modules.php    module register: optional parts, switchable under Settings → Flurfunk
- *   integrations/      optional cards for other plugins (MailerPress), loaded as modules
+ *   modules/           Flurfunk's own modules: comment cards, daily moderation thread, review requests
  *
  * Everything site-specific lives outside this plugin and plugs in through the hooks and
  * functions documented in README.md.
@@ -62,7 +62,7 @@ require_once FLURFUNK_DIR . 'inc/standalone.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
 require_once FLURFUNK_DIR . 'inc/data.php';
 
-require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. integrations/ (switchable).
+require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once FLURFUNK_DIR . 'inc/cli.php';
@@ -76,7 +76,7 @@ register_activation_hook( __FILE__, static fn () => delete_option( 'flurfunk_rew
 register_deactivation_hook(
 	__FILE__,
 	static function (): void {
-		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind' ) as $hook ) {
+		foreach ( array( 'flurfunk_cleanup_files', 'flurfunk_due', 'flurfunk_digest', 'flurfunk_remind', 'flurfunk_comments_daily' ) as $hook ) {
 			wp_clear_scheduled_hook( $hook );
 		}
 		// WordPress rebuilds the rules on the next request, without the /flurfunk/ address.

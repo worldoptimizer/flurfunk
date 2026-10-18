@@ -145,12 +145,17 @@ renderers (`Flurfunk.registerCard`), embeds (`Flurfunk.mountRefs`, `mountChannel
 `mountTarget`) and filters and actions for access, notifications, mail and push. All of it is in
 the [developer guide](docs/developers.md).
 
-## Integrations
+## Modules
 
-Optional cards for other plugins live in `integrations/` and load only when that plugin is active:
+Optional parts that only build on WordPress itself live in `modules/` and are switched on or off
+under *Settings → Flurfunk → Modules* (or `wp flurfunk module on|off <id>`):
 
-- **MailerPress**: `/newsletter` inserts a campaign with status, lists and subscribed recipients,
-  numbers after sending, and a link into the editor (team only).
+- **Comment cards** (`flurfunk/comments`, on): `/comment` inserts a comment with its state and
+  buttons to approve it, mark it as spam or move it to the trash (people who may moderate).
+- **Daily moderation thread** (`flurfunk/comments-daily`, off): once a day, if comments are
+  waiting, a thread in #general lists them.
+- **Review requests** (`flurfunk/review`, off): a post submitted for review becomes a task for the
+  people who may publish it; publishing ticks it off, back to draft marks it as a question.
 
 ## Tests and development
 

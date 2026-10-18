@@ -17,7 +17,8 @@ Flurfunk brings the conversations of an editorial team into wp-admin, next to th
 * Channels and threads, every thread can be a task with a tick box.
 * Threads can hang on a post (or anything a plugin registers) and show up in the editor's "Conversations" panel and in the posts list.
 * @mentions, simple formatting, files with previews and players.
-* Slash commands insert cards from other plugins: posts, statistics, newsletters …
+* Slash commands insert cards: posts, comments with buttons to approve them, and whatever other plugins add. Cards are built from ready blocks (facts, checklists, progress, status, people, tables) and can carry buttons that act on the site.
+* Optional modules: a daily thread for comments awaiting moderation, and a review task when a post is submitted for review.
 * Guests (e.g. guest authors) see only what concerns their own posts.
 * Files stay out of the media library until someone adds them – without copying or moving.
 * Tasks with due dates and responsible people, "My tasks", a board, reminders.

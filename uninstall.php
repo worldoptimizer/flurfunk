@@ -14,6 +14,7 @@ wp_clear_scheduled_hook( 'flurfunk_cleanup_files' );
 wp_clear_scheduled_hook( 'flurfunk_due' );
 wp_clear_scheduled_hook( 'flurfunk_digest' );
 wp_clear_scheduled_hook( 'flurfunk_remind' );
+wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
 delete_option( 'flurfunk_rewrite' );
 delete_option( 'flurfunk_welcome' );
 delete_option( 'flurfunk_modules' );

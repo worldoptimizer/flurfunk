@@ -2,8 +2,9 @@
 /**
  * Modules: optional parts of Flurfunk that a site switches on or off under Settings → Flurfunk.
  *
- * Flurfunk's own integrations (e.g. MailerPress) are modules, and any other plugin can add its
- * own the same way, so everything optional shows up in one place:
+ * Flurfunk's own optional parts (modules/: comment cards, the daily moderation thread, review
+ * requests) are modules, and any other plugin can add its own the same way, so everything
+ * optional shows up in one place:
  *
  *   add_action( 'flurfunk_modules', function () {
  *       flurfunk_register_module( 'acme/review', array(
@@ -144,18 +145,37 @@ function listing(): array {
 	return $out;
 }
 
-// Flurfunk's own integrations.
+// Flurfunk's own modules. They only build on WordPress itself.
 add_action(
 	'flurfunk_modules',
 	static function (): void {
 		register(
-			'flurfunk/mailerpress',
+			'flurfunk/comments',
 			array(
-				'label'       => __( 'MailerPress newsletter cards', 'flurfunk' ),
-				'description' => __( '/newsletter inserts a campaign as a card: status, lists, numbers after sending.', 'flurfunk' ),
-				'group'       => __( 'Integrations', 'flurfunk' ),
-				'requires'    => array( 'MAILERPRESS_VERSION' ),
-				'load'        => static fn () => require_once FLURFUNK_DIR . 'integrations/mailerpress.php',
+				'label'       => __( 'Comment cards', 'flurfunk' ),
+				'description' => __( '/comment inserts a comment as a card, with buttons to approve it, mark it as spam or move it to the trash. For people who may moderate comments.', 'flurfunk' ),
+				'group'       => __( 'Core', 'flurfunk' ),
+				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/comments.php',
+			)
+		);
+		register(
+			'flurfunk/comments-daily',
+			array(
+				'label'       => __( 'Daily moderation thread', 'flurfunk' ),
+				'description' => __( 'Once a day, if comments are waiting for approval, a thread in #general lists them.', 'flurfunk' ),
+				'group'       => __( 'Core', 'flurfunk' ),
+				'default'     => false,
+				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/comments-daily.php',
+			)
+		);
+		register(
+			'flurfunk/review',
+			array(
+				'label'       => __( 'Review requests', 'flurfunk' ),
+				'description' => __( 'A post submitted for review becomes a task for the people who may publish it; publishing it ticks the task off.', 'flurfunk' ),
+				'group'       => __( 'Core', 'flurfunk' ),
+				'default'     => false,
+				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/review.php',
 			)
 		);
 	},

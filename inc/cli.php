@@ -92,7 +92,7 @@ class Command {
 	 * ## EXAMPLES
 	 *
 	 *     wp flurfunk module
-	 *     wp flurfunk module off flurfunk/mailerpress
+	 *     wp flurfunk module on flurfunk/review
 	 *
 	 * @param array $args Arguments.
 	 */
