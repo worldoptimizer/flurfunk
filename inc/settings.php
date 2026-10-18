@@ -224,7 +224,7 @@ add_action(
 			}
 			Store\ensure_channel( $slug, $new );
 		}
-		wp_safe_redirect( add_query_arg( 'updated', '1', admin_url( 'options-general.php?page=' . PAGE ) ) );
+		wp_safe_redirect( add_query_arg( 'flurfunk-saved', '1', admin_url( 'options-general.php?page=' . PAGE ) ) );
 		exit;
 	}
 );
@@ -266,7 +266,7 @@ function render(): void {
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Flurfunk', 'flurfunk' ); ?></h1>
-		<?php if ( isset( $_GET['updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+		<?php if ( isset( $_GET['flurfunk-saved'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- own parameter: WordPress shows its own notice for "updated". ?>
 			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'flurfunk' ); ?></p></div>
 		<?php endif; ?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
