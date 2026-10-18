@@ -149,6 +149,8 @@ the comment"), and the people following the thread are notified as for a reply. 
 buttons you are allowed to use; if someone else was faster, the card says so and shows the
 current state.
 
+![A comment card: the comment waits for approval, with buttons to approve it, mark it as spam or move it to the trash](assets/screenshot-comment-card.png)
+
 ### Optional modules
 
 Your administrator can switch on more under *Settings → Flurfunk → Modules*:

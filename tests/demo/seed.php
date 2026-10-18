@@ -63,7 +63,7 @@ function flurfunk_demo_gate(): void {
 	if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || ! wp_verify_nonce( (string) ( $_POST['_wpnonce'] ?? '' ), 'flurfunk_demo' ) ) {
 		header( 'Content-Type: text/html; charset=utf-8' );
 		echo '<!doctype html><meta charset="utf-8"><title>Flurfunk demo content</title><body style="font:16px/1.5 system-ui;max-width:36em;margin:3em auto">'
-			. '<h1>Flurfunk demo content</h1><p>Creates the fictional Northline Magazine team: five people and an assistant, channels, four posts and about a dozen conversations. Only for test and demo sites.</p>'
+			. '<h1>Flurfunk demo content</h1><p>Creates the fictional Northline Magazine team: five people and an assistant, channels, four posts, reader comments and about a dozen conversations. Only for test and demo sites.</p>'
 			. '<form method="post">' . wp_nonce_field( 'flurfunk_demo', '_wpnonce', true, false )
 			. '<p><label><input type="checkbox" name="reset-passwords" value="1"> New passwords for existing demo accounts</label></p>'
 			. '<p><button type="submit" id="flurfunk-demo-run">Create demo content</button></p></form>';
@@ -247,6 +247,50 @@ $flurfunk_demo_reset = in_array( 'reset-passwords', (array) ( $args ?? array() )
 		}
 	}
 
+	/* Reader comments on the published post, one still waiting for approval -- */
+
+	$c = array();
+	foreach (
+		array(
+			'clara' => array( 'Clara Jansen', 'We did walk number four last Sunday. The fog lifted just as we reached the top – thank you for the tip!', 1, 110, '' ),
+			'ben'   => array( 'Ben Achterberg', 'Is the old tow path fine with a pram?', 1, 70, '' ),
+			'mia'   => array( 'mia', 'Yes, the first two kilometres from the lock are paved, after that it gets bumpy.', 1, 66, 'ben' ),
+			'oskar' => array( 'Oskar Lind', 'Careful with walk seven: the path between the mill and the bridge has been closed since the September storm. Maybe add a note?', 0, 5, '' ),
+		) as $key => [ $who, $text, $approved, $hours, $parent ]
+	) {
+		$found = get_comments(
+			array(
+				'post_id'    => $p['walks'],
+				'meta_key'   => '_flurfunk_demo', // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value' => $key, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'status'     => 'all',
+				'fields'     => 'ids',
+				'number'     => 1,
+			)
+		);
+		if ( $found ) {
+			$c[ $key ] = (int) $found[0];
+			continue;
+		}
+		$user = isset( $u[ $who ] ) ? get_userdata( $u[ $who ] ) : null;
+		$when = wp_date( 'Y-m-d H:i:s', (int) ( $now - $hours * HOUR_IN_SECONDS ) );
+		$id   = wp_insert_comment(
+			array(
+				'comment_post_ID'      => $p['walks'],
+				'comment_author'       => $user ? $user->display_name : $who,
+				'comment_author_email' => $user ? $user->user_email : strtolower( strtok( $who, ' ' ) ) . '@example.com',
+				'comment_content'      => $text,
+				'comment_approved'     => $approved,
+				'comment_parent'       => $parent ? (int) ( $c[ $parent ] ?? 0 ) : 0,
+				'user_id'              => $user ? $user->ID : 0,
+				'comment_date'         => $when,
+				'comment_date_gmt'     => get_gmt_from_date( $when ),
+				'comment_meta'         => array( '_flurfunk_demo' => $key ),
+			)
+		);
+		$c[ $key ] = (int) $id;
+	}
+
 	/* Conversations -------------------------------------------------------- */
 
 	$top   = static fn (): array => array(
@@ -428,6 +472,14 @@ $flurfunk_demo_reset = in_array( 'reset-passwords', (array) ( $args ?? array() )
 			'body'    => "Topics for the November newsletter:\n1. Autumn issue: cover story\n2. A teaser for the lighthouse interview\n3. Ten walks for a foggy weekend (our most-read story in October)\n\n" . $m( 'ana' ) . ' could you approve them by ' . $nice( 5 ) . '?',
 			'task'    => array( 'due' => 5, 'assignees' => array( 'ana' ) ),
 		),
+		'reader-tip'        => array(
+			'channel' => 'editorial',
+			'by'      => 'jonas',
+			'at'      => 2.5,
+			'title'   => 'Reader tip about walk seven',
+			'body'    => 'A reader says walk seven has been closed since the storm. ' . $m( 'ana' ) . ' shall we add a note to the article before we approve the comment?',
+			'comments' => array( 'oskar' ),
+		),
 		'cover-draft'       => array(
 			'channel' => 'editorial',
 			'by'      => 'ana',
@@ -468,6 +520,11 @@ $flurfunk_demo_reset = in_array( 'reset-passwords', (array) ( $args ?? array() )
 		}
 		if ( ! empty( $t['cards'] ) ) {
 			$args['attachments'] = array_map( static fn ( $k ) => array( 'provider' => 'flurfunk/post', 'ref' => array( 'id' => $p[ $k ] ) ), $t['cards'] );
+		}
+		foreach ( $t['comments'] ?? array() as $k ) {
+			if ( ! empty( $c[ $k ] ) ) {
+				$args['attachments'][] = array( 'provider' => 'flurfunk/comment', 'ref' => array( 'id' => $c[ $k ] ) );
+			}
 		}
 		$id = $at(
 			$t['by'],
@@ -535,9 +592,9 @@ $flurfunk_demo_reset = in_array( 'reset-passwords', (array) ( $args ?? array() )
 			$wpdb->update( table( 'threads' ), array( 'last_activity' => max( (string) $row->created, $last ) ), array( 'id' => $id ) );
 		}
 
-		// Ana was last here three hours ago; three conversations still wait for her.
+		// Ana was last here three hours ago; four conversations still wait for her.
 		$seen   = gmdate( 'Y-m-d H:i:s', $now - 3 * HOUR_IN_SECONDS );
-		$unread = array_filter( array( $ids['newsletter-topics'] ?? 0, $ids['interview-length'] ?? 0, $ids['team-lunch'] ?? 0 ) );
+		$unread = array_filter( array( $ids['newsletter-topics'] ?? 0, $ids['interview-length'] ?? 0, $ids['team-lunch'] ?? 0, $ids['reader-tip'] ?? 0 ) );
 		foreach ( $ids as $key => $id ) {
 			if ( in_array( $id, $unread, true ) ) {
 				continue;

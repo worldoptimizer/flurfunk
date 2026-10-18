@@ -1294,10 +1294,12 @@ anything else (renames, data rewrites) goes into `upgrade()` as a step.
 
 `tests/demo/seed.php` fills a test site with a small fictional editorial team, "Northline
 Magazine": five people (editors as team, two authors as guests) and an assistant, the channels
-#general, #editorial, #photo, #tech and #authors, four posts, and about a dozen conversations
-over the last days, with mentions, tasks in every state and with due dates (one overdue, one due
-today), an image gallery, a transcript file, `/post` cards and notifications for Ana Klein, the
-editor-in-chief. The screenshots in these docs were taken with it.
+#general, #editorial, #photo, #tech and #authors, four posts with a few reader comments (one
+waiting for approval), and about a dozen conversations over the last days, with mentions, tasks in
+every state and with due dates (one overdue, one due today), an image gallery, a transcript file,
+`/post` and `/comment` cards and notifications for Ana Klein, the editor-in-chief. Roles decide
+who is team and who is guest (editors and authors with Flurfunk's default permissions); the
+colours stay at Flurfunk's defaults. The screenshots in these docs were taken with it.
 
 ```bash
 wp eval-file wp-content/plugins/flurfunk/tests/demo/seed.php        # add reset-passwords for new ones
@@ -1307,7 +1309,7 @@ cp wp-content/plugins/flurfunk/tests/demo/demo-avatars.php wp-content/mu-plugins
 Without WP-CLI, open the file's address in the browser while logged in as an administrator
 (inside the plugin, or copied into the WordPress root) and confirm; or define
 `FLURFUNK_DEMO_SECRET` (16+ characters) in `wp-config.php` and add `?secret=…` once. Running it
-again adds nothing twice (people by login, posts by a meta key, threads by `ref_key`
+again adds nothing twice (people by login, posts and comments by a meta key, threads by `ref_key`
 `northline-demo:…`). New accounts get random passwords, printed once. Times are relative to the
 moment it runs. Only for test and demo sites: it sets the Flurfunk name (if none is set), changes the five
 channels' access and creates users with `@northline.example` addresses. The folder is not part of

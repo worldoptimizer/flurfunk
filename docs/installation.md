@@ -139,6 +139,8 @@ has it or from their own role, so you cannot lock yourself out. Modules and othe
 capabilities of their own (for example "Send newsletters"); they appear in the same table, with the
 roles they recommend already ticked when they were switched on.
 
+![The Permissions matrix and the Modules section under Settings → Flurfunk](assets/screenshot-permissions.png)
+
 **Role editor plugins.** Because these are normal WordPress capabilities, plugins such as
 [Members](https://wordpress.org/plugins/members/) or
 [User Role Editor](https://wordpress.org/plugins/user-role-editor/) show and change them too, also
