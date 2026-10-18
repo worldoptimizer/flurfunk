@@ -490,7 +490,18 @@ function send_digests( bool $force = false ): int {
 		}
 		update_user_meta( $uid, 'flurfunk_digest_day', wp_date( 'Y-m-d' ) );
 		$since = (string) get_user_meta( $uid, 'flurfunk_digest_last', true ) ?: gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
-		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT n.*, t.title, t.body, t.channel_id FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s ORDER BY n.id', table( 'notifications' ), table( 'threads' ), $uid, $since ) );
+		// Only threads they can still read (a channel may have gained a capability since).
+		$where = Access\where( $uid );
+		$rows  = $wpdb->get_results( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+			$wpdb->prepare(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
+				"SELECT n.*, t.title, t.body, t.channel_id FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s AND {$where} ORDER BY n.id",
+				table( 'notifications' ),
+				table( 'threads' ),
+				$uid,
+				$since
+			)
+		);
 		update_user_meta( $uid, 'flurfunk_digest_last', Store\now() );
 		if ( ! $rows ) {
 			continue;
@@ -603,7 +614,17 @@ function mark_read( int $user_id, ?array $ids = null, int $thread_id = 0 ): void
  */
 function unread( int $user_id ): int {
 	global $wpdb;
-	return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE user_id = %d AND read_at IS NULL', table( 'notifications' ), $user_id ) );
+	// Like the list: only notifications about threads they can (still) read.
+	$where = Access\where( $user_id );
+	return (int) $wpdb->get_var( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
+			"SELECT COUNT(*) FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND {$where}",
+			table( 'notifications' ),
+			table( 'threads' ),
+			$user_id
+		)
+	);
 }
 
 /**

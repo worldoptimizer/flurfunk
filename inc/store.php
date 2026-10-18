@@ -129,7 +129,8 @@ function channel_by_slug( string $slug ): ?object {
  * Create a channel or change its details.
  *
  * @param string $slug Short name.
- * @param array  $args name, topic, access_team, access_guests, position, archived.
+ * @param array  $args name, topic, access_team, access_guests, position, archived, capability
+ *                     (required on top of the levels, '' = none).
  * @param bool   $update Overwrite an existing channel with the details.
  * @return int ID.
  */
@@ -152,6 +153,9 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
 		if ( isset( $args[ $k ] ) ) {
 			$data[ $k ] = (int) $args[ $k ];
 		}
+	}
+	if ( isset( $args['capability'] ) ) {
+		$data['capability'] = substr( sanitize_key( (string) $args['capability'] ), 0, 64 );
 	}
 	if ( $row ) {
 		if ( $update && $data ) {
@@ -183,13 +187,14 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
  */
 function format_channel( object $c ): array {
 	return array(
-		'id'     => $c->slug,
-		'name'   => $c->name,
-		'topic'  => $c->topic,
-		'access' => array(
+		'id'         => $c->slug,
+		'name'       => $c->name,
+		'topic'      => $c->topic,
+		'access'     => array(
 			'team'   => $c->access_team,
 			'guests' => $c->access_guests,
 		),
+		'capability' => (string) ( $c->capability ?? '' ),
 	);
 }
 
@@ -1330,7 +1335,7 @@ function read_state( array $thread_ids, int $user_id ): array {
  */
 function audience( object $t ): array {
 	$channel = channel( (int) $t->channel_id );
-	if ( ! $channel || 'none' === $channel->access_guests || 'post' !== $t->target_type ) {
+	if ( ! $channel || 'none' === $channel->access_guests || 'post' !== $t->target_type || \Flurfunk\Caps\TEAM === Access\required_cap( $channel ) ) {
 		return array();
 	}
 	if ( 'all' === $channel->access_guests ) {
@@ -1340,7 +1345,7 @@ function audience( object $t ): array {
 	$post  = get_post( (int) $t->target_id );
 	$ids   = $post ? (array) apply_filters( 'flurfunk_post_owners', array( (int) $post->post_author ), $post ) : array();
 	foreach ( $ids as $uid ) {
-		if ( 'guest' === Access\kind( (int) $uid ) ) {
+		if ( 'guest' === Access\kind( (int) $uid ) && Access\can_see( $t, (int) $uid ) ) {
 			$names[] = person( (int) $uid )['name'];
 		}
 	}

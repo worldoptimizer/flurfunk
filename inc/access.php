@@ -8,6 +8,14 @@
  *   own-posts  only threads attached to one of their own posts
  *   none       nothing
  *
+ * A channel can also require a capability (its `capability`, '' = none): whoever lacks it gets
+ * 'none' there, whatever their level – so the channel, its threads, counts, notifications, search
+ * results and mention suggestions are gone for them, and they cannot start threads in it. All of
+ * that goes through level(), so nothing else needs to know. Assistants pass if the capability is
+ * flurfunk_team or flurfunk_guest, if their account has it, or if flurfunk_bot_can says so (default:
+ * no). Code that posts through flurfunk_as() / flurfunk_post() as an assistant always passes: that
+ * is the site's own PHP acting, not an agent reading.
+ *
  * Adjust with the filters flurfunk_user_kind and flurfunk_owned_post_ids (e.g. to count
  * co-authors from another plugin). The capabilities themselves live in inc/caps.php.
  *
@@ -117,15 +125,92 @@ function can_moderate( int $user_id = 0 ): bool {
  */
 function level( object $channel, int $user_id ): string {
 	static $cache = array();
-	$key = $channel->id . ':' . $user_id;
+	// The channel's settings are part of the key, so a change within the request counts at once.
+	$key = implode( ':', array( $channel->id, $user_id, $channel->access_team, $channel->access_guests, (int) $channel->archived, required_cap( $channel ), (int) acting( $user_id ) ) );
 	if ( isset( $cache[ $key ] ) ) {
 		return $cache[ $key ];
 	}
 	$kind  = kind( $user_id );
 	$level = '' === $kind || ! empty( $channel->archived ) ? 'none' : ( 'team' === $kind ? (string) $channel->access_team : (string) $channel->access_guests );
-	// E.g. a private channel for a few people: return 'none' for everyone else.
+	if ( 'none' !== $level && ! passes( $channel, $user_id ) ) {
+		$level = 'none';
+	}
+	// Runs after the capability check, so it has the last word. E.g. a private channel for a few
+	// people: return 'none' for everyone else.
 	$level = (string) apply_filters( 'flurfunk_channel_level', $level, $channel, $user_id, $kind );
 	return $cache[ $key ] = in_array( $level, LEVELS, true ) ? $level : 'none';
+}
+
+/**
+ * The capability a channel requires on top of its levels ('' = none).
+ *
+ * @param object $channel Channel row.
+ */
+function required_cap( object $channel ): string {
+	return sanitize_key( (string) ( $channel->capability ?? '' ) );
+}
+
+/**
+ * Does the person have what the channel requires? flurfunk_team and flurfunk_guest are counted
+ * the Flurfunk way (Caps\user_has(): assistants are team). For any other capability an assistant
+ * passes only if its account has it, while PHP code acts as it (flurfunk_as()), or if the filter
+ * flurfunk_bot_can allows it – by default it does not, so an agent with an application password
+ * cannot read a gated channel just because it is an assistant.
+ *
+ * @param object $channel Channel row.
+ * @param int    $user_id User.
+ */
+function passes( object $channel, int $user_id ): bool {
+	$cap = required_cap( $channel );
+	if ( '' === $cap ) {
+		return true;
+	}
+	if ( \Flurfunk\Caps\TEAM === $cap || \Flurfunk\Caps\GUEST === $cap ) {
+		return \Flurfunk\Caps\user_has( $user_id, $cap );
+	}
+	if ( user_can( $user_id, $cap ) ) {
+		return true;
+	}
+	if ( ! is_bot( $user_id ) ) {
+		return false;
+	}
+	return acting( $user_id ) || (bool) apply_filters( 'flurfunk_bot_can', false, $cap, $channel, $user_id );
+}
+
+/**
+ * Assistants that PHP code is acting as right now (flurfunk_as()), innermost last.
+ *
+ * @return int[]
+ */
+function &acting_stack(): array {
+	static $ids = array();
+	return $ids;
+}
+
+/**
+ * Is PHP code acting as this assistant right now (flurfunk_as(), flurfunk_post(), …)?
+ *
+ * @param int $user_id User.
+ */
+function acting( int $user_id ): bool {
+	return in_array( $user_id, acting_stack(), true );
+}
+
+/**
+ * Run code as an assistant from PHP: it passes channel capabilities while $fn runs.
+ *
+ * @param int      $user_id Assistant.
+ * @param callable $fn      Work.
+ * @return mixed What $fn returns.
+ */
+function as_server( int $user_id, callable $fn ) {
+	$stack   = &acting_stack();
+	$stack[] = $user_id;
+	try {
+		return $fn();
+	} finally {
+		array_pop( $stack );
+	}
 }
 
 /**

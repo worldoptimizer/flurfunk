@@ -110,6 +110,64 @@ function post_types(): array {
 	return $out;
 }
 
+/**
+ * Capabilities a channel can require, grouped: Flurfunk's registry (its own and declared ones)
+ * and a few common WordPress ones. A capability set in code that is not listed is kept as an
+ * extra option, so saving the form never drops it.
+ *
+ * @param string[] $also Capabilities to list as well (e.g. the ones channels use now).
+ * @return array<string, array<string, string>> Group => cap => label.
+ */
+function channel_caps( array $also = array() ): array {
+	$flurfunk = array();
+	foreach ( \Flurfunk\Caps\all() as $cap => $def ) {
+		$flurfunk[ $cap ] = $def['label'] . ' (' . $cap . ')';
+	}
+	$wp     = array();
+	$common = array(
+		'moderate_comments' => __( 'Moderate comments', 'flurfunk' ),
+		'edit_others_posts' => __( 'Edit other people\'s posts', 'flurfunk' ),
+		'publish_posts'     => __( 'Publish posts', 'flurfunk' ),
+		'manage_options'    => __( 'Manage options', 'flurfunk' ),
+	);
+	foreach ( $common as $cap => $label ) {
+		$wp[ $cap ] = $label . ' (' . $cap . ')';
+	}
+	$other = array();
+	foreach ( $also as $cap ) {
+		$cap = sanitize_key( (string) $cap );
+		if ( '' !== $cap && ! isset( $flurfunk[ $cap ] ) && ! isset( $wp[ $cap ] ) ) {
+			$other[ $cap ] = $cap;
+		}
+	}
+	$out = array(
+		__( 'Flurfunk', 'flurfunk' )  => $flurfunk,
+		__( 'WordPress', 'flurfunk' ) => $wp,
+	);
+	if ( $other ) {
+		$out[ __( 'Other', 'flurfunk' ) ] = $other;
+	}
+	return (array) apply_filters( 'flurfunk_channel_capabilities', $out );
+}
+
+/**
+ * Is this capability one of the choices (or '' for none)?
+ *
+ * @param string   $cap  Capability.
+ * @param string[] $also Extra capabilities allowed (the channel's current one).
+ */
+function known_cap( string $cap, array $also = array() ): bool {
+	if ( '' === $cap ) {
+		return true;
+	}
+	foreach ( channel_caps( $also ) as $caps ) {
+		if ( isset( $caps[ $cap ] ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
 add_action(
 	'admin_menu',
 	static function (): void {
@@ -147,7 +205,12 @@ add_action(
 		$in = wp_unslash( $_POST ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- sanitized in save() and below.
 		save( (array) ( $in['flurfunk'] ?? array() ) );
 		foreach ( (array) ( $in['channels'] ?? array() ) as $slug => $c ) {
-			Store\ensure_channel( (string) $slug, (array) $c + array( 'archived' => empty( $c['active'] ) ? 1 : 0 ), true );
+			$c   = (array) $c;
+			$now = Store\channel_by_slug( sanitize_key( (string) $slug ) );
+			if ( isset( $c['capability'] ) && ! known_cap( sanitize_key( (string) $c['capability'] ), $now ? array( (string) ( $now->capability ?? '' ) ) : array() ) ) {
+				unset( $c['capability'] ); // Not one of the choices: leave it as it is.
+			}
+			Store\ensure_channel( (string) $slug, $c + array( 'archived' => empty( $c['active'] ) ? 1 : 0 ), true );
 		}
 		// Assistants are user accounts: only for people who may create users (a manager need not).
 		if ( ! empty( $in['new_bot']['name'] ) && current_user_can( 'create_users' ) ) {
@@ -156,6 +219,9 @@ add_action(
 		$new = (array) ( $in['new_channel'] ?? array() );
 		if ( '' !== trim( (string) ( $new['name'] ?? '' ) ) ) {
 			$slug = sanitize_key( ( $new['slug'] ?? '' ) ?: sanitize_title( (string) $new['name'] ) );
+			if ( isset( $new['capability'] ) && ! known_cap( sanitize_key( (string) $new['capability'] ) ) ) {
+				unset( $new['capability'] );
+			}
 			Store\ensure_channel( $slug, $new );
 		}
 		wp_safe_redirect( add_query_arg( 'updated', '1', admin_url( 'options-general.php?page=' . PAGE ) ) );
@@ -180,6 +246,20 @@ function render(): void {
 		echo '<select name="' . esc_attr( $name ) . '">';
 		foreach ( $options as $v => $l ) {
 			echo '<option value="' . esc_attr( $v ) . '"' . selected( $current, $v, false ) . '>' . esc_html( $l ) . '</option>';
+		}
+		echo '</select>';
+	};
+	$channels = Store\channels( true );
+	$caps     = channel_caps( array_map( static fn ( $c ) => (string) ( $c->capability ?? '' ), $channels ) );
+	$cap_pick = static function ( string $name, string $current ) use ( $caps ): void {
+		echo '<select name="' . esc_attr( $name ) . '" aria-label="' . esc_attr__( 'Also requires', 'flurfunk' ) . '">';
+		echo '<option value=""' . selected( $current, '', false ) . '>' . esc_html__( 'Nothing else', 'flurfunk' ) . '</option>';
+		foreach ( $caps as $group => $list ) {
+			echo '<optgroup label="' . esc_attr( $group ) . '">';
+			foreach ( $list as $v => $l ) {
+				echo '<option value="' . esc_attr( $v ) . '"' . selected( $current, $v, false ) . '>' . esc_html( $l ) . '</option>';
+			}
+			echo '</optgroup>';
 		}
 		echo '</select>';
 	};
@@ -222,16 +302,18 @@ function render(): void {
 
 			<h2><?php esc_html_e( 'Channels', 'flurfunk' ); ?></h2>
 			<p class="description" style="max-width:46rem"><?php echo wp_kses( sprintf( /* translators: %s: link to the permissions section */ __( 'Who counts as team and who as guest is set under %s.', 'flurfunk' ), '<a href="#flurfunk-permissions">' . esc_html__( 'Permissions', 'flurfunk' ) . '</a>' ), array( 'a' => array( 'href' => array() ) ) ); ?></p>
-			<table class="widefat striped" style="max-width:60rem">
-				<thead><tr><th><?php esc_html_e( 'Active', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Name', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Topic', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Team sees', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Guests see', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Order', 'flurfunk' ); ?></th></tr></thead>
+			<p class="description" style="max-width:46rem"><?php esc_html_e( '"Also requires": only people with this capability see the channel at all (its threads, numbers, notifications and search results), whatever team and guests may see. Assistants count only for Flurfunk\'s Team and Guest; for anything else only when their account has the capability, but the site\'s own modules can always post there.', 'flurfunk' ); ?></p>
+			<table class="widefat striped" style="max-width:72rem">
+				<thead><tr><th><?php esc_html_e( 'Active', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Name', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Topic', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Team sees', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Guests see', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Also requires', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Order', 'flurfunk' ); ?></th></tr></thead>
 				<tbody>
-				<?php foreach ( Store\channels( true ) as $c ) : ?>
+				<?php foreach ( $channels as $c ) : ?>
 					<tr>
 						<td><input type="checkbox" name="channels[<?php echo esc_attr( $c->slug ); ?>][active]" value="1" <?php checked( ! $c->archived ); ?> aria-label="<?php esc_attr_e( 'Active', 'flurfunk' ); ?>"></td>
 						<td><input name="channels[<?php echo esc_attr( $c->slug ); ?>][name]" value="<?php echo esc_attr( $c->name ); ?>"><br><code>#<?php echo esc_html( $c->slug ); ?></code></td>
 						<td><input class="regular-text" name="channels[<?php echo esc_attr( $c->slug ); ?>][topic]" value="<?php echo esc_attr( $c->topic ); ?>"></td>
 						<td><?php $select( 'channels[' . $c->slug . '][access_team]', $levels, $c->access_team ); ?></td>
 						<td><?php $select( 'channels[' . $c->slug . '][access_guests]', $levels, $c->access_guests ); ?></td>
+						<td><?php $cap_pick( 'channels[' . $c->slug . '][capability]', (string) ( $c->capability ?? '' ) ); ?></td>
 						<td><input type="number" style="width:5em" name="channels[<?php echo esc_attr( $c->slug ); ?>][position]" value="<?php echo (int) $c->position; ?>"></td>
 					</tr>
 				<?php endforeach; ?>
@@ -241,6 +323,7 @@ function render(): void {
 						<td><input class="regular-text" name="new_channel[topic]" placeholder="<?php esc_attr_e( 'Topic', 'flurfunk' ); ?>"></td>
 						<td><?php $select( 'new_channel[access_team]', $levels, 'all' ); ?></td>
 						<td><?php $select( 'new_channel[access_guests]', $levels, 'none' ); ?></td>
+						<td><?php $cap_pick( 'new_channel[capability]', '' ); ?></td>
 						<td><input type="number" style="width:5em" name="new_channel[position]" value="100"></td>
 					</tr>
 				</tbody>

@@ -140,6 +140,7 @@ function import( array $data, string $bundle = '' ): array {
 				'topic'         => $c['topic'] ?? '',
 				'access_team'   => $c['access']['team'] ?? 'all',
 				'access_guests' => $c['access']['guests'] ?? 'none',
+				'capability'    => (string) ( $c['capability'] ?? '' ),
 				'position'      => $c['position'] ?? 100,
 				'archived'      => ! empty( $c['archived'] ) ? 1 : 0,
 			)

@@ -123,7 +123,8 @@ function flurfunk_register_target( string $type, array $args ): void {
  * Create a channel unless it exists (for plugins that bring their own channels).
  *
  * @param string $slug Short name.
- * @param array  $args name, topic, access_team, access_guests, position.
+ * @param array  $args name, topic, access_team, access_guests, position, capability (required on
+ *                     top of the levels, '' = none; see inc/access.php).
  * @return int Channel ID.
  */
 function flurfunk_ensure_channel( string $slug, array $args = array() ): int {
@@ -176,7 +177,8 @@ function flurfunk_as( int $user_id, callable $fn ) {
 	$before = get_current_user_id();
 	wp_set_current_user( $user_id );
 	try {
-		return $fn();
+		// An assistant acting for PHP code may post into channels that require a capability.
+		return Flurfunk\Access\is_bot( $user_id ) ? Flurfunk\Access\as_server( $user_id, $fn ) : $fn();
 	} finally {
 		wp_set_current_user( $before );
 	}

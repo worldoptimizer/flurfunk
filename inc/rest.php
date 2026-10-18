@@ -208,10 +208,16 @@ function bootstrap(): array {
 	$uid      = get_current_user_id();
 	$s        = \Flurfunk\Settings\get();
 	$channels = array();
+	$people   = Store\people();
 	foreach ( Store\channels() as $c ) {
 		$level = Access\level( $c, $uid );
 		if ( 'none' !== $level ) {
-			$channels[] = Store\format_channel( $c ) + array( 'level' => $level );
+			$row = Store\format_channel( $c ) + array( 'level' => $level );
+			// A channel that requires a capability: who can read it, so mentions only suggest them.
+			if ( '' !== Access\required_cap( $c ) ) {
+				$row['members'] = array_values( array_map( static fn ( $p ) => (int) $p['id'], array_filter( $people, static fn ( $p ) => 'none' !== Access\level( $c, (int) $p['id'] ) ) ) );
+			}
+			$channels[] = $row;
 		}
 	}
 	$me = Store\person( $uid );
@@ -223,7 +229,7 @@ function bootstrap(): array {
 			'moderate' => Access\can_moderate( $uid ),
 			'upload'   => current_user_can( 'upload_files' ),
 		),
-		'people'    => Store\people(),
+		'people'    => $people,
 		'channels'  => $channels,
 		'providers' => \Flurfunk\Providers\available( $uid ),
 		'counts'    => Store\counts( $uid ),

@@ -130,15 +130,16 @@ class Command {
 		$rows = array();
 		foreach ( \Flurfunk\Store\channels( true ) as $c ) {
 			$rows[] = array(
-				'channel' => $c->slug,
-				'name'    => $c->name,
-				'team'    => $c->access_team,
-				'guests'  => $c->access_guests,
-				'active'  => $c->archived ? 'no' : 'yes',
-				'threads' => (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE channel_id = %d', \Flurfunk\Schema\table( 'threads' ), $c->id ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- our own table, a one-off command.
+				'channel'  => $c->slug,
+				'name'     => $c->name,
+				'team'     => $c->access_team,
+				'guests'   => $c->access_guests,
+				'requires' => (string) ( $c->capability ?? '' ),
+				'active'   => $c->archived ? 'no' : 'yes',
+				'threads'  => (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE channel_id = %d', \Flurfunk\Schema\table( 'threads' ), $c->id ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- our own table, a one-off command.
 			);
 		}
-		WP_CLI\Utils\format_items( 'table', $rows, array( 'channel', 'name', 'team', 'guests', 'active', 'threads' ) );
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'channel', 'name', 'team', 'guests', 'requires', 'active', 'threads' ) );
 	}
 
 	/**
@@ -156,12 +157,14 @@ class Command {
 	 * [--guests=<level>]
 	 * : all, own-posts or none.
 	 * [--position=<n>]
+	 * [--capability=<cap>]
+	 * : Capability people also need to see the channel; empty for none.
 	 *
 	 * @param array $args       Arguments.
 	 * @param array $assoc_args Options.
 	 */
 	public function channel( array $args, array $assoc_args ): void {
-		$map = array( 'name' => 'name', 'topic' => 'topic', 'team' => 'access_team', 'guests' => 'access_guests', 'position' => 'position' );
+		$map = array( 'name' => 'name', 'topic' => 'topic', 'team' => 'access_team', 'guests' => 'access_guests', 'position' => 'position', 'capability' => 'capability' );
 		$in  = array();
 		foreach ( $map as $from => $to ) {
 			if ( isset( $assoc_args[ $from ] ) ) {

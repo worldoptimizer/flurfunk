@@ -80,6 +80,11 @@
 		return bootPromise;
 	};
 	const person = ( id ) => ( boot && boot.people.find( ( p ) => p.id === id ) ) || ( boot && boot.me.id === id ? boot.me : { id, name: '?', role: '', kind: '' } );
+	// People who can read a channel: a channel that requires a capability lists them, others are open to everyone.
+	const readers = ( slug ) => {
+		const ch = slug && boot.channels.find( ( c ) => c.id === slug );
+		return ch && ch.members ? boot.people.filter( ( p ) => ch.members.includes( p.id ) ) : boot.people;
+	};
 	const channelOf = ( slug ) => boot.channels.find( ( c ) => c.id === slug );
 	const chName = ( slug ) => ( channelOf( slug ) || { name: slug } ).name || slug;
 
@@ -382,7 +387,7 @@
 	 * @param {number[]} selected Preselected user IDs.
 	 * @param {Function} onDone   Called with the chosen IDs.
 	 */
-	const peoplePicker = ( anchor, selected, onDone ) => {
+	const peoplePicker = ( anchor, selected, onDone, channel ) => {
 		document.querySelectorAll( '.ff-people-pop' ).forEach( ( x ) => x.remove() );
 		const chosen = new Set( selected );
 		const pop = document.createElement( 'div' );
@@ -394,7 +399,7 @@
 		const q = $( '.ff-pick-q', pop );
 		const draw = () => {
 			const term = q.value.toLowerCase();
-			list.innerHTML = boot.people.filter( ( p ) => ! term || p.name.toLowerCase().includes( term ) ).slice( 0, 40 ).map( ( p ) => '<label class="ff-pp"><input type="checkbox" value="' + p.id + '"' + ( chosen.has( p.id ) ? ' checked' : '' ) + '>' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( p.role ) + '</small></span></label>' ).join( '' );
+			list.innerHTML = readers( channel ).filter( ( p ) => ! term || p.name.toLowerCase().includes( term ) ).slice( 0, 40 ).map( ( p ) => '<label class="ff-pp"><input type="checkbox" value="' + p.id + '"' + ( chosen.has( p.id ) ? ' checked' : '' ) + '>' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( p.role ) + '</small></span></label>' ).join( '' );
 		};
 		const close = () => {
 			pop.remove();
@@ -795,7 +800,7 @@
 			if ( 'due-clear' === act ) {
 				onUpdate( await api( 'threads/' + tid + '/task', { method: 'POST', body: { due: '' } } ) );
 			} else {
-				peoplePicker( el, th.assignees || [], async ( ids ) => onUpdate( await api( 'threads/' + tid + '/task', { method: 'POST', body: { assignees: ids } } ) ) );
+				peoplePicker( el, th.assignees || [], async ( ids ) => onUpdate( await api( 'threads/' + tid + '/task', { method: 'POST', body: { assignees: ids } } ) ), th.channel );
 			}
 			return true;
 		}
@@ -1090,7 +1095,8 @@
 			const mm = b.match( MENTION );
 			if ( mm ) {
 				const q = mm[ 1 ].toLowerCase();
-				const list = boot.people.filter( ( p ) => p.name.toLowerCase().split( /\s+/ ).some( ( w ) => w.startsWith( q ) ) || p.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
+				const chan = o.channel || ( el.elements.channel ? el.elements.channel.value : '' );
+				const list = readers( chan ).filter( ( p ) => p.name.toLowerCase().split( /\s+/ ).some( ( w ) => w.startsWith( q ) ) || p.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
 				return menu( list.length ? '' : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-person" data-name="' + esc( p.name ) + '">' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( p.role ) + '</small></span></button>' ) );
 			}
 			const sm = b.match( SLASH );
@@ -1685,6 +1691,7 @@
 			}
 			const c = composer( {
 				key: 'new:' + ui.view,
+				channel: v.channel,
 				className: 'ff-new-thread',
 				autoGrow: true,
 				placeholder: v.channel ? t( 'New thread in #%s … (@name, / for cards)', chName( v.channel ) ) : t( 'New thread … (@name, / for cards)' ),
@@ -1714,7 +1721,7 @@
 					hidden.value = ids.join( ',' );
 					btn.textContent = ids.length ? t( 'Responsible: %s', names( ids ) ) : t( 'Assign' );
 					c.elements.task.checked = c.elements.task.checked || ids.length > 0;
-				} );
+				}, v.channel || ( c.elements.channel ? c.elements.channel.value : '' ) );
 			} );
 			slot.replaceChildren( c );
 		};
@@ -1746,6 +1753,7 @@
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
 			const c = composer( {
 				key: 'thread:' + th.id,
+				channel: th.channel,
 				label: t( 'Reply' ),
 				submitLabel: t( 'Reply' ),
 				onSubmit: async ( payload ) => {
@@ -2190,7 +2198,7 @@
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;
 			} ).catch( () => {} ) ) );
-			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, messages: [] } ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, channel: th.channel, messages: [] } ) ) );
 			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'No conversations about this post yet.' ) ) + '</p>' )
 				+ list.map( ( th ) => '<div class="ff-box' + ( 'done' === th.status ? ' is-done' : '' ) + '" data-id="' + th.id + '">'
 					+ '<div class="ff-box-head"><h3>' + esc( th.title || person( th.author ).name ) + '</h3>' + doneBox( th, ' data-id="' + th.id + '"' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
@@ -2208,6 +2216,7 @@
 				if ( s ) {
 					s.replaceChildren( composer( {
 						key: 'thread:' + id,
+						channel: ( list.find( ( x ) => x.id === id ) || {} ).channel,
 						placeholder: t( 'Reply … (@name, / for cards)' ),
 						submitLabel: t( 'Reply' ),
 						onSubmit: async ( payload ) => {
@@ -2323,6 +2332,7 @@
 			if ( s ) {
 				s.replaceChildren( composer( {
 					key: 'ref:' + key,
+					channel: th ? th.channel : ( el.dataset.channel || opts.channel ),
 					label: th && th.replies ? t( 'Reply' ) : t( 'No replies yet' ),
 					placeholder: t( 'Reply … (@name, / for cards)' ),
 					submitLabel: t( 'Reply' ),
@@ -2408,7 +2418,7 @@
 			await Promise.all( [ ...open ].map( ( id ) => api( 'threads/' + id ).then( ( th ) => {
 				full[ id ] = th;
 			} ).catch( () => {} ) ) );
-			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, messages: [] } ) ) );
+			shown = Object.values( full ).concat( list.map( ( th ) => ( { id: th.id, body: th.body, assignees: th.assignees, channel: th.channel, messages: [] } ) ) );
 			const todo = list.filter( ( th ) => 'done' !== th.status );
 			const done = list.filter( ( th ) => 'done' === th.status );
 			root.innerHTML = ( list.length ? '' : '<p class="ff-empty">' + esc( t( 'Nothing here yet.' ) ) + '</p>' )
@@ -2421,6 +2431,7 @@
 				if ( slot ) {
 					const c = composer( {
 						key: 'thread:' + id,
+						channel: opts.channel,
 						placeholder: t( 'Reply … (@name, / for cards)' ),
 						submitLabel: t( 'Reply' ),
 						onSubmit: async ( payload ) => {
@@ -2438,6 +2449,7 @@
 			} );
 			$( '.ff-new-slot', root ).replaceChildren( composer( {
 				key: 'new:channel:' + opts.channel,
+				channel: opts.channel,
 				label: opts.newLabel || t( 'New item' ),
 				titleField: opts.titleLabel || t( 'Title' ),
 				placeholder: t( 'What is it about? (@name, / for cards)' ),

@@ -11,7 +11,7 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const OPTION     = 'flurfunk_db_version';
 
 /**
@@ -42,6 +42,7 @@ function install(): void {
   topic text NOT NULL,
   access_team varchar(16) NOT NULL DEFAULT 'all',
   access_guests varchar(16) NOT NULL DEFAULT 'none',
+  capability varchar(64) NOT NULL DEFAULT '',
   position int(11) NOT NULL DEFAULT 100,
   archived tinyint(1) NOT NULL DEFAULT 0,
   created datetime NOT NULL,
@@ -164,7 +165,8 @@ CREATE TABLE " . table( 'attachments' ) . " (
  * @param int $from Previous version.
  */
 function upgrade( int $from ): void {
-	// None yet. Example: if ( $from < 2 ) { … rewrite data … }
+	// 6: channels.capability (dbDelta adds it; '' = no extra capability, so existing channels
+	// stay as they were). Nothing to rewrite. Example for later: if ( $from < 7 ) { … }
 	unset( $from );
 }
 
