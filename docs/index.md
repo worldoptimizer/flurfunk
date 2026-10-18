@@ -82,7 +82,7 @@ and "remind me".
 
 ### Team and guests
 
-People are either **team** or **guests**, decided by a capability. Each channel says what the
+People are either **team** or **guests**, decided by Flurfunk's own capabilities per role. Each channel says what the
 team and what guests see: everything, only threads about their own posts, or nothing. Guest
 authors can talk about their own texts without seeing internal discussions.
 

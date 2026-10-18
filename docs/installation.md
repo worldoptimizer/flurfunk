@@ -68,7 +68,8 @@ automatically on the next request, even without reactivating the plugin.
 
 1. Open *Settings → Flurfunk*.
 2. Under **Look**, set a name (default: the site title), a logo and the two colours.
-3. Under **People**, decide who counts as team and who as guest.
+3. Under **Permissions**, check which roles count as team and which as guest (the defaults:
+   administrators and editors are team, authors and contributors guests).
 4. Under **Channels**, rename `#general` if you like and add the channels you need. Set for each
    channel what the team sees and what guests see.
 5. Under **Posts**, choose the post types conversations can be attached to.
@@ -79,7 +80,7 @@ Flurfunk sidebar. See the [user guide](user-guide.md#notifications).
 
 ## Settings
 
-*Settings → Flurfunk* needs the `manage_options` capability.
+*Settings → Flurfunk* needs the `flurfunk_manage` capability (administrators, by default).
 
 | Section | Setting | Default | Meaning |
 | --- | --- | --- | --- |
@@ -87,16 +88,12 @@ Flurfunk sidebar. See the [user guide](user-guide.md#notifications).
 | Look | Logo | none | Sidebar logo, push notification icon, fallback app icon. |
 | Look | Accent colour | `#0f6e66` | Mentions, unread counts, links. |
 | Look | Sidebar colour | `#1f2a2e` | Sidebar background and the web app theme colour. |
-| People | Team | `edit_others_posts` | Capability that makes someone team. |
-| People | Guests | `edit_posts` | Capability that makes someone a guest (if they are not team). "No guests" turns guests off. |
 | Channels | Active, Name, Topic, Team sees, Guests see, Order | | One row per channel, plus a row for a new channel. |
 | Assistants | New assistant | | Creates an assistant account. Lists existing ones with a link to their application passwords. |
 | Posts | Conversations about | `post` | Post types threads can be attached to and that get the editor panel and the list column. |
 | Posts | Show | both on | The "Conversations" panel in the block editor, the column in the posts list. |
 | Data | Keep conversations when the plugin is deleted | on | See [Deactivate and uninstall](#deactivate-and-uninstall). |
-
-The capabilities to choose from are `manage_options` (administrators), `edit_others_posts`
-(editors and up), `publish_posts` (authors and up) and `edit_posts` (contributors and up).
+| Permissions | Roles × capabilities | see below | Which roles are team or guest, moderate and manage. Saved with its own button. See [Permissions](#permissions). |
 
 A new channel's short name (slug) is derived from its name and cannot be changed in the form
 later. To choose the slug yourself, create the channel with WP-CLI:
@@ -119,11 +116,41 @@ Every user is one of:
 
 | Kind | Who | Default |
 | --- | --- | --- |
-| team | has the team capability, or is an assistant | editors and administrators |
-| guest | has the guest capability but not the team one | authors and contributors |
+| team | has `flurfunk_team`, or is an assistant | editors and administrators |
+| guest | has `flurfunk_guest` but not `flurfunk_team` | authors and contributors |
 | none | everyone else | subscribers; they do not see Flurfunk at all |
 
 A plugin can change this per user with the `flurfunk_user_kind` filter.
+
+### Permissions
+
+Flurfunk has its own capabilities, which WordPress grants through roles:
+
+| Capability | Allows | Default roles |
+| --- | --- | --- |
+| `flurfunk_team` | take part as team | administrator, editor |
+| `flurfunk_guest` | take part as a guest | author, contributor |
+| `flurfunk_moderate` | edit and delete other people's messages and threads | administrator, editor |
+| `flurfunk_manage` | the settings page: channels, permissions, modules, assistants, export and import | administrator |
+
+Change them under *Settings → Flurfunk → Permissions*: one row per capability, one column per role.
+Administrators always keep `flurfunk_manage`, and nobody can take it away from the last role that
+has it or from their own role, so you cannot lock yourself out. Modules and other plugins may add
+capabilities of their own (for example "Send newsletters"); they appear in the same table, with the
+roles they recommend already ticked when they were switched on.
+
+**Role editor plugins.** Because these are normal WordPress capabilities, plugins such as
+[Members](https://wordpress.org/plugins/members/) or
+[User Role Editor](https://wordpress.org/plugins/user-role-editor/) show and change them too, also
+for single users or custom roles. Both ways change the same thing.
+
+**Updating from 0.1.** 0.1 chose a "team capability" and a "guest capability" in the settings. On
+the first request after the update Flurfunk converts them once: roles that had the team capability
+get `flurfunk_team`, the other roles with the guest capability `flurfunk_guest`, and roles with
+`manage_options` (administrators) `flurfunk_manage` and `flurfunk_moderate`. So everyone keeps the
+access they had; editors can edit other people's messages only once you tick "Moderate" for them.
+
+**Uninstall** removes the capabilities from all roles; a reinstall grants them again.
 
 ### Channel access
 
@@ -155,11 +182,12 @@ the `flurfunk_owned_post_ids` filter.
 | Start a thread | team and guests in `all` channels; in `own-posts` channels only about their own posts |
 | Attach a thread to a post | team: any post of the configured types; guests: their own posts |
 | Change a task's state, due date and responsible people | everyone who can see the thread |
-| Edit or delete a message or thread | its author and administrators (`manage_options`) |
+| Edit or delete a message or thread | its author, and people with `flurfunk_moderate` |
 | Upload files | people with `upload_files`, and assistants |
 | Attach files from the media library | their own files and files they may edit; assistants (through the API) any file not attached to a private post |
 | Add a Flurfunk file to the media library | people with `upload_files`; guests only their own files |
-| Manage settings and channels | administrators (`manage_options`) |
+| Use a card command | team; guests only commands meant for them (like `/post`, their own posts) |
+| Manage settings, channels, permissions and modules | people with `flurfunk_manage` |
 
 Developers can adjust several of these with filters (`flurfunk_can_edit`, `flurfunk_can_resolve`,
 `flurfunk_can_target`, `flurfunk_can_attach`).
@@ -346,7 +374,8 @@ See [Cron](#cron-reminders-digests-cleanup). On low-traffic sites use a real cro
 
 ### Someone cannot see a thread or a channel
 
-- Check their kind (team, guest or none) against the capabilities under *People*.
+- Check their kind (team, guest or none): their role needs `flurfunk_team` or `flurfunk_guest`
+  under *Settings → Flurfunk → Permissions* (or in a role editor plugin).
 - Check the channel's level for their kind. Inactive (archived) channels are hidden from
   everyone.
 - In `own-posts` channels, the thread must be attached to a post they are the author of.
