@@ -13,7 +13,7 @@ the [examples](examples.md) page.
 - [Card building blocks](#card-building-blocks)
 - [Card actions](#card-actions)
 - [Custom card renderers](#custom-card-renderers)
-- [Core modules](#core-modules)
+- [Modules](#modules)
 - [Targets](#targets)
 - [Embedding](#embedding)
 - [Hooks](#hooks)
@@ -31,6 +31,7 @@ interface is drawn in the browser from the REST API.
 | `flurfunk.php` | global | Bootstrap, the public functions `flurfunk_*()` |
 | `inc/schema.php` | `Flurfunk\Schema` | Own tables, versioned (`DB_VERSION`), upgrade steps |
 | `inc/access.php` | `Flurfunk\Access` | Team and guests, channel levels, who sees what, assistants |
+| `inc/caps.php` | `Flurfunk\Caps` | Capabilities, the 0.1 migration, the permissions matrix, declared capabilities |
 | `inc/store.php` | `Flurfunk\Store` | Reading and writing, the data format |
 | `inc/providers.php` | `Flurfunk\Providers` | Slash commands and cards, built-in `/post` |
 | `inc/targets.php` | `Flurfunk\Targets` | What threads can be attached to, built-in `post` |
@@ -40,8 +41,10 @@ interface is drawn in the browser from the REST API.
 | `inc/notify.php` | `Flurfunk\Notify` | Notifications: in-app list, mail, digest, push, reminders, preferences |
 | `inc/push.php` | `Flurfunk\Push` | Web Push (VAPID, aes128gcm) without external libraries |
 | `inc/rest.php` | `Flurfunk\Rest` | REST API `flurfunk/v1` |
-| `inc/admin.php` | `Flurfunk\Admin` | Admin page, editor panel, posts column, web app manifest |
+| `inc/admin.php` | `Flurfunk\Admin` | Admin page, editor panel, posts column, OpenStation icon |
 | `inc/transfer.php` | `Flurfunk\Transfer` | JSON export and import |
+| `inc/data.php` | `Flurfunk\Data` | Export and import under *Settings → Flurfunk*, the welcome after the first activation |
+| `inc/standalone.php` | `Flurfunk\Standalone` | The full-screen app outside wp-admin (`/flurfunk/`) |
 | `inc/cli.php` | `Flurfunk\Cli` | `wp flurfunk …` |
 | `inc/strings.php` | `Flurfunk\Strings` | Translatable strings of the JavaScript |
 | `inc/modules.php` | `Flurfunk\Modules` | Module register: optional parts, switched under *Settings → Flurfunk* |
@@ -379,7 +382,7 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | Inserts, searches or refreshes a card | the provider's `capability` (default `flurfunk_team`), its `can`, and `snapshot` must not return null | |
 | Uploads | `upload_files` or assistant | |
 | Attaches a media library file by ID | their own files and files they may edit (`edit_post`); assistants any file not attached to a private post | `flurfunk_can_attach` |
-| Manages settings, channels, permissions, modules, assistants, export and import | `flurfunk_manage` | |
+| Manages settings, channels, permissions, modules, assistants, export and import | `flurfunk_manage`; creating an assistant account also needs `create_users` | |
 
 `own-posts` only ever applies to the target type `post`.
 
@@ -481,14 +484,21 @@ group, module`). Check a declared capability like any other with `user_can()`.
 
 ## PHP functions
 
-| Function | Returns | Purpose |
-| --- | --- | --- |
-| `flurfunk_register_provider( string $id, array $args )` | void | Register a slash command with cards. See [Providers](#providers-slash-commands-and-cards). |
-| `flurfunk_register_target( string $type, array $args )` | void | Register something threads can be attached to. See [Targets](#targets). |
-| `flurfunk_register_capability( string $cap, array $args = [] )` | bool | Declare a capability for the permissions matrix, with recommended roles. See [Declaring capabilities](#declaring-capabilities). |
-| `flurfunk_ensure_channel( string $slug, array $args = [] )` | int channel ID | Create a channel unless it exists. `$args`: `name`, `topic`, `access_team`, `access_guests`, `position`. An existing channel is left unchanged. |
-| `flurfunk_unread_count( int $user_id = 0 )` | int | Unread messages of a person (0 = current), for badges elsewhere. 0 for people without access. |
-| `flurfunk_url( string $view = '' )` | string | URL of the app, optionally opening a view. |
+| Function | Since | Returns | Purpose |
+| --- | --- | --- | --- |
+| `flurfunk_register_provider( string $id, array $args )` | 0.1.0 | void | Register a slash command with cards. See [Providers](#providers-slash-commands-and-cards). |
+| `flurfunk_register_target( string $type, array $args )` | 0.1.0 | void | Register something threads can be attached to. See [Targets](#targets). |
+| `flurfunk_register_module( string $id, array $args )` | 0.2.0 | bool | Register an optional module (a switch under *Settings → Flurfunk → Modules*). Call it on the `flurfunk_modules` action. See [Modules](#modules). |
+| `flurfunk_module_enabled( string $id )` | 0.2.0 | bool | Is a module switched on? |
+| `flurfunk_register_capability( string $cap, array $args = [] )` | 0.2.0 | bool | Declare a capability for the permissions matrix, with recommended roles. See [Declaring capabilities](#declaring-capabilities). |
+| `flurfunk_ensure_channel( string $slug, array $args = [] )` | 0.1.0 | int channel ID | Create a channel unless it exists. `$args`: `name`, `topic`, `access_team`, `access_guests`, `position`. An existing channel is left unchanged. |
+| `flurfunk_post( array $args )` | 0.2.0 | int thread ID or `WP_Error` | Start a thread from PHP. See [Posting from PHP](#posting-from-php). |
+| `flurfunk_reply( int\|string $thread, string $body, array $args = [] )` | 0.2.0 | int message ID or `WP_Error` | Reply to a thread (ID or `ref_key`). `$args`: `files`, `attachments`, `author`. |
+| `flurfunk_set_status( int\|string $thread, string $status, int $author = 0 )` | 0.2.0 | true or `WP_Error` | Set a thread's task state: `open`, `doing`, `waiting`, `done`, or `''` (no task). |
+| `flurfunk_as( int $user_id, callable $fn )` | 0.2.0 | what `$fn` returns | Run code as another person, then switch back. `0` = the default assistant (created if needed). |
+| `flurfunk_unread_count( int $user_id = 0 )` | 0.1.0 | int | Unread messages of a person (0 = current), for badges elsewhere. 0 for people without access. |
+| `flurfunk_url( string $view = '' )` | 0.1.0 | string | URL of the app in wp-admin, optionally opening a view. |
+| `flurfunk_app_url( string $view = '' )` | 0.1.0 | string | URL of the full-screen app outside wp-admin, same views. |
 
 Views for `flurfunk_url()` (and the `view` query argument of the app page):
 
@@ -504,9 +514,40 @@ Views for `flurfunk_url()` (and the `view` query argument of the app page):
 Register providers and targets on `init`. The built-in target is registered at priority 5, the
 built-in provider at priority 20; the default priority 10 is fine for your own.
 
-There is no public PHP function for posting yet. `Flurfunk\Store\create_thread()` and
-`Flurfunk\Store\add_message()` exist and are what the CLI uses, but they are internal and act as
-the current user. For scripts, use [WP-CLI or the REST API](#posting-as-an-assistant-from-scripts-and-ci).
+### Posting from PHP
+
+`flurfunk_post()`, `flurfunk_reply()` and `flurfunk_set_status()` act as the default assistant
+unless `author` names someone, and go through the same checks as the app: the author must be
+allowed to start a thread in the channel (and on the target), mentions, tasks and notifications
+work as usual, and the rate limit applies. With a `ref_key` the call is idempotent: if a thread
+with that key exists, its ID comes back and nothing is posted.
+
+```php
+// When an order fails: one task thread per order, with a card.
+$thread = flurfunk_post( array(
+	'channel'     => 'shop',                 // slug, required
+	'title'       => 'Payment failed for #1042',
+	'body'        => 'Stripe declined the card. <@12> please check.',
+	'task'        => true,                    // also implied by due or assignees
+	'due'         => gmdate( 'Y-m-d', strtotime( '+1 day' ) ),
+	'assignees'   => array( 12 ),
+	'target'      => array( 'type' => 'post', 'id' => 99 ), // optional
+	'attachments' => array( array( 'provider' => 'acme/order', 'ref' => array( 'id' => 1042 ) ) ),
+	'files'       => array(),                 // media library IDs
+	'ref_key'     => 'acme-order:1042',
+	// 'author'   => 7,                       // user ID; default: the assistant
+) );
+if ( ! is_wp_error( $thread ) ) {
+	flurfunk_reply( 'acme-order:1042', 'Retried, still failing.' );
+	flurfunk_set_status( 'acme-order:1042', 'waiting' );
+}
+
+// Anything else as a given person:
+flurfunk_as( 7, fn () => Flurfunk\Store\mark_all_read( 7 ) );
+```
+
+`Flurfunk\Store\create_thread()` and `Flurfunk\Store\add_message()` stay internal; use the
+functions above. From outside PHP, use [WP-CLI or the REST API](#posting-as-an-assistant-from-scripts-and-ci).
 
 ## Providers: slash commands and cards
 
@@ -711,10 +752,12 @@ Action IDs are keys like `ship` (lowercase letters, digits, `_`, `-`); up to six
 
 When someone clicks, `POST cards/<id>/action/<action>`:
 
-1. checks that the person may see the thread (404 otherwise), that the action exists (404), that
-   the provider's `can` and the action's `capability` allow it (403), and the rate limit (429);
-2. takes a lock on the card, so two clicks at once run one after the other, and checks that the
-   **stored** snapshot lists the action (409 otherwise; the app then shows the current card);
+1. checks that the person may see the thread (404 otherwise), that the action exists (404), and
+   the rate limit (429);
+2. takes a lock on the card, so two clicks at once run one after the other (409 if the lock is not
+   free within ten seconds), then checks that the provider's `capability` and `can` and the
+   action's `capability` allow it (403) and that the **stored** snapshot lists the action (409
+   otherwise; the app then shows the current card);
 3. calls the callback. A `WP_Error` comes back to the person as its message (status 400, or the
    4xx status you set); an exception becomes a generic error without details; `null` means "ask
    `snapshot` again";
@@ -723,7 +766,7 @@ When someone clicks, `POST cards/<id>/action/<action>`:
    thread's normal rules, as for a reply: author, participants, responsible people and followers.
 
 The app sends a random `key` per click; a retry with the same key within ten minutes returns the
-thread without running the action again. Your callback must still check its own permissions
+thread without running the action again, also when both requests arrive at the same time. Your callback must still check its own permissions
 (e.g. `edit_comment` for that comment): the capability only decides who sees the button.
 
 ## Custom card renderers
@@ -774,12 +817,49 @@ Rules:
 Load your script after Flurfunk's (handle `flurfunk`), on the pages where Flurfunk runs. See the
 [example](examples.md#a-custom-card-renderer).
 
-## Core modules
+## Modules
 
-Optional parts that only build on WordPress itself. Switch them under *Settings → Flurfunk →
-Modules* or with `wp flurfunk module on|off <id>`; a module that is off is not loaded at all.
-Other plugins add their own modules with `flurfunk_register_module()` on the `flurfunk_modules`
-action.
+A module is an optional part with a switch under *Settings → Flurfunk → Modules* (and
+`wp flurfunk module on|off <id>`). A module that is off is never loaded. Flurfunk's own optional
+parts are modules, and a plugin can register its own, so everything optional is in one list.
+
+```php
+add_action( 'flurfunk_modules', function () {
+	flurfunk_register_module( 'acme/review', array(
+		'label'        => __( 'Review workflow', 'acme' ),
+		'description'  => __( 'A task for every post that is submitted for review.', 'acme' ),
+		'group'        => 'Acme',
+		'requires'     => array( 'Acme_Plugin' ),        // or a callable, or a bool
+		'default'      => false,
+		'load'         => fn () => require __DIR__ . '/review.php',
+		'settings_url' => admin_url( 'admin.php?page=acme' ),
+		'capabilities' => array(
+			'acme_review' => array( 'label' => 'Approve reviews', 'roles' => array( 'editor' ) ),
+		),
+	) );
+} );
+```
+
+| Argument | Default | Meaning |
+| --- | --- | --- |
+| `label` | required | Name next to the switch |
+| `description` | | One sentence under it |
+| `group` | `Other` | Heading the module is listed under |
+| `requires` | `true` | `true`/`false`, a callable returning bool, or a list of functions, classes or constants that must exist. Unmet: the switch says so and the module does not load |
+| `default` | `true` | On until the site switches it off |
+| `load` | required | Callable that loads the module (e.g. `require` its file) |
+| `settings_url` | | Link shown next to the switch |
+| `capabilities` | | Capabilities the module brings, as in [Declaring capabilities](#declaring-capabilities); their roles get them once the module is on |
+
+IDs look like `vendor/name` (lowercase letters, digits, `_`, `-`). `flurfunk_modules` fires on
+`init` at priority 0, so labels can be translated; modules that are on load right after, before
+`flurfunk_modules_loaded`. A module can therefore hook into `init` (priority 1 and later),
+`admin_menu`, `rest_api_init` and everything later. `flurfunk_module_on` and
+`flurfunk_module_off` fire when a switch changes, `flurfunk_module_enabled` overrides the switch.
+
+### Core modules
+
+They only build on WordPress itself.
 
 | Module | Default | Does |
 | --- | --- | --- |
@@ -918,35 +998,40 @@ locked in the database.
 
 ### Filters
 
-| Filter | Arguments | Return | Purpose |
-| --- | --- | --- | --- |
-| `flurfunk_settings` | `array $settings` | array | Adjust settings in code. Keys: `name`, `logo_id`, `accent`, `sidebar`, `post_types`, `editor_panel`, `posts_column`, `keep_data`. (0.1 also had `team_cap` and `guest_cap`; they are only read once for the [migration](#capabilities).) Applied once per request. |
-| `flurfunk_user_kind` | `string $kind`, `WP_User $user` | `'team'`, `'guest'` or `''` | Who is team, guest or has no access. Default from `flurfunk_team` / `flurfunk_guest` (assistants: team). Cached per request. |
-| `flurfunk_capabilities` | `array $caps` | array | The capability registry for the permissions matrix and recommended grants: `cap => { label, description, roles, group, module }`. |
-| `flurfunk_channel_level` | `string $level`, `object $channel`, `int $user_id`, `string $kind` | `'all'`, `'own-posts'` or `'none'` | Per-person access to a channel, e.g. private channels. Other values count as `none`. Cached per request. |
-| `flurfunk_owned_post_ids` | `int[] $ids`, `int $user_id` | int[] | Posts that count as a person's own (co-authors). |
-| `flurfunk_post_owners` | `int[] $user_ids`, `WP_Post $post` | int[] | Owners of a post, for the "… can read this" hint only. |
-| `flurfunk_can_target` | `bool $can`, `string $type`, `int $id`, `int $user_id` | bool | May the person attach a thread to this target? Also used by the `/post` snapshot. |
-| `flurfunk_can_resolve` | `bool $can`, `object $thread`, `int $user_id` | bool | May the person change the task state, due date or assignees? |
-| `flurfunk_can_attach` | `bool $can`, `WP_Post $attachment`, `int $user_id` | bool | May the person refer to this media library file in a message? Default: own files, files they may edit, and for assistants any file not attached to a private post. |
-| `flurfunk_max_files` | `int $max` | int | Files per message. Default 50. |
-| `flurfunk_board_done_days` | `int $days` | int | How long done tasks stay on the board. Default 14. |
-| `flurfunk_can_edit` | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `flurfunk_moderate`. |
-| `flurfunk_target_info` | `array $info`, `string $type`, `int $id` | array | `type`, `title`, `url`, `status`, `label` of a target for the interface. |
-| `flurfunk_user_role_label` | `string $role`, `WP_User $user` | string | The role shown next to names. |
-| `flurfunk_notify_recipients` | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder, question (`waiting`) and done notifications. |
-| `flurfunk_mail` | `array {subject, body}`, `WP_User $user`, `?object $thread`, `int $message_id` | array or false | Change a notification mail, or return false to skip it. `$thread` is null for the daily digest. |
-| `flurfunk_push_payload` | `array {title, body, url, tag, icon}`, `array $n` | array | Change a push message. `$n` has `uid`, `kind`, `thread` (row), `message_id`, `actor`. |
-| `flurfunk_push_hosts` | `string[] $hosts` | string[] | Push services a browser subscription may point to; `*.example.com` matches subdomains. Default: `fcm.googleapis.com`, `android.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`. |
-| `flurfunk_push_renew_limit` | `int $max` | int | Logged-out subscription renewals per IP address and hour. Default 30; 0 = off. |
-| `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for people with `flurfunk_manage`; 0 = off. |
-| `flurfunk_thread_limit` | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
-| `flurfunk_notification_days` | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
-| `flurfunk_comments_channel` | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default `general`. |
-| `flurfunk_comments_hour` | `int $hour` | int | Hour (site time) of the daily moderation thread. Default 9. |
-| `flurfunk_review_channel` | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default `general`. |
-| `flurfunk_review_assignees` | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. |
-| `flurfunk_openstation_icon` | `array {title, icon, url, position}` | array or false | Desktop icon when the OpenStation plugin is active; false = none. |
+| Filter | Since | Arguments | Return | Purpose |
+| --- | --- | --- | --- | --- |
+| `flurfunk_settings` | 0.1.0 | `array $settings` | array | Adjust settings in code. Keys: `name`, `logo_id`, `accent`, `sidebar`, `post_types`, `editor_panel`, `posts_column`, `keep_data`. (0.1 also had `team_cap` and `guest_cap`; they are only read once for the [migration](#capabilities).) Applied once per request. |
+| `flurfunk_user_kind` | 0.1.0 | `string $kind`, `WP_User $user` | `'team'`, `'guest'` or `''` | Who is team, guest or has no access. Default from `flurfunk_team` / `flurfunk_guest` (assistants: team). Cached per request. |
+| `flurfunk_capabilities` | 0.2.0 | `array $caps` | array | The capability registry for the permissions matrix and recommended grants: `cap => { label, description, roles, group, module }`. |
+| `flurfunk_channel_level` | 0.1.0 | `string $level`, `object $channel`, `int $user_id`, `string $kind` | `'all'`, `'own-posts'` or `'none'` | Per-person access to a channel, e.g. private channels. Other values count as `none`. Cached per request. |
+| `flurfunk_owned_post_ids` | 0.1.0 | `int[] $ids`, `int $user_id` | int[] | Posts that count as a person's own (co-authors). |
+| `flurfunk_post_owners` | 0.1.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Owners of a post, for the "… can read this" hint only. |
+| `flurfunk_can_target` | 0.1.0 | `bool $can`, `string $type`, `int $id`, `int $user_id` | bool | May the person attach a thread to this target? Also used by the `/post` snapshot. |
+| `flurfunk_can_resolve` | 0.1.0 | `bool $can`, `object $thread`, `int $user_id` | bool | May the person change the task state, due date or assignees? |
+| `flurfunk_can_attach` | 0.1.0 | `bool $can`, `WP_Post $attachment`, `int $user_id` | bool | May the person refer to this media library file in a message? Default: own files, files they may edit, and for assistants any file not attached to a private post. |
+| `flurfunk_max_files` | 0.1.0 | `int $max` | int | Files per message. Default 50. |
+| `flurfunk_board_done_days` | 0.1.0 | `int $days` | int | How long done tasks stay on the board. Default 14. |
+| `flurfunk_can_edit` | 0.1.0 | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `flurfunk_moderate`. |
+| `flurfunk_target_info` | 0.1.0 | `array $info`, `string $type`, `int $id` | array | `type`, `title`, `url`, `status`, `label` of a target for the interface. |
+| `flurfunk_user_role_label` | 0.1.0 | `string $role`, `WP_User $user` | string | The role shown next to names. |
+| `flurfunk_notify_recipients` | 0.1.0 | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder, question (`waiting`) and done notifications. |
+| `flurfunk_mail` | 0.1.0 | `array {subject, body}`, `WP_User $user`, `?object $thread`, `int $message_id` | array or false | Change a notification mail, or return false to skip it. `$thread` is null for the daily digest. |
+| `flurfunk_push_payload` | 0.1.0 | `array {title, body, url, tag, icon}`, `array $n` | array | Change a push message. `$n` has `uid`, `kind`, `thread` (row), `message_id`, `actor`. |
+| `flurfunk_push_hosts` | 0.1.0 | `string[] $hosts` | string[] | Push services a browser subscription may point to; `*.example.com` matches subdomains. Default: `fcm.googleapis.com`, `android.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`. |
+| `flurfunk_push_renew_limit` | 0.1.0 | `int $max` | int | Logged-out subscription renewals per IP address and hour. Default 30; 0 = off. |
+| `flurfunk_rate_limit` | 0.1.0 | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for people with `flurfunk_manage`; 0 = off. |
+| `flurfunk_thread_limit` | 0.1.0 | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
+| `flurfunk_notification_days` | 0.1.0 | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
+| `flurfunk_comments_channel` | 0.2.0 | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default `general`. |
+| `flurfunk_comments_hour` | 0.2.0 | `int $hour` | int | Hour (site time) of the daily moderation thread. Default 9. |
+| `flurfunk_review_channel` | 0.2.0 | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default `general`. |
+| `flurfunk_review_assignees` | 0.2.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. |
+| `flurfunk_module_enabled` | 0.2.0 | `bool $on`, `string $id` | bool | Is a module switched on? Default: the choice under *Settings → Flurfunk → Modules*, else the module's `default`. Decides whether it loads. |
+| `flurfunk_people_query` | 0.1.0 | `array $args` | array | `get_users()` arguments for the people Flurfunk knows (mentions, people list). Default: everyone with `flurfunk_team` or `flurfunk_guest`; assistants are always added. |
+| `flurfunk_app_slug` | 0.1.0 | `string $slug` | string | Path of the full-screen app, default `flurfunk` (`/flurfunk/`). Rewrite rules are flushed once after a change. |
+| `flurfunk_manifest` | 0.1.0 | `array $manifest` | array | The web app manifest (name, colours, icons, start URL). |
+| `flurfunk_menu_icon` | 0.1.0 | `string $icon` | string | The admin menu icon (a `data:image/svg+xml;base64,…` URI, a dashicon name or a URL). |
+| `flurfunk_openstation_icon` | 0.1.0 | `array {title, icon_svg, url, position}` | array or false | Desktop icon when the OpenStation plugin is active; false = none. |
 
 Notification kinds for `flurfunk_notify_recipients` are `mention`, `assigned`, `due`, `remind`,
 `waiting`, `done`, `reply`, `channel` and `message`; other values are ignored. If several notifications for
@@ -960,15 +1045,19 @@ yourself.
 
 ### Actions
 
-| Action | Arguments | Fires |
-| --- | --- | --- |
-| `flurfunk_thread_created` | `object $thread` | After a thread was created (not on import). |
-| `flurfunk_message_added` | `object $thread`, `int $message_id` | After a reply was added, and after status lines (ticking a task adds a `status` message). Check the message type if you only want replies. Not on import. |
-| `flurfunk_message_edited` | `object $thread`, `int $message_id` | After a message was edited. |
-| `flurfunk_message_deleted` | `object $thread`, `int $message_id` | After a message was deleted. |
-| `flurfunk_assigned` | `object $thread`, `int[] $added`, `int $actor` | After people were made responsible. |
-| `flurfunk_status_changed` | `object $thread`, `string $status`, `int $actor` | After the task state changed (`open`, `doing`, `waiting`, `done`), or the thread stopped being a task (`''`). |
-| `flurfunk_card_action` | `object $thread`, `int $message_id`, `string $action`, `int $user_id`, `array $snapshot` | After a card action ran and its event line was added. |
+| Action | Since | Arguments | Fires |
+| --- | --- | --- | --- |
+| `flurfunk_thread_created` | 0.1.0 | `object $thread` | After a thread was created (not on import). |
+| `flurfunk_message_added` | 0.1.0 | `object $thread`, `int $message_id` | After a reply was added, and after status lines (ticking a task adds a `status` message). Check the message type if you only want replies. Not on import. |
+| `flurfunk_message_edited` | 0.1.0 | `object $thread`, `int $message_id` | After a message was edited. |
+| `flurfunk_message_deleted` | 0.1.0 | `object $thread`, `int $message_id` | After a message was deleted. |
+| `flurfunk_assigned` | 0.1.0 | `object $thread`, `int[] $added`, `int $actor` | After people were made responsible. |
+| `flurfunk_status_changed` | 0.1.0 | `object $thread`, `string $status`, `int $actor` | After the task state changed (`open`, `doing`, `waiting`, `done`), or the thread stopped being a task (`''`). |
+| `flurfunk_card_action` | 0.2.0 | `object $thread`, `int $message_id`, `string $action`, `int $user_id`, `array $snapshot` | After a card action ran and its event line was added. |
+| `flurfunk_modules` | 0.2.0 | | Register modules here with `flurfunk_register_module()` (on `init`, priority 0, so translations work). |
+| `flurfunk_modules_loaded` | 0.2.0 | | After the modules that are on have loaded (still `init`, priority 0). |
+| `flurfunk_module_on` | 0.2.0 | `string $id` | After a module was switched on (settings or `wp flurfunk module on`), only if it was off. |
+| `flurfunk_module_off` | 0.2.0 | `string $id` | After a module was switched off, only if it was on. E.g. to clear its cron events. |
 
 Editing a thread's own title or text (`threads/<id>/edit`) fires no action.
 
