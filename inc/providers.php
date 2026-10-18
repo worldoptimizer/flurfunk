@@ -1,7 +1,17 @@
 <?php
 /**
- * Providers: the extension API for slash commands and cards.
+ * Providers: the extension API for slash commands and cards (reference below).
  *
+ * @package Flurfunk
+ */
+
+namespace Flurfunk\Providers;
+
+use Flurfunk\Access;
+
+defined( 'ABSPATH' ) || exit;
+
+/*
  * Flurfunk itself only knows text, mentions and files. Everything else comes from providers
  * that other plugins register:
  *
@@ -59,15 +69,7 @@
  *
  * A plugin that needs a special look registers a renderer in JavaScript:
  *   window.Flurfunk.registerCard( 'myplugin/report', ( snapshot, h ) => html ), built with the helpers in h.
- *
- * @package Flurfunk
  */
-
-namespace Flurfunk\Providers;
-
-use Flurfunk\Access;
-
-defined( 'ABSPATH' ) || exit;
 
 /**
  * Registry.
