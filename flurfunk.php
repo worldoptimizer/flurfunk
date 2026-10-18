@@ -3,7 +3,7 @@
  * Plugin Name:       Flurfunk
  * Plugin URI:        https://worldoptimizer.github.io/flurfunk/
  * Description:       Team conversations inside WordPress: channels, threads and tasks, attachable to posts, with mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and inside the OpenStation desktop.
- * Version:           0.2.0-dev
+ * Version:           0.2.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Max Ziebell
@@ -41,7 +41,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const FLURFUNK_VERSION = '0.2.0-dev';
+const FLURFUNK_VERSION = '0.2.0';
 define( 'FLURFUNK_FILE', __FILE__ );
 define( 'FLURFUNK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FLURFUNK_URL', plugin_dir_url( __FILE__ ) );
