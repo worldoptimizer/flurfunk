@@ -176,7 +176,7 @@ function snapshot( array $ref, int $user_id ): ?array {
 		),
 		array(
 			'label' => __( 'Written', 'flurfunk' ),
-			'value' => wp_date( get_option( 'date_format' ) . ', ' . get_option( 'time_format' ), strtotime( $c->comment_date_gmt . ' UTC' ) ),
+			'value' => wp_date( date_and_time_format(), strtotime( $c->comment_date_gmt . ' UTC' ) ),
 		),
 	);
 	if ( $c->comment_parent ) {
@@ -232,3 +232,12 @@ function moderate( array $ref, int $user_id, string $to ) {
 	clean_comment_cache( (int) $c->comment_ID );
 	return snapshot( $ref, $user_id ) ?? new \WP_Error( 'flurfunk_comment', __( 'This comment no longer exists.', 'flurfunk' ), array( 'status' => 404 ) );
 }
+
+/**
+ * The site's date format, plus its time format unless the date format shows the time already.
+ */
+function date_and_time_format(): string {
+	$date = (string) get_option( 'date_format' );
+	return preg_match( '/(?<!\\\\)[aAgGhHi]/', $date ) ? $date : $date . ', ' . get_option( 'time_format' );
+}
+
