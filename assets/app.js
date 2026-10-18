@@ -395,7 +395,7 @@
 	const nameHtml = ( id ) => '<b>' + esc( person( id ).name ) + '</b>' + ( person( id ).bot ? ' <span class="ff-pill is-bot">' + esc( t( 'Assistant' ) ) + '</span>' : '' );
 	// One-line preview for lists: mentions and links stay, formatting and line structure don't.
 	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
-	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.manage );
+	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.moderate );
 	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
 	const messagesHtml = ( th ) => {
 		let html = '';

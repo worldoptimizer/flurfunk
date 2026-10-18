@@ -16,6 +16,11 @@
  *           'title' => 'Q3', 'subtitle' => 'Draft', 'url' => '…', // null = not allowed
  *       ),
  *       'can'      => fn ( int $user_id ) => true,   // offer the command to this person?
+ *       'capability' => 'flurfunk_team',             // needed to insert or search (default);
+ *                                                    // 'flurfunk_guest': guests too
+ *       'capabilities' => array(                     // optional, declared like in inc/caps.php
+ *           'myplugin_reports' => array( 'label' => 'Insert reports', 'roles' => array( 'editor' ) ),
+ *       ),
  *   ) );
  *
  * A message stores the reference plus a small snapshot, so it stays readable after the source
@@ -72,7 +77,20 @@ function register( string $id, array $args ): void {
 		'search'   => is_callable( $args['search'] ?? null ) ? $args['search'] : null,
 		'snapshot' => $args['snapshot'],
 		'can'      => is_callable( $args['can'] ?? null ) ? $args['can'] : null,
+		// Capability needed to insert, search or refresh the card (see inc/caps.php).
+		'cap'      => sanitize_key( (string) ( $args['capability'] ?? \Flurfunk\Caps\TEAM ) ),
 	);
+	\Flurfunk\Caps\register_list( $args['capabilities'] ?? array(), $registry[ $id ]['label'] );
+}
+
+/**
+ * May the person use this provider (its capability, then its `can` callback)?
+ *
+ * @param array $p       Provider.
+ * @param int   $user_id User.
+ */
+function allowed( array $p, int $user_id ): bool {
+	return \Flurfunk\Caps\user_has( $user_id, $p['cap'] ) && ( ! $p['can'] || call_user_func( $p['can'], $user_id ) );
 }
 
 /**
@@ -84,7 +102,7 @@ function register( string $id, array $args ): void {
 function available( int $user_id ): array {
 	$out = array();
 	foreach ( registry() as $p ) {
-		if ( ! $p['can'] || call_user_func( $p['can'], $user_id ) ) {
+		if ( allowed( $p, $user_id ) ) {
 			$out[] = array(
 				'id'      => $p['id'],
 				'command' => $p['command'],
@@ -106,7 +124,7 @@ function available( int $user_id ): array {
  */
 function search( string $id, string $query, int $user_id ): ?array {
 	$p = registry()[ $id ] ?? null;
-	if ( ! $p || ( $p['can'] && ! call_user_func( $p['can'], $user_id ) ) ) {
+	if ( ! $p || ! allowed( $p, $user_id ) ) {
 		return null;
 	}
 	if ( ! $p['search'] ) {
@@ -134,7 +152,7 @@ function search( string $id, string $query, int $user_id ): ?array {
  */
 function snapshot( string $id, array $ref, int $user_id ): ?array {
 	$p = registry()[ $id ] ?? null;
-	if ( ! $p || ( $p['can'] && ! call_user_func( $p['can'], $user_id ) ) ) {
+	if ( ! $p || ! allowed( $p, $user_id ) ) {
 		return null;
 	}
 	$snap = call_user_func( $p['snapshot'], $ref, $user_id );
@@ -217,8 +235,9 @@ function register_builtin(): void {
 			'command'  => _x( 'post', 'slash command', 'flurfunk' ),
 			'label'    => __( 'Post', 'flurfunk' ),
 			'hint'     => __( 'Insert a post as a card', 'flurfunk' ),
-			'search'   => __NAMESPACE__ . '\\search_posts',
-			'snapshot' => __NAMESPACE__ . '\\post_snapshot',
+			'search'     => __NAMESPACE__ . '\\search_posts',
+			'snapshot'   => __NAMESPACE__ . '\\post_snapshot',
+			'capability' => \Flurfunk\Caps\GUEST, // Guests get their own posts.
 		)
 	);
 }

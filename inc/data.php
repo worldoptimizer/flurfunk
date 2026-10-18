@@ -52,10 +52,10 @@ function remove_dir( string $dir ): void {
 }
 
 /**
- * Stop unless an administrator is asking (the nonce is checked right after, in each handler).
+ * Stop unless someone who manages Flurfunk is asking (the nonce is checked right after, in each handler).
  */
 function check(): void {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! \Flurfunk\Access\can_manage() ) {
 		wp_die( esc_html__( 'You cannot change this.', 'flurfunk' ), 403 );
 	}
 }
@@ -191,7 +191,7 @@ function render_section(): void {
 add_action(
 	'admin_notices',
 	static function (): void {
-		if ( ! get_option( WELCOME ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! get_option( WELCOME ) || ! \Flurfunk\Access\can_manage() ) {
 			return;
 		}
 		$screen = get_current_screen();

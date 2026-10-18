@@ -15,6 +15,7 @@
  * Layout:
  *   inc/schema.php     own tables (versioned, upgrade steps)
  *   inc/access.php     who sees what: team and guests per channel
+ *   inc/caps.php       capabilities (flurfunk_team, _guest, _moderate, _manage, declared ones)
  *   inc/store.php      reading and writing, data format "flurfunk/1"
  *   inc/providers.php  providers for slash commands and cards (the extension API)
  *   inc/targets.php    what threads can be attached to (posts built in, more via the API)
@@ -48,6 +49,7 @@ define( 'FLURFUNK_URL', plugin_dir_url( __FILE__ ) );
 require_once FLURFUNK_DIR . 'inc/strings.php';
 require_once FLURFUNK_DIR . 'inc/schema.php';
 require_once FLURFUNK_DIR . 'inc/access.php';
+require_once FLURFUNK_DIR . 'inc/caps.php';
 require_once FLURFUNK_DIR . 'inc/store.php';
 require_once FLURFUNK_DIR . 'inc/providers.php';
 require_once FLURFUNK_DIR . 'inc/targets.php';
@@ -68,6 +70,8 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once FLURFUNK_DIR . 'inc/cli.php';
 }
 
+// Capabilities first: it tells a fresh site from one that ran 0.1 by the settings and channels.
+register_activation_hook( __FILE__, 'Flurfunk\\Caps\\install' );
 // A fresh install (no settings yet) gets a short welcome in wp-admin.
 register_activation_hook( __FILE__, static fn () => false === get_option( 'flurfunk_settings' ) && add_option( 'flurfunk_welcome', 1, '', false ) );
 register_activation_hook( __FILE__, 'Flurfunk\\Schema\\activate' );
@@ -246,7 +250,8 @@ function flurfunk_set_status( $thread, string $status, int $author = 0 ) {
  * a switch and is only loaded when switched on. Call it on the `flurfunk_modules` action.
  *
  * @param string $id   ID like "vendor/name".
- * @param array  $args label, description, group, requires, default, load, settings_url.
+ * @param array  $args label, description, group, requires, default, load, settings_url,
+ *                     capabilities (cap => label, description, roles: granted once it is on).
  */
 function flurfunk_register_module( string $id, array $args ): bool {
 	return Flurfunk\Modules\register( $id, $args );
@@ -261,3 +266,13 @@ function flurfunk_module_enabled( string $id ): bool {
 	return Flurfunk\Modules\enabled( $id );
 }
 
+/**
+ * Declare a capability (see inc/caps.php): it shows up in the permissions matrix under
+ * Settings → Flurfunk, and the recommended roles get it once unless the site already decided.
+ *
+ * @param string $cap  Capability, e.g. "acme_send".
+ * @param array  $args label, description, roles (recommended role names), group.
+ */
+function flurfunk_register_capability( string $cap, array $args = array() ): bool {
+	return Flurfunk\Caps\register( $cap, $args );
+}

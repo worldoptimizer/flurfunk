@@ -10,11 +10,11 @@
  *   GET  threads/<id>              thread with messages; marks it read
  *   POST threads/<id>/messages     reply
  *   POST threads/<id>/status       open | doing | waiting | done | ''
- *   POST threads/<id>/edit         title, body (author or manager)
+ *   POST threads/<id>/edit         title, body (author or moderator)
  *   POST threads/<id>/follow       mode: follow | mute | default
  *   POST threads/<id>/remind       when: hour | tomorrow | monday | none | ISO time
  *   POST threads/<id>/task         due (Y-m-d or ''), assignees (user IDs)
- *   POST messages/<id>             new text (author or manager)
+ *   POST messages/<id>             new text (author or moderator)
  *   DELETE messages/<id>           remove (a note stays in its place)
  *   GET  providers/<id>/search     suggestions for a slash command
  *   GET  targets?q=                things a thread can be attached to
@@ -202,9 +202,10 @@ function bootstrap(): array {
 	return array(
 		'format'    => 'flurfunk/1',
 		'me'        => $me + array(
-			'prefs'  => \Flurfunk\Notify\prefs( $uid ),
-			'manage' => Access\can_manage( $uid ),
-			'upload' => current_user_can( 'upload_files' ),
+			'prefs'    => \Flurfunk\Notify\prefs( $uid ),
+			'manage'   => Access\can_manage( $uid ),
+			'moderate' => Access\can_moderate( $uid ),
+			'upload'   => current_user_can( 'upload_files' ),
 		),
 		'people'    => Store\people(),
 		'channels'  => $channels,

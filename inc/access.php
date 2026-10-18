@@ -2,14 +2,14 @@
 /**
  * Who sees what.
  *
- * A person is "team" (may edit other people's posts) or "guest" (writes only their own posts,
+ * A person is "team" (capability flurfunk_team, or an assistant) or "guest" (flurfunk_guest,
  * e.g. guest authors) – or has no access. Each channel sets a level for both sides:
  *   all        every thread in the channel
  *   own-posts  only threads attached to one of their own posts
  *   none       nothing
  *
  * Adjust with the filters flurfunk_user_kind and flurfunk_owned_post_ids (e.g. to count
- * co-authors from another plugin). The required capabilities come from the settings.
+ * co-authors from another plugin). The capabilities themselves live in inc/caps.php.
  *
  * @package Flurfunk
  */
@@ -35,8 +35,7 @@ function kind( int $user_id = 0 ): string {
 	$user = get_userdata( $user_id );
 	$kind = '';
 	if ( $user ) {
-		$s    = \Flurfunk\Settings\get();
-		$kind = is_bot( $user_id ) || user_can( $user, $s['team_cap'] ) ? 'team' : ( '' !== $s['guest_cap'] && user_can( $user, $s['guest_cap'] ) ? 'guest' : '' );
+		$kind = is_bot( $user_id ) || user_can( $user, \Flurfunk\Caps\TEAM ) ? 'team' : ( user_can( $user, \Flurfunk\Caps\GUEST ) ? 'guest' : '' );
 		$kind = (string) apply_filters( 'flurfunk_user_kind', $kind, $user );
 	}
 	return $cache[ $user_id ] = $kind;
@@ -93,12 +92,21 @@ function can_use( int $user_id = 0 ): bool {
 }
 
 /**
- * May the person manage channels and settings?
+ * May the person manage settings, channels, permissions, modules and assistants?
  *
  * @param int $user_id User (0 = current).
  */
 function can_manage( int $user_id = 0 ): bool {
-	return user_can( $user_id ?: get_current_user_id(), 'manage_options' );
+	return user_can( $user_id ?: get_current_user_id(), \Flurfunk\Caps\MANAGE );
+}
+
+/**
+ * May the person edit and delete other people's messages and threads?
+ *
+ * @param int $user_id User (0 = current).
+ */
+function can_moderate( int $user_id = 0 ): bool {
+	return user_can( $user_id ?: get_current_user_id(), \Flurfunk\Caps\MODERATE );
 }
 
 /**
