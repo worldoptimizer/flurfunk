@@ -368,20 +368,116 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | Check | Rule | Filter |
 | --- | --- | --- |
 | Uses Flurfunk at all | kind is `team` or `guest` | `flurfunk_user_kind` |
-| Kind | assistant or team capability → team; guest capability → guest | `flurfunk_user_kind` |
+| Kind | assistant or `flurfunk_team` → team; `flurfunk_guest` → guest | `flurfunk_user_kind` |
 | Channel level | archived → `none`; otherwise the channel's team or guest level | `flurfunk_channel_level` |
 | Sees a thread | level `all`; or `own-posts` and the thread is attached to one of their posts | `flurfunk_owned_post_ids` |
 | Starts a thread | as "sees", plus may attach to the chosen target | `flurfunk_can_target` |
 | Attaches to a target | the target type's `can` callback (default: team, and the target exists) | `flurfunk_can_target` |
-| Edits or deletes | author or `manage_options` | `flurfunk_can_edit` |
+| Edits or deletes | author or `flurfunk_moderate` | `flurfunk_can_edit` |
 | Changes task state, due date, assignees | sees the thread | `flurfunk_can_resolve` |
 | Is mentioned or assigned | only people who can see the thread | |
-| Inserts or refreshes a card | the provider's `can`, and `snapshot` must not return null | |
+| Inserts, searches or refreshes a card | the provider's `capability` (default `flurfunk_team`), its `can`, and `snapshot` must not return null | |
 | Uploads | `upload_files` or assistant | |
 | Attaches a media library file by ID | their own files and files they may edit (`edit_post`); assistants any file not attached to a private post | `flurfunk_can_attach` |
-| Manages settings and channels | `manage_options` | |
+| Manages settings, channels, permissions, modules, assistants, export and import | `flurfunk_manage` | |
 
 `own-posts` only ever applies to the target type `post`.
+
+## Capabilities
+
+Flurfunk checks only its own capabilities (and WordPress's `upload_files` for files). They are
+normal primitive capabilities granted to roles, so role editor plugins such as Members or User Role
+Editor can hand them out like any other, also to single users. Administrators manage them under
+*Settings → Flurfunk → Permissions*.
+
+| Capability | Allows | Fresh site |
+| --- | --- | --- |
+| `flurfunk_team` | Takes part as team: sees channels according to their team level, attaches threads to any post, uses team providers. | administrator, editor |
+| `flurfunk_guest` | Takes part as a guest: sees channels according to their guest level (usually only threads about their own posts). Team wins if someone has both. | author, contributor |
+| `flurfunk_moderate` | Edits and deletes other people's messages and threads. | administrator, editor |
+| `flurfunk_manage` | Settings page, channels, permissions, modules, assistants, export and import. | administrator |
+
+There is no `flurfunk_use`: someone uses Flurfunk when they are team or guest. Assistant accounts
+count as team without holding `flurfunk_team`. `flurfunk_user_kind` and `flurfunk_channel_level`
+still have the last word. In code, ask `Flurfunk\Access\kind()`, `can_use()`, `can_manage()` and
+`can_moderate()` rather than the capabilities, so assistants and filters are respected.
+
+**Grants.** Activation (and the first request after an update, once per site; on a network each
+site on its first request) grants the defaults above. The version is kept in the option
+`flurfunk_caps_version`; nothing is granted again later, so whatever the site changes stays.
+*Settings → Flurfunk → Permissions* never takes `flurfunk_manage` away from administrators, from the
+last role that has it or from the role of the person saving; if a role editor removes it from every
+role, administrators get it back.
+
+**Migration from 0.1.** 0.1 chose a WordPress capability for the team (`team_cap`, default
+`edit_others_posts`) and one for guests (`guest_cap`, default `edit_posts`) in the settings.
+On the first request with 0.2 a site that ran 0.1 (it has Flurfunk settings or channels) gets,
+once:
+
+- `flurfunk_team` for every role with the team capability,
+- `flurfunk_guest` for every other role with the guest capability (none if guests were off),
+- `flurfunk_manage` and `flurfunk_moderate` for every role with `manage_options` (in 0.1 only they
+  could edit other people's messages; editors do not get `flurfunk_moderate` here, unlike on a fresh
+  site).
+
+Values set through the `flurfunk_settings` filter are read for this too. Afterwards `team_cap` and
+`guest_cap` are removed from the settings and no longer read. Capabilities granted to single users
+(not roles) are not migrated.
+
+**Uninstall** removes Flurfunk's capabilities from all roles on every site, whether or not the
+conversations are kept; declared capabilities (below) only if no role had them before Flurfunk
+granted them. A reinstall grants them again (a site with kept data is migrated as above).
+
+### Declaring capabilities
+
+Modules, providers and plugins can declare capabilities of their own. They appear in the
+permissions matrix, and their recommended roles get them once, unless the site already decided
+(some role has the capability already, or the matrix was saved with it). After that Flurfunk never
+grants them again.
+
+```php
+add_action( 'init', function () {
+	flurfunk_register_capability( 'acme_send_newsletter', array(
+		'label'       => 'Send newsletters',
+		'description' => 'May send a campaign from its card.',
+		'roles'       => array( 'administrator', 'editor' ), // recommended
+		'group'       => 'Acme',                             // heading in the matrix
+	) );
+} );
+
+// In a module: granted once the module is switched on; switching it off keeps the grants.
+flurfunk_register_module( 'acme/newsletter', array(
+	'label'        => 'Newsletter cards',
+	'load'         => fn () => require __DIR__ . '/newsletter.php',
+	'capabilities' => array(
+		'acme_send_newsletter' => array( 'label' => 'Send newsletters', 'roles' => array( 'administrator', 'editor' ) ),
+	),
+) );
+
+// In a provider: `capability` is what the command needs, `capabilities` declares new ones.
+flurfunk_register_provider( 'acme/newsletter', array(
+	'command'    => 'newsletter',
+	'snapshot'   => 'acme_newsletter_card',
+	'capability' => 'acme_send_newsletter',
+) );
+```
+
+Names are lower-case letters, digits, `_` and `-`; Flurfunk's own four cannot be declared again.
+Capabilities of a module that is off and that no role has are left out of the matrix. The
+`flurfunk_capabilities` filter adjusts the whole registry (`cap => label, description, roles,
+group, module`). Check a declared capability like any other with `user_can()`.
+
+### For integrators upgrading from 0.1
+
+- Code that relied on `team_cap` / `guest_cap` (option or `flurfunk_settings` filter) to decide who
+  is team: after the migration grant `flurfunk_team` / `flurfunk_guest` to the roles instead, or
+  keep using the `flurfunk_user_kind` filter.
+- Code that checked `manage_options` to mean "manages Flurfunk" should use
+  `Flurfunk\Access\can_manage()`; `manage_options` alone no longer opens the settings.
+- Providers without `capability` are now team only. A provider guests should use (e.g. statistics
+  for their own posts) needs `'capability' => 'flurfunk_guest'`.
+- Users created later get access through their role, as before; custom roles need the capabilities
+  granted (matrix, role editor or `get_role( 'x' )->add_cap( 'flurfunk_team' )`).
 
 ## PHP functions
 
@@ -389,6 +485,7 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | --- | --- | --- |
 | `flurfunk_register_provider( string $id, array $args )` | void | Register a slash command with cards. See [Providers](#providers-slash-commands-and-cards). |
 | `flurfunk_register_target( string $type, array $args )` | void | Register something threads can be attached to. See [Targets](#targets). |
+| `flurfunk_register_capability( string $cap, array $args = [] )` | bool | Declare a capability for the permissions matrix, with recommended roles. See [Declaring capabilities](#declaring-capabilities). |
 | `flurfunk_ensure_channel( string $slug, array $args = [] )` | int channel ID | Create a channel unless it exists. `$args`: `name`, `topic`, `access_team`, `access_guests`, `position`. An existing channel is left unchanged. |
 | `flurfunk_unread_count( int $user_id = 0 )` | int | Unread messages of a person (0 = current), for badges elsewhere. 0 for people without access. |
 | `flurfunk_url( string $view = '' )` | string | URL of the app, optionally opening a view. |
@@ -445,7 +542,9 @@ add_action( 'init', function () {
 | `label` | no | string | Shown on the card and in the menu. Default: the command. |
 | `hint` | no | string | One line in the command menu. |
 | `search` | no | callable `( string $q, int $user_id ): array` | Suggestions while typing. Without it the command offers nothing to pick. |
-| `can` | no | callable `( int $user_id ): bool` | Offer the command to this person. Checked for the menu, search, snapshot, refresh and actions. Default: everyone. |
+| `capability` | no | string | Capability needed for the menu, search, snapshot, refresh and actions. Default `flurfunk_team`; `flurfunk_guest` (or `''`) opens it to guests too; any other capability is checked with `user_can()`. Assistants count as team. |
+| `capabilities` | no | array | Capabilities to declare, `cap => [ label, description, roles ]`. See [Declaring capabilities](#declaring-capabilities). |
+| `can` | no | callable `( int $user_id ): bool` | Offer the command to this person, checked after `capability`. Checked for the menu, search, snapshot, refresh and actions. Default: everyone who has the capability. |
 | `actions` | no | array | Buttons on the card that run PHP. See [card actions](#card-actions). |
 | `hidden` | no | bool | Not in the `/` menu. For cards that only code attaches (e.g. a thread posted from PHP). |
 
@@ -605,7 +704,7 @@ them with the provider; each snapshot lists the ones that make sense right now.
 | `done` | | Event line in the thread, `%s` is the person ("Ana marked the order as shipped"). Without it: *Ana chose "Mark as shipped"* |
 | `style` | `secondary` | `primary`, `secondary` or `danger` |
 | `confirm` | | Question asked inside the card before it runs. Use it for anything hard to undo |
-| `capability` | `flurfunk_team` | Needed to see and run the button. `flurfunk_team`, `flurfunk_guest` and `flurfunk_manage` fall back to Flurfunk's team, user and settings checks while no role carries them |
+| `capability` | `flurfunk_team` | Needed to see and run the button, on top of the provider's `capability` and `can`. Any [capability](#permissions), e.g. `moderate_comments` or one you declared |
 | `callback` | required | `( array $ref, array $card, int $user_id ): array\|WP_Error`. Runs as the person who clicked |
 
 Action IDs are keys like `ship` (lowercase letters, digits, `_`, `-`); up to six per provider.
@@ -821,8 +920,9 @@ locked in the database.
 
 | Filter | Arguments | Return | Purpose |
 | --- | --- | --- | --- |
-| `flurfunk_settings` | `array $settings` | array | Adjust settings in code. Keys: `name`, `logo_id`, `accent`, `sidebar`, `team_cap`, `guest_cap`, `post_types`, `editor_panel`, `posts_column`, `keep_data`. Applied once per request. |
-| `flurfunk_user_kind` | `string $kind`, `WP_User $user` | `'team'`, `'guest'` or `''` | Who is team, guest or has no access. Cached per request. |
+| `flurfunk_settings` | `array $settings` | array | Adjust settings in code. Keys: `name`, `logo_id`, `accent`, `sidebar`, `post_types`, `editor_panel`, `posts_column`, `keep_data`. (0.1 also had `team_cap` and `guest_cap`; they are only read once for the [migration](#capabilities).) Applied once per request. |
+| `flurfunk_user_kind` | `string $kind`, `WP_User $user` | `'team'`, `'guest'` or `''` | Who is team, guest or has no access. Default from `flurfunk_team` / `flurfunk_guest` (assistants: team). Cached per request. |
+| `flurfunk_capabilities` | `array $caps` | array | The capability registry for the permissions matrix and recommended grants: `cap => { label, description, roles, group, module }`. |
 | `flurfunk_channel_level` | `string $level`, `object $channel`, `int $user_id`, `string $kind` | `'all'`, `'own-posts'` or `'none'` | Per-person access to a channel, e.g. private channels. Other values count as `none`. Cached per request. |
 | `flurfunk_owned_post_ids` | `int[] $ids`, `int $user_id` | int[] | Posts that count as a person's own (co-authors). |
 | `flurfunk_post_owners` | `int[] $user_ids`, `WP_Post $post` | int[] | Owners of a post, for the "… can read this" hint only. |
@@ -831,7 +931,7 @@ locked in the database.
 | `flurfunk_can_attach` | `bool $can`, `WP_Post $attachment`, `int $user_id` | bool | May the person refer to this media library file in a message? Default: own files, files they may edit, and for assistants any file not attached to a private post. |
 | `flurfunk_max_files` | `int $max` | int | Files per message. Default 50. |
 | `flurfunk_board_done_days` | `int $days` | int | How long done tasks stay on the board. Default 14. |
-| `flurfunk_can_edit` | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `manage_options`. |
+| `flurfunk_can_edit` | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `flurfunk_moderate`. |
 | `flurfunk_target_info` | `array $info`, `string $type`, `int $id` | array | `type`, `title`, `url`, `status`, `label` of a target for the interface. |
 | `flurfunk_user_role_label` | `string $role`, `WP_User $user` | string | The role shown next to names. |
 | `flurfunk_notify_recipients` | `array $to`, `object $thread`, `int $message_id` | array | `user_id => kind` for a new thread (`$message_id` 0) or message. Not used for task, due, reminder, question (`waiting`) and done notifications. |
@@ -839,7 +939,7 @@ locked in the database.
 | `flurfunk_push_payload` | `array {title, body, url, tag, icon}`, `array $n` | array | Change a push message. `$n` has `uid`, `kind`, `thread` (row), `message_id`, `actor`. |
 | `flurfunk_push_hosts` | `string[] $hosts` | string[] | Push services a browser subscription may point to; `*.example.com` matches subdomains. Default: `fcm.googleapis.com`, `android.googleapis.com`, `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`. |
 | `flurfunk_push_renew_limit` | `int $max` | int | Logged-out subscription renewals per IP address and hour. Default 30; 0 = off. |
-| `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for administrators; 0 = off. |
+| `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for people with `flurfunk_manage`; 0 = off. |
 | `flurfunk_thread_limit` | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
 | `flurfunk_notification_days` | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
 | `flurfunk_comments_channel` | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default `general`. |

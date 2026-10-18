@@ -40,7 +40,9 @@ Developers extend Flurfunk with providers (slash commands and cards), targets, f
 
 = Who can use Flurfunk? =
 
-Everyone who can edit other people's posts (editors and administrators) is "team" and sees all channels. Everyone else who can write posts (authors, contributors) is a "guest" and only sees conversations about their own posts. Both are adjustable per site and per channel in the settings.
+By default administrators and editors are "team" and see all channels; authors and contributors are "guests" and only see conversations about their own posts; subscribers don't see Flurfunk. Flurfunk has its own capabilities for this (flurfunk_team, flurfunk_guest, plus flurfunk_moderate to edit other people's messages and flurfunk_manage for the settings), which you assign to roles under Settings → Flurfunk → Permissions. Role editor plugins such as Members or User Role Editor can manage them as well, also for single users. What team and guests see is set per channel.
+
+When updating from 0.1, the "team" and "guest" capabilities chosen in the old settings are turned into these role permissions once, so everyone keeps the access they had.
 
 = Push notifications don't work. Why? =
 

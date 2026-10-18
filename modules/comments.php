@@ -3,7 +3,7 @@
  * Module "Comment cards": /comment inserts a comment as a card with its state and buttons to
  * approve it, mark it as spam or move it to the trash. Only WordPress core underneath.
  *
- * Who: people who use Flurfunk and may moderate comments (moderate_comments); each action
+ * Who: the team (flurfunk_team) who may moderate comments (moderate_comments); each action
  * checks edit_comment for that comment again. The card shows the commenter's public name, the
  * post and an excerpt, never the email or IP address.
  *
@@ -71,7 +71,7 @@ function register(): void {
  * @param int $user_id User.
  */
 function can( int $user_id ): bool {
-	return Access\can_use( $user_id ) && user_can( $user_id, 'moderate_comments' );
+	return user_can( $user_id, 'moderate_comments' ); // On top of the provider's team capability.
 }
 
 /**

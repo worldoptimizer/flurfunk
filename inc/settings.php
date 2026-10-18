@@ -1,8 +1,8 @@
 <?php
 /**
- * Settings: branding (name, logo, colours), who counts as team or guest, which post types
- * conversations can attach to, channels. Everything a site wants to adjust lives here or in a
- * provider – nothing site-specific belongs in the plugin code.
+ * Settings: branding (name, logo, colours), which post types conversations can attach to,
+ * channels, assistants; the permissions matrix comes from inc/caps.php. Everything a site wants
+ * to adjust lives here or in a provider – nothing site-specific belongs in the plugin code.
  *
  * @package Flurfunk
  */
@@ -26,8 +26,6 @@ function defaults(): array {
 		'logo_id'       => 0,
 		'accent'        => '#8b5a1b',
 		'sidebar'       => '#231b12',
-		'team_cap'      => 'edit_others_posts',
-		'guest_cap'     => 'edit_posts',
 		'post_types'    => array( 'post' ),
 		'editor_panel'  => true,
 		'posts_column'  => true,
@@ -81,15 +79,12 @@ function colour( $value, string $fallback ): string {
  * @param array $in Raw input.
  */
 function save( array $in ): void {
-	$d    = defaults();
-	$caps = array_keys( capabilities() );
-	$out  = array(
+	$d   = defaults();
+	$out = array(
 		'name'         => sanitize_text_field( (string) ( $in['name'] ?? '' ) ),
 		'logo_id'      => absint( $in['logo_id'] ?? 0 ),
 		'accent'       => colour( $in['accent'] ?? '', $d['accent'] ),
 		'sidebar'      => colour( $in['sidebar'] ?? '', $d['sidebar'] ),
-		'team_cap'     => in_array( $in['team_cap'] ?? '', $caps, true ) ? $in['team_cap'] : $d['team_cap'],
-		'guest_cap'    => '' === ( $in['guest_cap'] ?? '' ) || in_array( $in['guest_cap'], $caps, true ) ? (string) ( $in['guest_cap'] ?? '' ) : $d['guest_cap'],
 		'post_types'   => array_values( array_intersect( (array) ( $in['post_types'] ?? array() ), array_keys( post_types() ) ) ) ?: $d['post_types'],
 		'editor_panel' => ! empty( $in['editor_panel'] ),
 		'posts_column' => ! empty( $in['posts_column'] ),
@@ -98,20 +93,6 @@ function save( array $in ): void {
 	update_option( OPTION, $out, true );
 	get( true );
 	\Flurfunk\Store\bump();
-}
-
-/**
- * Capabilities to choose from.
- *
- * @return array<string,string>
- */
-function capabilities(): array {
-	return array(
-		'manage_options'    => __( 'Administrators (manage_options)', 'flurfunk' ),
-		'edit_others_posts' => __( 'Editors and up (edit_others_posts)', 'flurfunk' ),
-		'publish_posts'     => __( 'Authors and up (publish_posts)', 'flurfunk' ),
-		'edit_posts'        => __( 'Contributors and up (edit_posts)', 'flurfunk' ),
-	);
 }
 
 /**
@@ -132,7 +113,7 @@ function post_types(): array {
 add_action(
 	'admin_menu',
 	static function (): void {
-		$hook = add_options_page( __( 'Flurfunk', 'flurfunk' ), __( 'Flurfunk', 'flurfunk' ), 'manage_options', PAGE, __NAMESPACE__ . '\\render' );
+		$hook = add_options_page( __( 'Flurfunk', 'flurfunk' ), __( 'Flurfunk', 'flurfunk' ), \Flurfunk\Caps\MANAGE, PAGE, __NAMESPACE__ . '\\render' );
 		add_action( 'load-' . $hook, static fn () => add_action( 'admin_enqueue_scripts', __NAMESPACE__ . '\\enqueue' ) );
 	}
 );
@@ -149,7 +130,7 @@ function enqueue(): void {
 add_filter(
 	'plugin_action_links_' . plugin_basename( FLURFUNK_FILE ),
 	static function ( array $links ): array {
-		if ( current_user_can( 'manage_options' ) ) {
+		if ( Access\can_manage() ) {
 			array_unshift( $links, '<a href="' . esc_url( admin_url( 'options-general.php?page=' . PAGE ) ) . '">' . esc_html__( 'Settings', 'flurfunk' ) . '</a>' );
 		}
 		return $links;
@@ -238,21 +219,8 @@ function render(): void {
 				</tr>
 			</table>
 
-			<h2><?php esc_html_e( 'People', 'flurfunk' ); ?></h2>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Team', 'flurfunk' ); ?></th>
-					<td><?php $select( 'flurfunk[team_cap]', capabilities(), $s['team_cap'] ); ?>
-						<p class="description"><?php esc_html_e( 'The team sees channels according to their team setting.', 'flurfunk' ); ?></p></td>
-				</tr>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Guests', 'flurfunk' ); ?></th>
-					<td><?php $select( 'flurfunk[guest_cap]', array( '' => __( 'No guests', 'flurfunk' ) ) + capabilities(), $s['guest_cap'] ); ?>
-						<p class="description"><?php esc_html_e( 'Everyone else with this capability is a guest, e.g. guest authors. Guests see channels according to their guest setting.', 'flurfunk' ); ?></p></td>
-				</tr>
-			</table>
-
 			<h2><?php esc_html_e( 'Channels', 'flurfunk' ); ?></h2>
+			<p class="description" style="max-width:46rem"><?php echo wp_kses( sprintf( /* translators: %s: link to the permissions section */ __( 'Who counts as team and who as guest is set under %s.', 'flurfunk' ), '<a href="#flurfunk-permissions">' . esc_html__( 'Permissions', 'flurfunk' ) . '</a>' ), array( 'a' => array( 'href' => array() ) ) ); ?></p>
 			<table class="widefat striped" style="max-width:60rem">
 				<thead><tr><th><?php esc_html_e( 'Active', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Name', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Topic', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Team sees', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Guests see', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Order', 'flurfunk' ); ?></th></tr></thead>
 				<tbody>
@@ -321,6 +289,7 @@ function render(): void {
 			</table>
 			<?php submit_button(); ?>
 		</form>
+		<?php \Flurfunk\Caps\render_section(); ?>
 		<?php \Flurfunk\Modules\render_section(); ?>
 		<?php \Flurfunk\Data\render_section(); ?>
 	</div>

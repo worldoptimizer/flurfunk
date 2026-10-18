@@ -14,6 +14,9 @@
  *           'requires'    => fn () => post_type_exists( 'post' ),   // optional
  *           'default'     => true,                                   // on until switched off
  *           'load'        => fn () => require __DIR__ . '/review.php',
+ *           'capabilities' => array(                                 // optional, see inc/caps.php
+ *               'acme_review' => array( 'label' => 'Approve reviews', 'roles' => array( 'editor' ) ),
+ *           ),
  *       ) );
  *   } );
  *
@@ -47,7 +50,9 @@ function &registry(): array {
  * @param string $id   Unique ID, ideally "vendor/name".
  * @param array  $args label, description, group, requires (callable|bool|string[] of
  *                     functions/classes/constants that must exist), default (bool), load
- *                     (callable), settings_url (string, optional link next to the switch).
+ *                     (callable), settings_url (string, optional link next to the switch),
+ *                     capabilities (cap => label, description, roles; the roles get it once the
+ *                     module is on, unless the site already decided).
  * @return bool Registered.
  */
 function register( string $id, array $args ): bool {
@@ -68,6 +73,7 @@ function register( string $id, array $args ): bool {
 		'settings_url' => (string) ( $args['settings_url'] ?? '' ),
 		'loaded'       => false,
 	);
+	\Flurfunk\Caps\register_list( $args['capabilities'] ?? array(), $modules[ $id ]['label'], $id );
 	return true;
 }
 
@@ -108,6 +114,15 @@ function enabled( string $id ): bool {
 }
 
 /**
+ * Is a module switched on and are its requirements met (so it loads)?
+ *
+ * @param string $id Module ID.
+ */
+function active( string $id ): bool {
+	return enabled( $id ) && available( registry()[ $id ] );
+}
+
+/**
  * Switch modules on or off.
  *
  * @param array<string, bool> $changes Module ID => on.
@@ -121,6 +136,7 @@ function set( array $changes ): void {
 		}
 	}
 	update_option( OPTION, $choices, true );
+	\Flurfunk\Caps\seed_pending(); // Recommended grants of modules that just came on.
 }
 
 /**
@@ -249,7 +265,7 @@ function render_section(): void {
 add_action(
 	'admin_post_flurfunk_modules',
 	static function (): void {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! \Flurfunk\Access\can_manage() ) {
 			wp_die( esc_html__( 'You cannot change this.', 'flurfunk' ), 403 );
 		}
 		check_admin_referer( 'flurfunk_modules' );

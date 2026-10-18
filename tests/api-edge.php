@@ -4,7 +4,8 @@
  *
  *   wp eval-file tests/api-edge.php <team-user-id> <second-team-user-id> <guest-user-id>
  *
- * The guest needs at least one post of their own. Everything happens in a temporary channel
+ * The team users need flurfunk_team, the guest flurfunk_guest (e.g. an administrator, an editor and
+ * an author on a fresh site) and at least one post of their own. Everything happens in a temporary channel
  * "ff-test" (plus one archived channel) that is removed at the end, so it is safe on staging.
  *
  * @package Flurfunk
@@ -12,6 +13,7 @@
 
 // phpcs:disable
 
+use Flurfunk\Caps;
 use Flurfunk\Providers;
 use Flurfunk\Store;
 
@@ -903,6 +905,293 @@ wp_delete_user( $tmp );
 $as( $team );
 list( $s, $x ) = $req( 'GET', 'threads/' . $tid );
 $check( 'threads of deleted people stay readable', 200 === $s && 'von bald gelöscht' === $x['body'], $s );
+
+WP_CLI::log( 'Capabilities' );
+global $wpdb;
+// Everything below changes roles; the roles option and Flurfunk's options are restored at the end.
+$roles_key  = $wpdb->get_blog_prefix() . 'user_roles';
+$roles_snap = get_option( $roles_key );
+$opts_snap  = array();
+foreach ( array( 'flurfunk_settings', 'flurfunk_caps_version', 'flurfunk_caps_seeded', 'flurfunk_modules', 'flurfunk_welcome', 'flurfunk_rewrite' ) as $o ) {
+	$opts_snap[ $o ] = get_option( $o, null );
+}
+$restore_roles = function () use ( $roles_key, $roles_snap ) {
+	update_option( $roles_key, $roles_snap );
+	wp_roles()->for_site();
+};
+$cap_users = array();
+$cap_user  = function ( string $role, array $caps = array() ) use ( &$cap_users ) {
+	$id = wp_insert_user( array( 'user_login' => 'ff-test-cap-' . wp_generate_password( 6, false ), 'user_email' => 'ff-cap-' . wp_generate_password( 6, false ) . '@example.invalid', 'user_pass' => wp_generate_password(), 'role' => $role ) );
+	$u  = new WP_User( $id );
+	foreach ( $caps as $c ) {
+		$u->add_cap( $c );
+	}
+	$cap_users[] = $id;
+	return (int) $id;
+};
+
+// Fresh defaults.
+foreach ( wp_roles()->role_objects as $r ) {
+	foreach ( array_keys( Caps\core_roles() ) as $c ) {
+		$r->remove_cap( $c );
+	}
+}
+Caps\grant_defaults();
+$check(
+	'fresh site: administrators team, manage, moderate; editors team, moderate; authors and contributors guests',
+	array( 'administrator', 'editor' ) === Caps\roles_with( Caps\TEAM ) && array( 'administrator' ) === Caps\roles_with( Caps\MANAGE ) && array( 'administrator', 'editor' ) === Caps\roles_with( Caps\MODERATE ) && array( 'author', 'contributor' ) === Caps\roles_with( Caps\GUEST ),
+	array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ), Caps\roles_with( Caps\MANAGE ), Caps\roles_with( Caps\MODERATE ) )
+);
+
+// Which roles have a WordPress capability (sorted), so the checks hold on sites with extra roles.
+$having = static function ( string $cap, string $not = '' ): array {
+	$out = array();
+	foreach ( wp_roles()->role_objects as $name => $role ) {
+		if ( $role->has_cap( $cap ) && ( '' === $not || ! $role->has_cap( $not ) ) ) {
+			$out[] = $name;
+		}
+	}
+	sort( $out );
+	return $out;
+};
+$sorted = static function ( array $a ): array {
+	sort( $a );
+	return $a;
+};
+// Migration from 0.1 settings: team = publish_posts (authors and up), no guests.
+foreach ( wp_roles()->role_objects as $r ) {
+	foreach ( array_keys( Caps\core_roles() ) as $c ) {
+		$r->remove_cap( $c );
+	}
+}
+delete_option( Caps\OPTION );
+update_option( 'flurfunk_settings', array( 'name' => 'Alt', 'team_cap' => 'publish_posts', 'guest_cap' => '' ) );
+Caps\install();
+$s = get_option( 'flurfunk_settings' );
+$check(
+	'0.1 settings migrate once: team capability → flurfunk_team, no guests stays no guests',
+	$having( 'publish_posts' ) === $sorted( Caps\roles_with( Caps\TEAM ) ) && array() === Caps\roles_with( Caps\GUEST ),
+	array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ) )
+);
+$check( '… manage_options roles get manage and moderate, editors no moderation (as in 0.1)', array( 'administrator' ) === Caps\roles_with( Caps\MANAGE ) && array( 'administrator' ) === Caps\roles_with( Caps\MODERATE ), Caps\roles_with( Caps\MODERATE ) );
+$check( '… the old settings keys are gone, the rest stays', ! isset( $s['team_cap'] ) && ! isset( $s['guest_cap'] ) && 'Alt' === $s['name'], $s );
+get_role( 'author' )->remove_cap( Caps\TEAM );
+Caps\install();
+$check( '… and it runs only once', ! get_role( 'author' )->has_cap( Caps\TEAM ) && Caps\VERSION === (int) get_option( Caps\OPTION ) );
+delete_option( Caps\OPTION );
+$wpdb->insert( $wpdb->options, array( 'option_name' => Caps\OPTION . '_lock', 'option_value' => (string) time(), 'autoload' => 'no' ) );
+Caps\install();
+$check( 'a second request waits while another one migrates', false === get_option( Caps\OPTION ) );
+$wpdb->update( $wpdb->options, array( 'option_value' => (string) ( time() - HOUR_IN_SECONDS ) ), array( 'option_name' => Caps\OPTION . '_lock' ) );
+Caps\install();
+$check( '… and a stale lock does not block it forever', Caps\VERSION === (int) get_option( Caps\OPTION ) && ! $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", Caps\OPTION . '_lock' ) ) );
+update_option( 'flurfunk_settings', array( 'guest_cap' => 'edit_posts' ) );
+delete_option( Caps\OPTION );
+foreach ( wp_roles()->role_objects as $r ) {
+	$r->remove_cap( Caps\TEAM );
+	$r->remove_cap( Caps\GUEST );
+}
+Caps\install();
+$check( 'without a team setting the 0.1 default (edit_others_posts) applies; guests are the other edit_posts roles', $having( 'edit_others_posts' ) === $sorted( Caps\roles_with( Caps\TEAM ) ) && $having( 'edit_posts', 'edit_others_posts' ) === $sorted( Caps\roles_with( Caps\GUEST ) ), array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ) ) );
+$restore_roles();
+update_option( 'flurfunk_settings', $opts_snap['flurfunk_settings'] ?? array() );
+update_option( Caps\OPTION, Caps\VERSION );
+
+// kind() follows the capabilities, whatever the role.
+$u_team  = $cap_user( 'subscriber', array( Caps\TEAM ) );
+$u_guest = $cap_user( 'subscriber', array( Caps\GUEST ) );
+$u_both  = $cap_user( 'subscriber', array( Caps\TEAM, Caps\GUEST ) );
+$check( 'kind(): flurfunk_team → team, flurfunk_guest → guest, both → team', 'team' === Flurfunk\Access\kind( $u_team ) && 'guest' === Flurfunk\Access\kind( $u_guest ) && 'team' === Flurfunk\Access\kind( $u_both ) );
+$u_wp = $cap_user( 'subscriber', array( 'edit_others_posts', 'manage_options' ) );
+$check( '… WordPress capabilities alone give no access', '' === Flurfunk\Access\kind( $u_wp ) );
+$u_kf = $cap_user( 'subscriber' );
+add_filter( 'flurfunk_user_kind', $kf = fn ( $k, $u ) => (int) $u->ID === $u_kf ? 'guest' : $k, 10, 2 );
+$check( '… and the flurfunk_user_kind filter still decides last', 'guest' === Flurfunk\Access\kind( $u_kf ) );
+remove_filter( 'flurfunk_user_kind', $kf, 10 );
+
+// Moderation and management.
+$u_mod    = $cap_user( 'subscriber', array( Caps\TEAM, Caps\MODERATE ) );
+$u_mgr    = $cap_user( 'subscriber', array( Caps\TEAM, Caps\MANAGE ) );
+$u_siteop = $cap_user( 'subscriber', array( Caps\TEAM, 'manage_options' ) );
+$as( $team );
+list( $s, $x ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'body' => 'Moderationstest' ) );
+$mt = (int) $x['id'];
+list( $s, $x ) = $req( 'POST', 'threads/' . $mt . '/messages', array( 'body' => 'vom Team' ) );
+$mm = end( $x['messages'] )['id'];
+$as( $u_team );
+list( $s ) = $req( 'POST', 'messages/' . $mm, array( 'body' => 'fremd' ) );
+$check( 'team without flurfunk_moderate cannot edit others\' messages', 403 === $s, $s );
+list( $s ) = $req( 'POST', 'threads/' . $mt . '/edit', array( 'body' => 'fremd' ) );
+$check( '… nor threads', 403 === $s, $s );
+$as( $u_siteop );
+list( $s ) = $req( 'DELETE', 'messages/' . $mm );
+$check( '… and manage_options alone is no moderation any more', 403 === $s, $s );
+$as( $u_mod );
+list( $s, $x ) = $req( 'POST', 'messages/' . $mm, array( 'body' => 'moderiert' ) );
+$check( 'flurfunk_moderate edits others\' messages', 200 === $s, $s );
+list( $s ) = $req( 'POST', 'threads/' . $mt . '/edit', array( 'body' => 'moderiert' ) );
+$check( '… and threads', 200 === $s, $s );
+list( $s, $b ) = $req( 'GET', 'bootstrap' );
+$check( 'bootstrap tells the app: moderate yes, manage no', true === $b['me']['moderate'] && false === $b['me']['manage'] && '' === $b['settings'], $b['me'] ?? $s );
+list( $s ) = $req( 'DELETE', 'messages/' . $mm );
+$check( 'flurfunk_moderate deletes others\' messages', 200 === $s, $s );
+$as( $u_mgr );
+list( $s, $b ) = $req( 'GET', 'bootstrap' );
+$check( 'flurfunk_manage (without manage_options) manages: settings link, can_manage()', true === $b['me']['manage'] && '' !== $b['settings'] && Flurfunk\Access\can_manage( $u_mgr ), $b['me'] ?? $s );
+$check( '… but does not moderate by itself', false === $b['me']['moderate'] );
+$check( 'manage_options without flurfunk_manage does not manage Flurfunk', ! Flurfunk\Access\can_manage( $u_siteop ) );
+// The admin forms: refused without flurfunk_manage, past the capability check (on to the nonce) with it.
+$died = function ( string $action ) {
+	$handler = fn () => function ( $message ) {
+		throw new RuntimeException( is_string( $message ) ? $message : 'die' );
+	};
+	add_filter( 'wp_die_handler', $handler );
+	$_REQUEST['_wpnonce'] = 'wrong';
+	try {
+		do_action( 'admin_post_' . $action );
+		$out = 'ran';
+	} catch ( RuntimeException $e ) {
+		$out = $e->getMessage();
+	}
+	remove_filter( 'wp_die_handler', $handler );
+	unset( $_REQUEST['_wpnonce'] );
+	return $out;
+};
+$denied = array();
+foreach ( array( 'flurfunk_settings', 'flurfunk_caps', 'flurfunk_modules', 'flurfunk_export', 'flurfunk_import' ) as $a ) {
+	$as( $u_siteop );
+	$no = $died( $a );
+	$as( $u_mgr );
+	$yes = $died( $a );
+	if ( ! in_array( $no, array( __( 'You cannot change this.', 'flurfunk' ), __( 'Sorry, you are not allowed to do that.', 'flurfunk' ) ), true ) || $yes === $no ) {
+		$denied[ $a ] = array( $no, $yes );
+	}
+}
+$check( 'settings, permissions, modules, export and import need flurfunk_manage, not manage_options', ! $denied, $denied );
+
+// Declared capabilities.
+$check( 'Flurfunk\'s own capability names cannot be declared again', ! @flurfunk_register_capability( Caps\TEAM, array() ) && ! @flurfunk_register_capability( 'Bad Cap', array() ) );
+$check( 'a plugin declares a capability', flurfunk_register_capability( 'ff_test_plain', array( 'label' => 'Plain', 'roles' => array( 'author' ) ) ) );
+get_role( 'contributor' )->add_cap( 'ff_test_pre' );
+flurfunk_register_capability( 'ff_test_pre', array( 'label' => 'Pre', 'roles' => array( 'editor' ) ) );
+add_filter( 'flurfunk_capabilities', $cf = fn ( $c ) => $c + array( 'ff_test_filtered' => array( 'label' => 'Filtered' ) ) );
+$check( 'the flurfunk_capabilities filter adds to the registry', isset( Caps\all()['ff_test_filtered'] ) && isset( Caps\all()[ Caps\TEAM ] ) );
+remove_filter( 'flurfunk_capabilities', $cf );
+Caps\seed_pending();
+$check( 'recommended roles get it once', get_role( 'author' )->has_cap( 'ff_test_plain' ) );
+$check( '… unless some role already had it (the site decided)', ! get_role( 'editor' )->has_cap( 'ff_test_pre' ) && empty( get_option( Caps\SEEDED )['ff_test_pre']['new'] ) );
+get_role( 'author' )->remove_cap( 'ff_test_plain' );
+Caps\seed_pending();
+$check( '… and never again after the site took it away', ! get_role( 'author' )->has_cap( 'ff_test_plain' ) );
+
+flurfunk_register_module( 'ff-test/capmod', array( 'label' => 'Cap module', 'default' => false, 'load' => '__return_true', 'capabilities' => array( 'ff_test_mod' => array( 'label' => 'Module right', 'roles' => array( 'editor' ) ) ) ) );
+Caps\seed_pending();
+$check( 'a module declares capabilities; nothing is granted while it is off', isset( Caps\all()['ff_test_mod'] ) && 'ff-test/capmod' === Caps\all()['ff_test_mod']['module'] && ! Caps\roles_with( 'ff_test_mod' ) );
+$check( '… and the matrix leaves them out', ! isset( Caps\shown()['ff_test_mod'] ) );
+Flurfunk\Modules\set( array( 'ff-test/capmod' => true ) );
+$check( 'switching the module on grants the recommended roles', array( 'editor' ) === Caps\roles_with( 'ff_test_mod' ) && isset( Caps\shown()['ff_test_mod'] ) );
+Flurfunk\Modules\set( array( 'ff-test/capmod' => false ) );
+$check( 'switching it off keeps the grants (and the matrix still shows them)', array( 'editor' ) === Caps\roles_with( 'ff_test_mod' ) && isset( Caps\shown()['ff_test_mod'] ) );
+get_role( 'editor' )->remove_cap( 'ff_test_mod' );
+Flurfunk\Modules\set( array( 'ff-test/capmod' => true ) );
+$check( 'switching it on again does not grant again', ! Caps\roles_with( 'ff_test_mod' ) );
+
+// Providers.
+flurfunk_register_provider( 'ff-test/teamonly', array( 'command' => 'ffteam', 'search' => fn () => array( array( 'ref' => array( 'id' => 1 ), 'title' => 'T' ) ), 'snapshot' => fn () => array( 'title' => 'Teamkarte' ) ) );
+flurfunk_register_provider( 'ff-test/guestok', array( 'command' => 'ffguest', 'capability' => Caps\GUEST, 'search' => fn () => array( array( 'ref' => array( 'id' => 1 ), 'title' => 'G' ) ), 'snapshot' => fn () => array( 'title' => 'Gastkarte' ) ) );
+flurfunk_register_provider( 'ff-test/special', array( 'command' => 'ffspecial', 'capability' => 'ff_test_special', 'capabilities' => array( 'ff_test_special' => array( 'label' => 'Special cards' ) ), 'snapshot' => fn () => array( 'title' => 'Spezial' ) ) );
+$check( 'a provider declares its capability for the matrix', isset( Caps\all()['ff_test_special'] ) );
+$as( $guest );
+$cmds = wp_list_pluck( Flurfunk\Providers\available( $guest ), 'id' );
+$check( 'providers need flurfunk_team by default: guests are not offered them', ! in_array( 'ff-test/teamonly', $cmds, true ) && in_array( 'ff-test/guestok', $cmds, true ) && in_array( 'flurfunk/post', $cmds, true ), $cmds );
+list( $s ) = $req( 'GET', 'providers/ff-test/teamonly/search', null, array( 'q' => 'x' ) );
+$check( '… cannot search them over REST', 404 === $s, $s );
+list( $s, $items ) = $req( 'GET', 'providers/ff-test/guestok/search', null, array( 'q' => 'x' ) );
+$check( '… but providers with capability flurfunk_guest work for guests', 200 === $s && 1 === count( $items ), $s );
+list( $s, $x ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'target' => array( 'type' => 'post', 'id' => $guest_post ), 'body' => 'Karten', 'attachments' => array( array( 'provider' => 'ff-test/teamonly', 'ref' => array( 'id' => 1 ) ), array( 'provider' => 'ff-test/guestok', 'ref' => array( 'id' => 1 ) ) ) ) );
+$check( '… and a team-only card is dropped from a guest\'s message', 200 === $s && array( 'ff-test/guestok' ) === wp_list_pluck( $x['attachments'], 'provider' ), $x['attachments'] ?? $x );
+$as( $team2 );
+list( $s ) = $req( 'GET', 'providers/ff-test/teamonly/search', null, array( 'q' => 'x' ) );
+$check( 'the team can use team providers', 200 === $s, $s );
+list( $s ) = $req( 'GET', 'providers/ff-test/special/search', null, array( 'q' => 'x' ) );
+$check( 'a provider with its own capability is closed to people without it', 404 === $s && null === Flurfunk\Providers\snapshot( 'ff-test/special', array( 'id' => 1 ), $team2 ), $s );
+$u_special = $cap_user( 'subscriber', array( Caps\TEAM, 'ff_test_special' ) );
+$check( '… and open to those with it', null !== Flurfunk\Providers\snapshot( 'ff-test/special', array( 'id' => 1 ), $u_special ) );
+$bot2 = $cap_user( 'subscriber' );
+update_user_meta( $bot2, 'flurfunk_bot', 1 );
+$check( 'assistants count as team for providers', null !== Flurfunk\Providers\snapshot( 'ff-test/teamonly', array( 'id' => 1 ), $bot2 ) );
+$preg = &Flurfunk\Providers\registry();
+unset( $preg['ff-test/teamonly'], $preg['ff-test/guestok'], $preg['ff-test/special'] );
+
+// Lockout protection.
+$grid = array();
+foreach ( wp_roles()->role_objects as $n => $r ) {
+	foreach ( array_keys( Caps\shown() ) as $c ) {
+		if ( $r->has_cap( $c ) ) {
+			$grid[ $n ][ $c ] = 1;
+		}
+	}
+}
+$as( $team );
+$g = $grid;
+unset( $g['administrator'][ Caps\MANAGE ] );
+Caps\save_matrix( $g );
+$check( 'the matrix never takes manage away from administrators', get_role( 'administrator' )->has_cap( Caps\MANAGE ) );
+$g = $grid;
+$g['author'][ Caps\TEAM ] = 1;
+unset( $g['author'][ Caps\GUEST ] );
+Caps\save_matrix( $g );
+$check( 'the matrix grants and removes capabilities per role', get_role( 'author' )->has_cap( Caps\TEAM ) && ! get_role( 'author' )->has_cap( Caps\GUEST ) );
+add_role( 'ff_test_mgr', 'FF Manager', array( 'read' => true, Caps\MANAGE => true, Caps\TEAM => true ) );
+$u_rolemgr = $cap_user( 'ff_test_mgr' );
+$as( $u_rolemgr );
+$g = $grid;
+$g['ff_test_mgr'] = array( Caps\TEAM => 1 );
+$held = Caps\save_matrix( $g );
+$check( 'nobody takes manage away from their own role', $held && get_role( 'ff_test_mgr' )->has_cap( Caps\MANAGE ) );
+foreach ( wp_roles()->role_objects as $r ) {
+	$r->remove_cap( Caps\MANAGE );
+}
+Caps\ensure_manager();
+$check( 'if no role can manage any more, administrators get it back', array( 'administrator' ) === Caps\roles_with( Caps\MANAGE ) );
+remove_role( 'ff_test_mgr' );
+
+// Uninstall removes the capabilities from all roles (data is kept with keep_data).
+$as( $team );
+$restore_roles();
+get_role( 'editor' )->add_cap( 'ff_test_plain' ); // Granted by Flurfunk ("new"), see above.
+$seeded_now = get_option( Caps\SEEDED );
+$settings_now = get_option( 'flurfunk_settings' );
+update_option( 'flurfunk_settings', array( 'keep_data' => true ) + (array) $settings_now );
+update_option( Caps\SEEDED, array_merge( (array) $seeded_now, array( 'ff_test_plain' => array( 'new' => true ) ) ) );
+get_role( 'contributor' )->add_cap( 'ff_test_pre' );
+defined( 'WP_UNINSTALL_PLUGIN' ) || define( 'WP_UNINSTALL_PLUGIN', 'flurfunk/flurfunk.php' );
+include FLURFUNK_DIR . 'uninstall.php';
+$left = array();
+foreach ( wp_roles()->role_objects as $n => $r ) {
+	foreach ( array_keys( $r->capabilities ) as $c ) {
+		if ( str_starts_with( $c, 'flurfunk_' ) || 'ff_test_plain' === $c ) {
+			$left[] = "$n:$c";
+		}
+	}
+}
+$check( 'uninstall removes Flurfunk\'s capabilities from every role', ! $left && false === get_option( Caps\OPTION ), $left );
+$check( '… but leaves capabilities it did not introduce', get_role( 'contributor' )->has_cap( 'ff_test_pre' ) );
+$check( '… and keeps the conversations', (bool) $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}flurfunk_threads'" ) );
+
+// Back to how it was.
+$restore_roles();
+foreach ( $opts_snap as $o => $v ) {
+	null === $v ? delete_option( $o ) : update_option( $o, $v );
+}
+$seeded = (array) get_option( Caps\SEEDED, array() );
+unset( $seeded['ff_test_plain'], $seeded['ff_test_pre'], $seeded['ff_test_mod'], $seeded['ff_test_special'] );
+update_option( Caps\SEEDED, $seeded );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+foreach ( $cap_users as $id ) {
+	wp_delete_user( $id );
+}
+$check( 'roles are back as before the tests', get_option( $roles_key ) === $roles_snap );
 
 WP_CLI::log( 'Clean up' );
 global $wpdb;

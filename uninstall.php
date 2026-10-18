@@ -2,7 +2,8 @@
 /**
  * Uninstall: drop the tables, remove Flurfunk files and the assistant accounts only if the site
  * chose not to keep the conversations (Settings → Flurfunk → Data). Files already added to the
- * media library stay.
+ * media library stay. The capabilities always go (on every site of a network): without the
+ * plugin they mean nothing, and a reinstall grants them again.
  *
  * @package Flurfunk
  */
@@ -18,6 +19,35 @@ wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
 delete_option( 'flurfunk_rewrite' );
 delete_option( 'flurfunk_welcome' );
 delete_option( 'flurfunk_modules' );
+
+// Capabilities: Flurfunk's own, and declared ones that no role had before Flurfunk granted them.
+$flurfunk_remove_caps = static function (): void {
+	$caps = array( 'flurfunk_team', 'flurfunk_guest', 'flurfunk_moderate', 'flurfunk_manage' );
+	foreach ( (array) get_option( 'flurfunk_caps_seeded', array() ) as $cap => $info ) {
+		if ( ! empty( $info['new'] ) ) {
+			$caps[] = (string) $cap;
+		}
+	}
+	foreach ( wp_roles()->role_objects as $role ) {
+		foreach ( array_unique( $caps ) as $cap ) {
+			if ( isset( $role->capabilities[ $cap ] ) ) {
+				$role->remove_cap( $cap );
+			}
+		}
+	}
+	delete_option( 'flurfunk_caps_version' );
+	delete_option( 'flurfunk_caps_seeded' );
+	delete_option( 'flurfunk_caps_version_lock' );
+};
+if ( is_multisite() ) {
+	foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $flurfunk_site ) {
+		switch_to_blog( (int) $flurfunk_site );
+		$flurfunk_remove_caps();
+		restore_current_blog();
+	}
+} else {
+	$flurfunk_remove_caps();
+}
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	delete_option( 'flurfunk_vapid' ); // Kept with the data, so push subscriptions keep working after a reinstall.
 	global $wpdb;

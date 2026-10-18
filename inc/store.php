@@ -260,8 +260,8 @@ function people(): array {
 				(array) apply_filters(
 					'flurfunk_people_query',
 					array(
-						// Everyone who can be team or guest by the settings; kind() decides below.
-						'capability__in' => array_values( array_filter( array_unique( array( 'edit_posts', \Flurfunk\Settings\get()['team_cap'], \Flurfunk\Settings\get()['guest_cap'] ) ) ) ),
+						// Everyone with a Flurfunk role capability; kind() decides below.
+						'capability__in' => array( \Flurfunk\Caps\TEAM, \Flurfunk\Caps\GUEST ),
 						'fields'         => 'ID',
 						'orderby'        => 'display_name',
 					)
@@ -519,13 +519,13 @@ function set_status( int $thread_id, string $status ) {
 }
 
 /**
- * May the person change or remove this message / thread? Authors may, and site managers.
+ * May the person change or remove this message / thread? Authors may, and moderators.
  *
  * @param int $author  Author of the item.
  * @param int $user_id User.
  */
 function can_edit( int $author, int $user_id ): bool {
-	return (bool) apply_filters( 'flurfunk_can_edit', $author === $user_id || Access\can_manage( $user_id ), $author, $user_id );
+	return (bool) apply_filters( 'flurfunk_can_edit', $author === $user_id || Access\can_moderate( $user_id ), $author, $user_id );
 }
 
 /**
