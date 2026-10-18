@@ -149,7 +149,8 @@ add_action(
 		foreach ( (array) ( $in['channels'] ?? array() ) as $slug => $c ) {
 			Store\ensure_channel( (string) $slug, (array) $c + array( 'archived' => empty( $c['active'] ) ? 1 : 0 ), true );
 		}
-		if ( ! empty( $in['new_bot']['name'] ) ) {
+		// Assistants are user accounts: only for people who may create users (a manager need not).
+		if ( ! empty( $in['new_bot']['name'] ) && current_user_can( 'create_users' ) ) {
 			Access\create_bot( (string) $in['new_bot']['name'], 'flurfunk-' . sanitize_title( (string) $in['new_bot']['name'] ) );
 		}
 		$new = (array) ( $in['new_channel'] ?? array() );
@@ -252,12 +253,14 @@ function render(): void {
 				<?php foreach ( get_users( array( 'meta_key' => 'flurfunk_bot' ) ) as $bot ) : // phpcs:ignore WordPress.DB.SlowDBQuery ?>
 					<tr>
 						<td><strong><?php echo esc_html( $bot->display_name ); ?></strong><br><code><?php echo esc_html( $bot->user_login ); ?></code> · ID <?php echo (int) $bot->ID; ?><?php echo (int) get_option( 'flurfunk_bot_default' ) === $bot->ID ? ' · ' . esc_html__( 'default for wp flurfunk post', 'flurfunk' ) : ''; ?></td>
-						<td><a href="<?php echo esc_url( get_edit_user_link( $bot->ID ) . '#application-passwords-section' ); ?>"><?php esc_html_e( 'Application passwords', 'flurfunk' ); ?></a></td>
+						<td><?php if ( current_user_can( 'edit_user', $bot->ID ) ) : ?><a href="<?php echo esc_url( get_edit_user_link( $bot->ID ) . '#application-passwords-section' ); ?>"><?php esc_html_e( 'Application passwords', 'flurfunk' ); ?></a><?php endif; ?></td>
 					</tr>
 				<?php endforeach; ?>
+					<?php if ( current_user_can( 'create_users' ) ) : ?>
 					<tr>
 						<td colspan="2"><label><?php esc_html_e( 'New assistant', 'flurfunk' ); ?> <input name="new_bot[name]" placeholder="<?php esc_attr_e( 'Name', 'flurfunk' ); ?>"></label></td>
 					</tr>
+					<?php endif; ?>
 				</tbody>
 			</table>
 			<?php assistants_help(); ?>
