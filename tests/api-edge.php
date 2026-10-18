@@ -1112,7 +1112,7 @@ $died = function ( string $action ) {
 	return $out;
 };
 $denied = array();
-foreach ( array( 'flurfunk_settings', 'flurfunk_caps', 'flurfunk_modules', 'flurfunk_export', 'flurfunk_import' ) as $a ) {
+foreach ( array( 'flurfunk_settings', 'flurfunk_modules', 'flurfunk_export', 'flurfunk_import' ) as $a ) {
 	$as( $u_siteop );
 	$no = $died( $a );
 	$as( $u_mgr );
@@ -1121,7 +1121,15 @@ foreach ( array( 'flurfunk_settings', 'flurfunk_caps', 'flurfunk_modules', 'flur
 		$denied[ $a ] = array( $no, $yes );
 	}
 }
-$check( 'settings, permissions, modules, export and import need flurfunk_manage, not manage_options', ! $denied, $denied );
+$check( 'settings, modules, export and import need flurfunk_manage, not manage_options', ! $denied, $denied );
+// The permissions matrix changes roles: flurfunk_manage alone is not enough, promote_users is needed too.
+$as( $u_mgr );
+$no = $died( 'flurfunk_caps' );
+( new WP_User( $u_mgr ) )->add_cap( 'promote_users' );
+$as( $u_mgr );
+$yes = $died( 'flurfunk_caps' );
+( new WP_User( $u_mgr ) )->remove_cap( 'promote_users' );
+$check( 'the permissions matrix needs promote_users as well', __( 'You cannot change this.', 'flurfunk' ) === $no && $yes !== $no, array( $no, $yes ) );
 
 // Declared capabilities.
 $check( 'Flurfunk\'s own capability names cannot be declared again', ! @flurfunk_register_capability( Caps\TEAM, array() ) && ! @flurfunk_register_capability( 'Bad Cap', array() ) );
