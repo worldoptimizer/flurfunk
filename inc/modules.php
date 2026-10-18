@@ -141,7 +141,11 @@ function set( array $changes ): void {
 	update_option( OPTION, $choices, true );
 	// Only for modules that really changed (the form sends every switch), once the choice is saved.
 	foreach ( $changed as $id => $on ) {
-		do_action( $on ? 'flurfunk_module_on' : 'flurfunk_module_off', $id );
+		if ( $on ) {
+			do_action( 'flurfunk_module_on', $id );
+		} else {
+			do_action( 'flurfunk_module_off', $id );
+		}
 	}
 	\Flurfunk\Caps\seed_pending(); // Recommended grants of modules that just came on.
 }
