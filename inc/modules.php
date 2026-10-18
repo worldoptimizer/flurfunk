@@ -16,9 +16,10 @@
  *       ) );
  *   } );
  *
- * Registration happens on `flurfunk_modules` (plugins_loaded, priority 20); enabled modules whose
- * requirements are met load right after, still during plugins_loaded. A module that is switched
- * off is never loaded, so it costs nothing.
+ * Registration happens on `flurfunk_modules` (init, priority 0, so labels can be translated);
+ * enabled modules whose requirements are met load right after. A module can therefore hook into
+ * init (priority 1 and later), admin_menu, rest_api_init and everything after. A module that is
+ * switched off is never loaded, so it costs nothing.
  *
  * @package Flurfunk
  */
@@ -163,7 +164,7 @@ add_action(
 
 // Registration, then loading what is switched on.
 add_action(
-	'plugins_loaded',
+	'init',
 	static function (): void {
 		do_action( 'flurfunk_modules' );
 		$modules = &registry();
@@ -176,7 +177,7 @@ add_action(
 		unset( $m );
 		do_action( 'flurfunk_modules_loaded' );
 	},
-	20
+	0
 );
 
 /**

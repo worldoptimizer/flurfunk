@@ -554,7 +554,8 @@ list( $s ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 
 $check( 'a reminder in the past is refused', 400 === $s, $s );
 list( $s ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'gestern irgendwann' ) );
 $check( 'nonsense is refused', 400 === $s, $s );
-$check( '"monday" lies in the future on a Monday', strtotime( Store\remind_time( 'monday', $team2 ) . ' UTC' ) > time() + DAY_IN_SECONDS );
+$monday = strtotime( Store\remind_time( 'monday', $team2 ) . ' UTC' );
+$check( '"monday" is the coming Monday', $monday > time() && $monday <= time() + 7 * DAY_IN_SECONDS && '1' === wp_date( 'N', $monday ) );
 Store\set_reminder( $t2['id'], $team2, gmdate( 'Y-m-d H:i:s', time() - 60 ) );
 $as( $team );
 $hq = (int) wp_date( 'G' );
