@@ -129,13 +129,20 @@ function active( string $id ): bool {
  */
 function set( array $changes ): void {
 	$choices = (array) get_option( OPTION, array() );
+	$changed = array();
 	foreach ( $changes as $id => $on ) {
 		if ( isset( registry()[ $id ] ) ) {
+			if ( enabled( $id ) !== (bool) $on ) {
+				$changed[ $id ] = (bool) $on;
+			}
 			$choices[ $id ] = (bool) $on;
-			do_action( $on ? 'flurfunk_module_on' : 'flurfunk_module_off', $id );
 		}
 	}
 	update_option( OPTION, $choices, true );
+	// Only for modules that really changed (the form sends every switch), once the choice is saved.
+	foreach ( $changed as $id => $on ) {
+		do_action( $on ? 'flurfunk_module_on' : 'flurfunk_module_off', $id );
+	}
 	\Flurfunk\Caps\seed_pending(); // Recommended grants of modules that just came on.
 }
 
@@ -223,6 +230,9 @@ function render_section(): void {
 	$groups = listing();
 	?>
 	<h2 id="flurfunk-modules"><?php esc_html_e( 'Modules', 'flurfunk' ); ?></h2>
+	<?php if ( isset( $_GET['modules'] ) && 'saved' === $_GET['modules'] ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only picks the notice after a redirect. ?>
+		<div class="notice notice-success inline"><p><?php esc_html_e( 'Modules saved.', 'flurfunk' ); ?></p></div>
+	<?php endif; ?>
 	<p><?php esc_html_e( 'Optional parts of Flurfunk and additions from other plugins. Modules that are off are not loaded at all.', 'flurfunk' ); ?></p>
 	<?php if ( ! $groups ) : ?>
 		<p class="description"><?php esc_html_e( 'No modules are installed.', 'flurfunk' ); ?></p>

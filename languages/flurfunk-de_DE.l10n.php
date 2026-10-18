@@ -201,6 +201,7 @@ return array(
 		'Moderate' => 'Moderieren',
 		'Moderate comments' => 'Kommentare moderieren',
 		'Modules' => 'Module',
+		'Modules saved.' => 'Module gespeichert.',
 		'Move this comment to the trash?' => 'Diesen Kommentar in den Papierkorb legen?',
 		'Moved to %s' => 'Verschoben nach %s',
 		'Mute' => 'Stummschalten',
