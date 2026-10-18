@@ -88,12 +88,13 @@ Flurfunk sidebar. See the [user guide](user-guide.md#notifications).
 | Look | Logo | none | Sidebar logo, push notification icon, fallback app icon. |
 | Look | Accent colour | `#0f6e66` | Mentions, unread counts, links. |
 | Look | Sidebar colour | `#1f2a2e` | Sidebar background and the web app theme colour. |
-| Channels | Active, Name, Topic, Team sees, Guests see, Order | | One row per channel, plus a row for a new channel. |
+| Channels | Active, Name, Topic, Team sees, Guests see, Also requires, Order | | One row per channel, plus a row for a new channel. "Also requires": a capability people need on top of that to see the channel at all, see [Channel access](#channel-access). |
 | Assistants | New assistant | | Creates an assistant account. Lists existing ones with a link to their application passwords. |
 | Posts | Conversations about | `post` | Post types threads can be attached to and that get the editor panel and the list column. |
 | Posts | Show | both on | The "Conversations" panel in the block editor, the column in the posts list. |
 | Data | Keep conversations when the plugin is deleted | on | See [Deactivate and uninstall](#deactivate-and-uninstall). |
 | Permissions | Roles × capabilities | see below | Which roles are team or guest, moderate and manage. Saved with its own button. See [Permissions](#permissions). |
+| Modules | A switch per module, and its settings underneath | | Optional parts, e.g. the daily moderation thread (setting: its channel) and review requests (settings: channel, assign everyone who may publish). Saved with their own button. |
 
 A new channel's short name (slug) is derived from its name and cannot be changed in the form
 later. To choose the slug yourself, create the channel with WP-CLI:
@@ -170,8 +171,17 @@ Typical setups:
 - Channel for talking with guest authors about their texts: team `all`, guests `own-posts`.
   Each guest only sees the threads about their own posts. The team sees a hint "… can read this"
   on threads guests can read.
+- Channel for one job, e.g. comment moderation: set **Also requires** to `moderate_comments`.
+  Only people who may moderate comments see it, its threads, numbers, notifications and search
+  results; nobody else can be mentioned there. The daily moderation thread creates such a channel,
+  #comments, when you switch it on.
 - Private channel for a few people: use the `flurfunk_channel_level` filter
   ([example](examples.md#a-private-channel)).
+
+**Also requires** works on top of the levels: whoever lacks the capability sees nothing of the
+channel, team or guest. *Team* (`flurfunk_team`) closes a channel to guests whatever its guest
+level. Assistants pass for Team and Guest; for any other capability only if their account has it,
+but the site's own modules can always post there as the assistant.
 
 "Own posts" are the posts the person is the author of. A plugin can add co-authored posts with
 the `flurfunk_owned_post_ids` filter.

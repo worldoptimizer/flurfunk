@@ -159,9 +159,15 @@ under *Settings → Flurfunk → Modules* (or `wp flurfunk module on|off <id>`):
 - **Comment cards** (`flurfunk/comments`, on): `/comment` inserts a comment with its state and
   buttons to approve it, mark it as spam or move it to the trash (people who may moderate).
 - **Daily moderation thread** (`flurfunk/comments-daily`, off): once a day, if comments are
-  waiting, a thread in #general lists them.
+  waiting, a thread lists them, by default in its own channel #comments that requires
+  `moderate_comments`.
 - **Review requests** (`flurfunk/review`, off): a post submitted for review becomes a task for the
   people who may publish it; publishing ticks it off, back to draft marks it as a question.
+  Settings: channel, and whether everyone who may publish is assigned.
+
+Modules can bring settings of their own (channel, checkbox, number, text, select, roles), shown
+under their switch and read with `flurfunk_module_setting()`. Channels can also require a
+capability on top of their team and guest levels; see the [developer guide](docs/developers.md#channels-that-require-a-capability).
 
 ## Tests and development
 

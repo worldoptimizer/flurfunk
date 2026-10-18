@@ -157,7 +157,8 @@ Your administrator can switch on more under *Settings → Flurfunk → Modules*:
 
 - **Comment cards** (on by default): the `/comment` command above.
 - **Daily moderation thread**: once a day, if comments are waiting for approval, the assistant
-  posts a thread in #general with the number and a list of them.
+  posts a thread with the number and a list of them, by default in its own channel #comments,
+  which only people who may moderate comments see.
 - **Review requests**: when a post is submitted for review, a task appears for the people who
   may publish it. Publishing it ticks the task off; moving it back to draft marks it as a
   question.

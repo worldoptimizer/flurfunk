@@ -77,7 +77,7 @@ All tables are prefixed `{$wpdb->prefix}flurfunk_`.
 
 | Table | Rows | Key columns |
 | --- | --- | --- |
-| `channels` | channels | `slug` (unique), `name`, `topic`, `access_team`, `access_guests`, `position`, `archived` |
+| `channels` | channels | `slug` (unique), `name`, `topic`, `access_team`, `access_guests`, `capability` (required on top of the levels, `''` = none; since DB version 6), `position`, `archived` |
 | `threads` | threads (the first post) | `channel_id`, `ref_key`, `target_type`, `target_id`, `title`, `body`, `author_id`, `status` (`''`, `open`, `doing`, `waiting`, `done`), `due_date`, `resolved_by`, `resolved_at`, `created`, `last_activity` |
 | `messages` | replies and log lines | `thread_id`, `type` (`message`, `status`, `event`, `deleted`), `author_id`, `body`, `status`, `files` (JSON), `created`, `edited` |
 | `mentions` | who was mentioned where | `thread_id`, `message_id` (0 = the thread itself), `user_id` |
@@ -96,6 +96,8 @@ Other storage:
 | --- | --- | --- |
 | option | `flurfunk_settings` | Site settings (see `flurfunk_settings` filter) |
 | option | `flurfunk_db_version` | Schema version |
+| option | `flurfunk_modules` | Module switches: `id => bool` |
+| option | `flurfunk_module_settings` | Module settings: `id => { key => value }` (see [Module settings](#module-settings)) |
 | option | `flurfunk_rev` | Global revision counter |
 | option | `flurfunk_vapid` | Push key pair |
 | option | `flurfunk_bot_default` | Default assistant for `wp flurfunk post` |
@@ -128,6 +130,7 @@ The REST API, the export and the import use the same shapes.
       "name": "General",
       "topic": "Anything that concerns everyone",
       "access": { "team": "all", "guests": "none" },
+      "capability": "",
       "position": 100,
       "archived": false
     }
@@ -337,7 +340,8 @@ The board in the app asks for `view=board&limit=200`, optionally with `channel` 
 `tasks`, `mine` and `overdue` count active tasks.
 
 **`GET bootstrap`**: `format`, `me` (person plus `prefs`, `manage`, `upload`), `people`,
-`channels` (with your `level`), `providers` (`id`, `command`, `label`, `hint`, `hidden`, `actions`:
+`channels` (with your `level`; a channel that requires a capability also lists the IDs of the people
+who can read it as `members`, which the app uses for mention and assignee suggestions), `providers` (`id`, `command`, `label`, `hint`, `hidden`, `actions`:
 `{id: {label, done, style, confirm, can}}`), `counts`,
 `targets` (up to 15 you can attach to), `recent` (targets with recent conversations), `locale`,
 `look` (`name`, `logo`, `accent`, `sidebar`), `settings` (settings URL for admins), `push`
@@ -372,7 +376,7 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | --- | --- | --- |
 | Uses Flurfunk at all | kind is `team` or `guest` | `flurfunk_user_kind` |
 | Kind | assistant or `flurfunk_team` → team; `flurfunk_guest` → guest | `flurfunk_user_kind` |
-| Channel level | archived → `none`; otherwise the channel's team or guest level | `flurfunk_channel_level` |
+| Channel level | archived → `none`; lacks the channel's `capability` → `none`; otherwise the channel's team or guest level | `flurfunk_channel_level` (runs last), `flurfunk_bot_can` |
 | Sees a thread | level `all`; or `own-posts` and the thread is attached to one of their posts | `flurfunk_owned_post_ids` |
 | Starts a thread | as "sees", plus may attach to the chosen target | `flurfunk_can_target` |
 | Attaches to a target | the target type's `can` callback (default: team, and the target exists) | `flurfunk_can_target` |
@@ -385,6 +389,38 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | Manages settings, channels, permissions, modules, assistants, export and import | `flurfunk_manage`; creating an assistant account also needs `create_users` | |
 
 `own-posts` only ever applies to the target type `post`.
+
+### Channels that require a capability
+
+A channel can require a capability on top of its levels (*Settings → Flurfunk → Channels → Also
+requires*, `ensure_channel()`'s `capability`, `wp flurfunk channel --capability=…`). Whoever lacks
+it gets the level `none` there: the channel is not listed, its threads do not open, are not
+counted, found or listed, notifications about them disappear from the list, the unread number and
+the digest, nobody without it can be mentioned or assigned there, and nobody without it can start
+a thread or reply. It is checked once, in `Flurfunk\Access\level()`, so `can_see()`, `can_start()`
+and `where()` (every list and count) follow; `flurfunk_channel_level` runs after it and can still
+open or close a channel per person.
+
+| Capability | Who passes |
+| --- | --- |
+| `''` | everyone (the default) |
+| `flurfunk_team` | the team, assistants included; guests never |
+| `flurfunk_guest` | everyone who uses Flurfunk (team, guests, assistants) |
+| anything else | people with it (`user_can()`); assistants only if their account has it, while PHP code acts as them, or if `flurfunk_bot_can` returns true |
+
+**Assistants.** Code on the site that posts as the assistant (`flurfunk_post()`, `flurfunk_reply()`,
+`flurfunk_set_status()`, anything inside `flurfunk_as()`) always passes: that is the site acting,
+so a module can post into a gated channel. An agent that logs in as the assistant with an
+application password does not, unless the account itself has the capability or you allow it:
+
+```php
+// Let assistants read and post in channels that require moderate_comments.
+add_filter( 'flurfunk_bot_can', fn ( $ok, $cap ) => $ok || 'moderate_comments' === $cap, 10, 2 );
+```
+
+The choices in the settings are Flurfunk's capability registry (its own and declared ones) and
+`moderate_comments`, `edit_others_posts`, `publish_posts`, `manage_options`; adjust the list with
+`flurfunk_channel_capabilities`. A capability set in code that is not in the list is kept.
 
 ## Capabilities
 
@@ -490,12 +526,13 @@ group, module`). Check a declared capability like any other with `user_can()`.
 | `flurfunk_register_target( string $type, array $args )` | 0.1.0 | void | Register something threads can be attached to. See [Targets](#targets). |
 | `flurfunk_register_module( string $id, array $args )` | 0.2.0 | bool | Register an optional module (a switch under *Settings → Flurfunk → Modules*). Call it on the `flurfunk_modules` action. See [Modules](#modules). |
 | `flurfunk_module_enabled( string $id )` | 0.2.0 | bool | Is a module switched on? |
+| `flurfunk_module_setting( string $module_id, string $key )` | 0.2.0 | mixed | A module's setting: the saved value or the field's default; `null` for an unknown module or key. See [Module settings](#module-settings). |
 | `flurfunk_register_capability( string $cap, array $args = [] )` | 0.2.0 | bool | Declare a capability for the permissions matrix, with recommended roles. See [Declaring capabilities](#declaring-capabilities). |
-| `flurfunk_ensure_channel( string $slug, array $args = [] )` | 0.1.0 | int channel ID | Create a channel unless it exists. `$args`: `name`, `topic`, `access_team`, `access_guests`, `position`. An existing channel is left unchanged. |
+| `flurfunk_ensure_channel( string $slug, array $args = [] )` | 0.1.0 | int channel ID | Create a channel unless it exists. `$args`: `name`, `topic`, `access_team`, `access_guests`, `position`, `capability` (0.2.0; see [Channels that require a capability](#channels-that-require-a-capability)). An existing channel is left unchanged. |
 | `flurfunk_post( array $args )` | 0.2.0 | int thread ID or `WP_Error` | Start a thread from PHP. See [Posting from PHP](#posting-from-php). |
 | `flurfunk_reply( int\|string $thread, string $body, array $args = [] )` | 0.2.0 | int message ID or `WP_Error` | Reply to a thread (ID or `ref_key`). `$args`: `files`, `attachments`, `author`. |
 | `flurfunk_set_status( int\|string $thread, string $status, int $author = 0 )` | 0.2.0 | true or `WP_Error` | Set a thread's task state: `open`, `doing`, `waiting`, `done`, or `''` (no task). |
-| `flurfunk_as( int $user_id, callable $fn )` | 0.2.0 | what `$fn` returns | Run code as another person, then switch back. `0` = the default assistant (created if needed). |
+| `flurfunk_as( int $user_id, callable $fn )` | 0.2.0 | what `$fn` returns | Run code as another person, then switch back. `0` = the default assistant (created if needed). As an assistant it passes channel capabilities. |
 | `flurfunk_unread_count( int $user_id = 0 )` | 0.1.0 | int | Unread messages of a person (0 = current), for badges elsewhere. 0 for people without access. |
 | `flurfunk_url( string $view = '' )` | 0.1.0 | string | URL of the app in wp-admin, optionally opening a view. |
 | `flurfunk_app_url( string $view = '' )` | 0.1.0 | string | URL of the full-screen app outside wp-admin, same views. |
@@ -519,7 +556,8 @@ built-in provider at priority 20; the default priority 10 is fine for your own.
 `flurfunk_post()`, `flurfunk_reply()` and `flurfunk_set_status()` act as the default assistant
 unless `author` names someone, and go through the same checks as the app: the author must be
 allowed to start a thread in the channel (and on the target), mentions, tasks and notifications
-work as usual, and the rate limit applies. With a `ref_key` the call is idempotent: if a thread
+work as usual, and the rate limit applies. As the assistant they may also post into channels that
+require a capability. With a `ref_key` the call is idempotent: if a thread
 with that key exists, its ID comes back and nothing is posted.
 
 ```php
@@ -836,6 +874,10 @@ add_action( 'flurfunk_modules', function () {
 		'capabilities' => array(
 			'acme_review' => array( 'label' => 'Approve reviews', 'roles' => array( 'editor' ) ),
 		),
+		'settings'     => array(
+			array( 'key' => 'channel', 'type' => 'channel', 'label' => __( 'Channel', 'acme' ), 'default' => 'general' ),
+			array( 'key' => 'remind', 'type' => 'number', 'label' => __( 'Remind after days', 'acme' ), 'default' => 2, 'min' => 1, 'max' => 30 ),
+		),
 	) );
 } );
 ```
@@ -850,12 +892,44 @@ add_action( 'flurfunk_modules', function () {
 | `load` | required | Callable that loads the module (e.g. `require` its file) |
 | `settings_url` | | Link shown next to the switch |
 | `capabilities` | | Capabilities the module brings, as in [Declaring capabilities](#declaring-capabilities); their roles get them once the module is on |
+| `settings` | | Fields shown under the switch, see [Module settings](#module-settings) |
 
 IDs look like `vendor/name` (lowercase letters, digits, `_`, `-`). `flurfunk_modules` fires on
 `init` at priority 0, so labels can be translated; modules that are on load right after, before
 `flurfunk_modules_loaded`. A module can therefore hook into `init` (priority 1 and later),
 `admin_menu`, `rest_api_init` and everything later. `flurfunk_module_on` and
 `flurfunk_module_off` fire when a switch changes, `flurfunk_module_enabled` overrides the switch.
+
+### Module settings
+
+A module can bring a few settings of its own. Flurfunk shows them under the module's switch in
+*Settings → Flurfunk → Modules* (saved with the same button, also while the module is off),
+sanitizes them by type and stores them in the option `flurfunk_module_settings`
+(`module ID => { key => value }`). Read them with `flurfunk_module_setting( $module_id, $key )`:
+the saved value, or the field's `default` while nothing is saved.
+
+| Field key | Meaning |
+| --- | --- |
+| `key` | required; lower-case letters, digits, `_` and `-` |
+| `type` | `channel`, `checkbox`, `number`, `text`, `select` or `roles`; a field with another type is left out (with a `_doing_it_wrong` notice) |
+| `label` | text next to the field |
+| `description` | optional line under it |
+| `default` | value until the site saves one (defaults: `false`, `0`, `[]` for roles, else `''`) |
+| `options` | `select` only: `value => label` |
+| `min`, `max` | `number` only: the value is clamped to them |
+
+| Type | Field | Stored as | Invalid input becomes |
+| --- | --- | --- | --- |
+| `checkbox` | checkbox | bool | `false` (an unticked box in the form is `false`) |
+| `number` | number input | int (float if a decimal point was entered), clamped to `min`/`max` | the default |
+| `text` | text input | string, `sanitize_text_field()` | |
+| `select` | select | one of the `options` keys | the default |
+| `channel` | select of all channels (inactive ones marked; the default is listed even if it does not exist yet) | channel slug | the default |
+| `roles` | a checkbox per role | list of role names that exist | unknown roles are dropped |
+
+The `flurfunk_module_setting` filter (`$value`, `$module_id`, `$key`) adjusts what
+`flurfunk_module_setting()` returns. `Flurfunk\Modules\save_settings( $id, $values )` saves from
+code (only the given keys; sanitized the same way).
 
 ### Core modules
 
@@ -864,8 +938,8 @@ They only build on WordPress itself.
 | Module | Default | Does |
 | --- | --- | --- |
 | `flurfunk/comments` | on | `/comment` (German `/kommentar`) inserts a comment: the commenter's public name, the post, an excerpt as quote, the state as status pill, and the actions **Approve**, **Spam** and **Trash** (with confirmation), depending on the state. For the team (`flurfunk_team`) with `moderate_comments`; each action checks `edit_comment` for that comment. The card never contains the email or IP address, the user agent or the commenter's website. |
-| `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" in #general (filter `flurfunk_comments_channel`) with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. |
-| `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it in #general (filter `flurfunk_review_channel`), assigned to everyone who may publish and edit it (not the author, no assistants; filter `flurfunk_review_assignees`), with the post as a card. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
+| `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. Setting **Channel** (default `comments`): switching the module on creates #comments ("Comments"), which requires `moderate_comments` and is closed to guests (an existing #comments is used as it is). The filter `flurfunk_comments_channel` overrides the setting. |
+| `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it, assigned to everyone who may publish and edit it (not the author, no assistants), with the post as a card. Settings: **Channel** (default `general`) and **Assign everyone who may publish** (default on; off: nobody is assigned). The filters `flurfunk_review_channel` and `flurfunk_review_assignees` override them per post. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
 
 ## Targets
 
@@ -1003,7 +1077,9 @@ locked in the database.
 | `flurfunk_settings` | 0.1.0 | `array $settings` | array | Adjust settings in code. Keys: `name`, `logo_id`, `accent`, `sidebar`, `post_types`, `editor_panel`, `posts_column`, `keep_data`. (0.1 also had `team_cap` and `guest_cap`; they are only read once for the [migration](#capabilities).) Applied once per request. |
 | `flurfunk_user_kind` | 0.1.0 | `string $kind`, `WP_User $user` | `'team'`, `'guest'` or `''` | Who is team, guest or has no access. Default from `flurfunk_team` / `flurfunk_guest` (assistants: team). Cached per request. |
 | `flurfunk_capabilities` | 0.2.0 | `array $caps` | array | The capability registry for the permissions matrix and recommended grants: `cap => { label, description, roles, group, module }`. |
-| `flurfunk_channel_level` | 0.1.0 | `string $level`, `object $channel`, `int $user_id`, `string $kind` | `'all'`, `'own-posts'` or `'none'` | Per-person access to a channel, e.g. private channels. Other values count as `none`. Cached per request. |
+| `flurfunk_channel_level` | 0.1.0 | `string $level`, `object $channel`, `int $user_id`, `string $kind` | `'all'`, `'own-posts'` or `'none'` | Per-person access to a channel, e.g. private channels. Runs after the channel's capability check (so it can override it). Other values count as `none`. Cached per request. |
+| `flurfunk_bot_can` | 0.2.0 | `bool $can` (false), `string $cap`, `object $channel`, `int $user_id` | bool | May an assistant whose account lacks the capability a channel requires use that channel anyway (e.g. an agent over the REST API)? PHP code acting as the assistant passes without it. See [Channels that require a capability](#channels-that-require-a-capability). |
+| `flurfunk_channel_capabilities` | 0.2.0 | `array $groups` | array | The capabilities offered under *Channels → Also requires*: `group label => { cap => label }`. |
 | `flurfunk_owned_post_ids` | 0.1.0 | `int[] $ids`, `int $user_id` | int[] | Posts that count as a person's own (co-authors). |
 | `flurfunk_post_owners` | 0.1.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Owners of a post, for the "… can read this" hint only. |
 | `flurfunk_can_target` | 0.1.0 | `bool $can`, `string $type`, `int $id`, `int $user_id` | bool | May the person attach a thread to this target? Also used by the `/post` snapshot. |
@@ -1022,11 +1098,12 @@ locked in the database.
 | `flurfunk_rate_limit` | 0.1.0 | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for people with `flurfunk_manage`; 0 = off. |
 | `flurfunk_thread_limit` | 0.1.0 | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
 | `flurfunk_notification_days` | 0.1.0 | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
-| `flurfunk_comments_channel` | 0.2.0 | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default `general`. |
+| `flurfunk_comments_channel` | 0.2.0 | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default: the module's setting (`comments`). |
 | `flurfunk_comments_hour` | 0.2.0 | `int $hour` | int | Hour (site time) of the daily moderation thread. Default 9. |
-| `flurfunk_review_channel` | 0.2.0 | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default `general`. |
-| `flurfunk_review_assignees` | 0.2.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. |
+| `flurfunk_review_channel` | 0.2.0 | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default: the module's setting (`general`). |
+| `flurfunk_review_assignees` | 0.2.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. Default: everyone who may publish it, or nobody when the module's setting is off. |
 | `flurfunk_module_enabled` | 0.2.0 | `bool $on`, `string $id` | bool | Is a module switched on? Default: the choice under *Settings → Flurfunk → Modules*, else the module's `default`. Decides whether it loads. |
+| `flurfunk_module_setting` | 0.2.0 | `mixed $value`, `string $module_id`, `string $key` | mixed | What `flurfunk_module_setting()` returns: the saved value or the field's default (`null` for unknown keys). |
 | `flurfunk_people_query` | 0.1.0 | `array $args` | array | `get_users()` arguments for the people Flurfunk knows (mentions, people list). Default: everyone with `flurfunk_team` or `flurfunk_guest`; assistants are always added. |
 | `flurfunk_app_slug` | 0.1.0 | `string $slug` | string | Path of the full-screen app, default `flurfunk` (`/flurfunk/`). Rewrite rules are flushed once after a change. |
 | `flurfunk_manifest` | 0.1.0 | `array $manifest` | array | The web app manifest (name, colours, icons, start URL). |
@@ -1102,16 +1179,16 @@ to choose who owns imported files (default: the first administrator).
 wp flurfunk status
 ```
 
-A table of channels: slug, name, team and guest level, active, number of threads.
+A table of channels: slug, name, team and guest level, required capability, active, number of threads.
 
 ### `wp flurfunk channel`
 
 ```
-wp flurfunk channel <slug> [--name=<name>] [--topic=<topic>] [--team=<level>] [--guests=<level>] [--position=<n>]
+wp flurfunk channel <slug> [--name=<name>] [--topic=<topic>] [--team=<level>] [--guests=<level>] [--position=<n>] [--capability=<cap>]
 ```
 
 Creates the channel or changes the given details of an existing one. Levels: `all`, `own-posts`,
-`none`.
+`none`. `--capability` is required on top of the levels (`--capability=` for none).
 
 ### `wp flurfunk bot-create`
 
@@ -1247,7 +1324,9 @@ assigned. Cards are created through their provider, with the assistant's permiss
 ### Things to keep in mind
 
 - The assistant sees channels according to the **team** setting. For a private channel, let it in
-  through `flurfunk_channel_level`.
+  through `flurfunk_channel_level`. A channel that requires a capability other than
+  `flurfunk_team`/`flurfunk_guest` is closed to it unless its account has the capability or
+  `flurfunk_bot_can` allows it.
 - The rate limit (30 per minute) applies. Batch output into one message.
 - Text is cut at 20,000 characters per message. Control characters are removed; HTML is stored as plain text and never rendered.
 - A request returns the full thread. Pipe through `jq -r .id` or similar if you only need the ID.
