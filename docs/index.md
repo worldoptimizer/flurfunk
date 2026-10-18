@@ -64,10 +64,10 @@ someone adds them, without being copied or moved.
 
 ### Slash commands and cards
 
-Typing `/` opens a menu of commands. `/post` inserts a post as a card. Other plugins register
-their own commands (the bundled MailerPress integration adds `/newsletter`). A card stores a
-snapshot of its data, so it stays readable when the source changes, and can be updated on
-request.
+Typing `/` opens a menu of commands. `/post` inserts a post as a card, `/comment` a comment with
+buttons to approve it, mark it as spam or trash it. Other plugins register their own commands
+and build their cards from the same [building blocks](cards.md). A card stores a snapshot of its
+data, so it stays readable when the source changes, and can be updated on request.
 
 ![A card inserted with a slash command](assets/screenshot-card.png)
 

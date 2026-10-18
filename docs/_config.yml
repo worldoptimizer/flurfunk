@@ -47,6 +47,8 @@ nav:
     url: /user-guide.html
   - title: Developers
     url: /developers.html
+  - title: Cards
+    url: /cards.html
   - title: Examples
     url: /examples.html
 

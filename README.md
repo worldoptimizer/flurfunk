@@ -53,7 +53,8 @@ extension; no external service or library.
 | [Overview](docs/index.md) | What Flurfunk does, feature tour |
 | [Installation and administration](docs/installation.md) | Requirements, settings, access, assistants, cron, moving sites, privacy, uninstall, troubleshooting |
 | [User guide](docs/user-guide.md) | Threads, formatting, mentions, slash commands, files, tasks, the board, notifications, shortcuts |
-| [Developer guide](docs/developers.md) | Architecture, data format, REST API, providers, targets, embeds, hooks, WP-CLI |
+| [Developer guide](docs/developers.md) | Architecture, data format, REST API, providers, card blocks and actions, targets, embeds, hooks, WP-CLI |
+| [Card gallery](docs/cards.md) | Every card building block, light and dark |
 | [Examples](docs/examples.md) | A provider, a card renderer, a target type, embeds, shell and CI scripts, filters |
 
 ## Quick start
@@ -138,6 +139,11 @@ add_action( 'init', function () {
 	) );
 } );
 ```
+
+Cards are built from ready blocks (`fields`, `checklist`, `progress`, `status`, `people`,
+`table`, `badges`, `quote`) and can carry buttons that run PHP on the site (`actions`, with
+inline confirmation and an event line in the thread); see
+[card building blocks](docs/developers.md#card-building-blocks).
 
 Also available: targets (`flurfunk_register_target`), channels from code
 (`flurfunk_ensure_channel`), badges (`flurfunk_unread_count`), links (`flurfunk_url`), custom card

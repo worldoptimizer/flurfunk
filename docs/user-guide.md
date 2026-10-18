@@ -131,7 +131,7 @@ Type `/` at the start of the text or after a space. A menu lists the commands yo
 | Command | Inserts |
 | --- | --- |
 | `/post` | A post as a card: title, status, author, thumbnail, link to the editor |
-| `/newsletter` | A MailerPress campaign (only if MailerPress is active; team only) |
+| `/comment` | A comment with its state and buttons to approve it, mark it as spam or move it to the trash (if the module is on and you may moderate comments) |
 | others | Whatever plugins on your site add |
 
 Type the command, a space and a search term, for example `/post teaser`. Pick a result with the
@@ -139,8 +139,26 @@ mouse or the arrow keys. The card appears above the send button; click × to rem
 A message can carry up to 10 cards.
 
 A card is a snapshot: it shows the data from the moment it was inserted, so it stays readable
-even when the post or campaign changes or is deleted. Click **Update** on a card to fetch the
+even when the post or comment changes or is deleted. Click **Update** on a card to fetch the
 current data.
+
+Some cards have **buttons**, for example **Approve** on a comment. A button acts on the site right
+away and the card shows the new state. Buttons that are hard to undo ask first, inside the card:
+confirm, or press Esc or **Cancel** to leave it. The thread records who did what ("Ana approved
+the comment"), and the people following the thread are notified as for a reply. You only see the
+buttons you are allowed to use; if someone else was faster, the card says so and shows the
+current state.
+
+### Optional modules
+
+Your administrator can switch on more under *Settings → Flurfunk → Modules*:
+
+- **Comment cards** (on by default): the `/comment` command above.
+- **Daily moderation thread**: once a day, if comments are waiting for approval, the assistant
+  posts a thread in #general with the number and a list of them.
+- **Review requests**: when a post is submitted for review, a task appears for the people who
+  may publish it. Publishing it ticks the task off; moving it back to draft marks it as a
+  question.
 
 ![A card in a message](assets/screenshot-card.png)
 

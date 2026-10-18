@@ -10,7 +10,10 @@ the [examples](examples.md) page.
 - [Permissions](#permissions)
 - [PHP functions](#php-functions)
 - [Providers: slash commands and cards](#providers-slash-commands-and-cards)
+- [Card building blocks](#card-building-blocks)
+- [Card actions](#card-actions)
 - [Custom card renderers](#custom-card-renderers)
+- [Core modules](#core-modules)
 - [Targets](#targets)
 - [Embedding](#embedding)
 - [Hooks](#hooks)
@@ -41,7 +44,10 @@ interface is drawn in the browser from the REST API.
 | `inc/transfer.php` | `Flurfunk\Transfer` | JSON export and import |
 | `inc/cli.php` | `Flurfunk\Cli` | `wp flurfunk …` |
 | `inc/strings.php` | `Flurfunk\Strings` | Translatable strings of the JavaScript |
-| `integrations/mailerpress.php` | `Flurfunk\Integrations\MailerPress` | `/newsletter` cards, loaded only when MailerPress is active |
+| `inc/modules.php` | `Flurfunk\Modules` | Module register: optional parts, switched under *Settings → Flurfunk* |
+| `modules/comments.php` | `Flurfunk\Modules\Comments` | `/comment` cards with moderation buttons |
+| `modules/comments-daily.php` | `Flurfunk\Modules\CommentsDaily` | Daily thread about comments awaiting moderation |
+| `modules/review.php` | `Flurfunk\Modules\Review` | Review requests as tasks |
 | `assets/app.js` | `window.Flurfunk` | The interface |
 | `assets/editor.js` | | Block editor "Conversations" panel |
 | `assets/sw.js` | | Service worker for push (controls no pages) |
@@ -174,6 +180,7 @@ The REST API, the export and the import use the same shapes.
         { "id": 41, "type": "event", "author": 1, "created": "2026-10-15T10:05:00+00:00", "event": "due", "due": "2026-10-20" },
         { "id": 42, "type": "event", "author": 1, "created": "2026-10-15T10:05:10+00:00", "event": "assign", "added": [ 7 ], "removed": [] },
         { "id": 43, "type": "status", "author": 7, "created": "2026-10-16T08:30:00+00:00", "status": "done" },
+        { "id": 45, "type": "event", "author": 7, "created": "2026-10-16T08:30:30+00:00", "event": "card_action", "card": 3, "provider": "flurfunk/comment", "action": "approve", "label": "Approve", "summary": "Ana approved the comment", "title": "Comment by Eve" },
         { "id": 44, "type": "deleted", "author": 7, "created": "2026-10-16T08:31:00+00:00" }
       ],
       "read": { "1": 44, "7": 43 }
@@ -209,7 +216,7 @@ The REST API, the export and the import use the same shapes.
 | --- | --- |
 | `message` | `id`, `author`, `created`, `text`, `mentions[]`, `files[]`, `attachments[]`, `edited` |
 | `status` | `id`, `author`, `created`, `status` (`open`, `doing`, `waiting`, `done`, `none`) |
-| `event` | `id`, `author`, `created`, `event` (`due` with `due`, or `assign` with `added[]`, `removed[]`) |
+| `event` | `id`, `author`, `created`, `event`: `due` with `due`; `assign` with `added[]`, `removed[]`; `card_action` with `card` (card ID), `provider`, `action`, `label`, `summary` ("Ana approved", in the language of the person who clicked) and `title` (the card's title) |
 | `deleted` | `id`, `author`, `created` |
 
 ### Card (attachment)
@@ -271,6 +278,7 @@ Request bodies are JSON (`Content-Type: application/json`), except file uploads.
 | GET | `providers/<vendor>/<name>/search` | `q` | `[{ref, title, subtitle}]`, at most 20 |
 | GET | `targets` | `q` | `[{type, id, title, subtitle, label}]` across all target types, at most 30 |
 | POST | `cards/<id>/refresh` | | The full thread with a fresh snapshot |
+| POST | `cards/<id>/action/<action>` | `key` (optional idempotency key, up to 64 of `A-Za-z0-9_-`; also as header `X-Flurfunk-Key`) | The full thread with the new snapshot and the event line. See [card actions](#card-actions) |
 | POST | `files` | Raw file as body, `Content-Disposition: attachment; filename="name.ext"`, `Content-Type` | The file `{id, name, size, type, url, …}` |
 | POST | `files/<id>/adopt` | | The file, now in the media library |
 | POST | `me/prefs` | Any of `theme`, `avatar`, `mail`, `push`, `quiet`, `badge`, `hour`, `pause` (`1h`, `3h`, `tomorrow`, `none`), `channel` `{slug, level}` | All preferences |
@@ -326,7 +334,8 @@ The board in the app asks for `view=board&limit=200`, optionally with `channel` 
 `tasks`, `mine` and `overdue` count active tasks.
 
 **`GET bootstrap`**: `format`, `me` (person plus `prefs`, `manage`, `upload`), `people`,
-`channels` (with your `level`), `providers` (`id`, `command`, `label`, `hint`), `counts`,
+`channels` (with your `level`), `providers` (`id`, `command`, `label`, `hint`, `hidden`, `actions`:
+`{id: {label, done, style, confirm, can}}`), `counts`,
 `targets` (up to 15 you can attach to), `recent` (targets with recent conversations), `locale`,
 `look` (`name`, `logo`, `accent`, `sidebar`), `settings` (settings URL for admins), `push`
 (`available`, `key`, `devices`).
@@ -344,6 +353,9 @@ Errors are standard WordPress REST errors: `{"code": "…", "message": "…", "d
 | `flurfunk_invalid` | 400 | Reminder time not within the next year |
 | `flurfunk_forbidden` | 403 / 404 | Not allowed, or not visible (404 hides that it exists) |
 | `flurfunk_card` | 409 | The provider no longer returns a snapshot |
+| `flurfunk_action` | 404 | Unknown card action |
+| `flurfunk_action_gone` | 409 | The card does not offer this action (any more), e.g. someone else was faster |
+| `flurfunk_action_failed` | 400 / 500 | The action's callback returned an error (its message) or threw (a generic message) |
 | `flurfunk_rate` | 429 | Rate limit reached |
 | `flurfunk_upload` | 400 / 403 / 413 | Empty file, no upload right, file too large |
 | `flurfunk_file` | 404 | Not a Flurfunk file (adopt) |
@@ -433,7 +445,9 @@ add_action( 'init', function () {
 | `label` | no | string | Shown on the card and in the menu. Default: the command. |
 | `hint` | no | string | One line in the command menu. |
 | `search` | no | callable `( string $q, int $user_id ): array` | Suggestions while typing. Without it the command offers nothing to pick. |
-| `can` | no | callable `( int $user_id ): bool` | Offer the command to this person. Checked for the menu, search, snapshot and refresh. Default: everyone. |
+| `can` | no | callable `( int $user_id ): bool` | Offer the command to this person. Checked for the menu, search, snapshot, refresh and actions. Default: everyone. |
+| `actions` | no | array | Buttons on the card that run PHP. See [card actions](#card-actions). |
+| `hidden` | no | bool | Not in the `/` menu. For cards that only code attaches (e.g. a thread posted from PHP). |
 
 The provider ID should look like `vendor/name`: the search route only accepts IDs matching
 `[a-z0-9_-]+/[a-z0-9_-]+`.
@@ -456,22 +470,26 @@ The search callback is called with the text after `/command ` (it may be empty a
 
 ### Snapshot fields
 
-Flurfunk keeps only these fields and cleans them (HTML stripped, URLs escaped):
+A snapshot is data, never HTML. Flurfunk keeps only these fields, cleans them (tags and control
+characters removed, lengths cut, links limited to `http`, `https` and, for links, `mailto`) and
+draws them itself. Fields of the wrong type are dropped, never turned into text.
 
 | Field | Type | Shown as |
 | --- | --- | --- |
-| `title` | string | Bold title, linked to `url` if given |
-| `subtitle` | string | Small line under the title |
-| `text` | string | Paragraph |
+| `title` | string (300) | Bold title, linked to `url` if given |
+| `subtitle` | string (300) | Small line under the title |
+| `text` | string (2,000, line breaks kept) | Paragraph |
 | `url` | URL | Link of the title |
-| `image` | URL | Image at the side |
-| `audio` | URL | Audio player |
+| `image` | URL (http/https) | Image at the side |
+| `audio` | URL (http/https) | Audio player |
 | `metric` | `{value, label}` | Big number with a label |
 | `spark` | number[] (up to 60) | Small bar chart |
 | `meta` | string[] (up to 6) | Small facts, joined with " · " |
-| `target` | `{type, id}` | Stored with the card; the default card does not draw it (yet) |
-| `action` | `{label, url}` | Button |
-| `data` | array | Not drawn; free data for your own [renderer](#custom-card-renderers) |
+| `status`, `fields`, `checklist`, `progress`, `people`, `table`, `badges`, `quote` | | The [building blocks](#card-building-blocks) |
+| `target` | `{type, id}` | "Conversations about this" link |
+| `action` | `{label, url}` | Link button |
+| `actions` | string[] | The [card actions](#card-actions) available right now |
+| `data` | array (up to 16 KB as JSON) | Not drawn; free data for your own [renderer](#custom-card-renderers) |
 
 Everything else is dropped. `data` is passed through JSON, so only plain values survive.
 
@@ -496,6 +514,119 @@ title, status, author, thumbnail and the edit link. Remove it with:
 remove_action( 'init', 'Flurfunk\Providers\register_builtin', 20 );
 ```
 
+## Card building blocks
+
+Next to the classic fields, a snapshot can use these blocks. They look the same everywhere, in
+light and dark, follow the accent colour, and are readable on phones. See them all in the
+[card gallery](cards.md).
+
+| Block | Schema | Limits | Drawn as |
+| --- | --- | --- | --- |
+| `status` | `{label, tone}`; `tone`: `neutral`, `positive`, `warning`, `critical`, `info` | label 60 | Pill next to the title. Unknown tones become `neutral`. |
+| `fields` | `[{label, value, url?}]` | 12 fields; label 60, value 200 | Label/value pairs in columns (`<dl>`) |
+| `checklist` | `[{label, done}]` | 20 items; label 200 | Ticked and open items; screen readers hear "done"/"open" |
+| `progress` | `{value, max?, label?}` | `max` defaults to 100, `value` is clamped to 0…max | Bar with percentage (`role="progressbar"`) |
+| `people` | user IDs | 12 | Avatars and names of people Flurfunk knows (others are left out) |
+| `table` | `{columns: [...], rows: [[...]]}` | 6 columns, 20 rows, cells 200 | Plain text table; scrolls sideways when narrow. `columns` may be empty |
+| `badges` | strings | 8; 40 each | Small labels |
+| `quote` | string | 2,000; line breaks kept | Quoted block of plain text |
+
+Empty blocks are left out, lists are cut at their limit after invalid entries were dropped, and
+`done` must be a real boolean (or `1`, `"true"`, `"yes"`).
+
+```php
+add_action( 'init', function () {
+	if ( ! function_exists( 'flurfunk_register_provider' ) ) {
+		return;
+	}
+	flurfunk_register_provider( 'acme/order', array(
+		'command'  => 'order',
+		'label'    => 'Order',
+		'search'   => fn ( string $q ) => acme_find_orders( $q ),      // [ [ 'ref' => [ 'id' => 1042 ], 'title' => '#1042' ] ]
+		'can'      => fn ( int $user_id ) => user_can( $user_id, 'manage_options' ),
+		'snapshot' => function ( array $ref, int $user_id ) {
+			$o = acme_get_order( (int) $ref['id'] );
+			if ( ! $o ) {
+				return null;
+			}
+			return array(
+				'title'     => 'Order #' . $o->id,
+				'url'       => admin_url( 'admin.php?page=acme-orders&id=' . $o->id ),
+				'status'    => array( 'label' => $o->paid ? 'Paid' : 'Open', 'tone' => $o->paid ? 'positive' : 'warning' ),
+				'fields'    => array(
+					array( 'label' => 'Customer', 'value' => $o->customer ),
+					array( 'label' => 'Total', 'value' => $o->total ),
+				),
+				'checklist' => array(
+					array( 'label' => 'Paid', 'done' => $o->paid ),
+					array( 'label' => 'Shipped', 'done' => $o->shipped ),
+				),
+				'table'     => array(
+					'columns' => array( 'Item', 'Qty' ),
+					'rows'    => array_map( fn ( $i ) => array( $i->name, (string) $i->qty ), $o->items ),
+				),
+				'people'    => array( $o->handled_by ),   // user IDs
+				'badges'    => $o->express ? array( 'Express' ) : array(),
+				'quote'     => $o->customer_note,
+				'actions'   => $o->shipped ? array() : array( 'ship' ),   // see "Card actions"
+			);
+		},
+	) );
+} );
+```
+
+## Card actions
+
+A provider can put buttons on its cards that run PHP on the site: approve, ship, retry. Register
+them with the provider; each snapshot lists the ones that make sense right now.
+
+```php
+'actions' => array(
+	'ship' => array(
+		'label'      => 'Mark as shipped',
+		'done'       => '%s marked the order as shipped',   // event line, %s = person
+		'style'      => 'primary',                          // primary | secondary | danger
+		'confirm'    => 'Mark this order as shipped?',      // optional: asked inline first
+		'capability' => 'flurfunk_team',                    // default
+		'callback'   => function ( array $ref, array $card, int $user_id ) {
+			$ok = acme_ship_order( (int) $ref['id'], $user_id );
+			if ( ! $ok ) {
+				return new WP_Error( 'acme', 'The shipping service did not answer.' );
+			}
+			return acme_order_snapshot( $ref );             // the new snapshot
+		},
+	),
+),
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `label` | the action ID | Button text (60 characters) |
+| `done` | | Event line in the thread, `%s` is the person ("Ana marked the order as shipped"). Without it: *Ana chose "Mark as shipped"* |
+| `style` | `secondary` | `primary`, `secondary` or `danger` |
+| `confirm` | | Question asked inside the card before it runs. Use it for anything hard to undo |
+| `capability` | `flurfunk_team` | Needed to see and run the button. `flurfunk_team`, `flurfunk_guest` and `flurfunk_manage` fall back to Flurfunk's team, user and settings checks while no role carries them |
+| `callback` | required | `( array $ref, array $card, int $user_id ): array\|WP_Error`. Runs as the person who clicked |
+
+Action IDs are keys like `ship` (lowercase letters, digits, `_`, `-`); up to six per provider.
+
+When someone clicks, `POST cards/<id>/action/<action>`:
+
+1. checks that the person may see the thread (404 otherwise), that the action exists (404), that
+   the provider's `can` and the action's `capability` allow it (403), and the rate limit (429);
+2. takes a lock on the card, so two clicks at once run one after the other, and checks that the
+   **stored** snapshot lists the action (409 otherwise; the app then shows the current card);
+3. calls the callback. A `WP_Error` comes back to the person as its message (status 400, or the
+   4xx status you set); an exception becomes a generic error without details; `null` means "ask
+   `snapshot` again";
+4. stores the returned snapshot (cleaned like any other), adds an `event` message with
+   `event: card_action` to the thread and fires `flurfunk_card_action`. Notifications follow the
+   thread's normal rules, as for a reply: author, participants, responsible people and followers.
+
+The app sends a random `key` per click; a retry with the same key within ten minutes returns the
+thread without running the action again. Your callback must still check its own permissions
+(e.g. `edit_comment` for that comment): the capability only decides who sees the button.
+
 ## Custom card renderers
 
 The default card handles most needs. For a special look, register a renderer for your provider
@@ -503,29 +634,59 @@ ID in JavaScript. It receives the snapshot and a helper object and returns an HT
 
 ```js
 window.Flurfunk.registerCard( 'myplugin/report', ( s, h ) =>
-	'<div class="ff-card-body"><b class="ff-card-title">' + h.esc( s.title ) + '</b>'
-	+ ( s.data && s.data.note ? '<span class="ff-card-text">' + h.rich( s.data.note ) + '</span>' : '' )
+	'<div class="ff-card-body"><span class="ff-card-head"><b class="ff-card-title">' + h.esc( s.title ) + '</b>'
+	+ h.status( s.data.state, 'positive' ) + '</span>'
+	+ h.fields( [ { label: 'Views', value: s.data.views } ] )
+	+ h.progress( s.data.done, s.data.total, 'Steps' )
 	+ '</div>'
 );
 ```
 
 | Helper | Does |
 | --- | --- |
-| `h.esc( value )` | HTML-escapes a value. Use it for every value you output. |
+| `h.esc( value )` | HTML-escapes a value. Use it for every value you output yourself. |
 | `h.rich( text )` | Escapes and applies Flurfunk's [formatting](user-guide.md#formatting) |
 | `h.when( iso )` | A short, localised relative time ("today, 14:05") |
+| `h.card( snapshot )` | The default card body for a snapshot, to extend |
+| `h.status( label, tone )` (also `h.pill`) | Status pill; tone `neutral`, `positive`, `warning`, `critical`, `info` |
+| `h.fields( [ { label, value, url } ] )` | Label/value pairs |
+| `h.list( [ { label, done } ] )` (also `h.checklist`) | Checklist |
+| `h.progress( value, max = 100, label )` | Progress bar |
+| `h.people( ids )` | Avatars and names; also takes `[ { name, avatar } ]` |
+| `h.table( columns, rows )` | Table of plain text |
+| `h.badges( labels )` | Small labels |
+| `h.quote( text )` | Quoted text |
+| `h.button( label, { style, action, confirm } )` | A button. With `action` (an action ID of your provider) it runs that card action, with confirmation, busy state and errors |
+
+The block helpers escape their input. The same helpers are available as
+`window.Flurfunk.cardHelpers`.
 
 Rules:
 
 - The returned HTML is inserted as is. Escape everything that comes from data.
 - The renderer is used for stored cards. While composing, the card preview uses the default look.
 - If the renderer throws, the default card is drawn instead.
-- Flurfunk wraps the result in its card frame with the provider label and the Update button.
-- The CSS classes `ff-card-body`, `ff-card-title`, `ff-card-sub`, `ff-card-text`, `ff-card-metric`,
-  `ff-card-meta`, `ff-card-action`, `ff-card-img` give you the default styles.
+- Flurfunk wraps the result in its card frame with the provider label and the Update button, and
+  adds the row of available actions unless your HTML already contains buttons made with
+  `h.button( …, { action } )`.
+- The CSS classes `ff-card-body`, `ff-card-head`, `ff-card-title`, `ff-card-sub`, `ff-card-text`,
+  `ff-card-metric`, `ff-card-meta`, `ff-card-action`, `ff-card-img` give you the default styles.
 
 Load your script after Flurfunk's (handle `flurfunk`), on the pages where Flurfunk runs. See the
 [example](examples.md#a-custom-card-renderer).
+
+## Core modules
+
+Optional parts that only build on WordPress itself. Switch them under *Settings → Flurfunk →
+Modules* or with `wp flurfunk module on|off <id>`; a module that is off is not loaded at all.
+Other plugins add their own modules with `flurfunk_register_module()` on the `flurfunk_modules`
+action.
+
+| Module | Default | Does |
+| --- | --- | --- |
+| `flurfunk/comments` | on | `/comment` (German `/kommentar`) inserts a comment: the commenter's public name, the post, an excerpt as quote, the state as status pill, and the actions **Approve**, **Spam** and **Trash** (with confirmation), depending on the state. For people who use Flurfunk and have `moderate_comments`; each action checks `edit_comment` for that comment. The card never contains the email or IP address, the user agent or the commenter's website. |
+| `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" in #general (filter `flurfunk_comments_channel`) with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. |
+| `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it in #general (filter `flurfunk_review_channel`), assigned to everyone who may publish and edit it (not the author, no assistants; filter `flurfunk_review_assignees`), with the post as a card. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
 
 ## Targets
 
@@ -681,6 +842,10 @@ locked in the database.
 | `flurfunk_rate_limit` | `int $max`, `int $user_id` | int | New threads and messages per minute and person. Default 30, 0 for administrators; 0 = off. |
 | `flurfunk_thread_limit` | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
 | `flurfunk_notification_days` | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
+| `flurfunk_comments_channel` | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default `general`. |
+| `flurfunk_comments_hour` | `int $hour` | int | Hour (site time) of the daily moderation thread. Default 9. |
+| `flurfunk_review_channel` | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default `general`. |
+| `flurfunk_review_assignees` | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. |
 | `flurfunk_openstation_icon` | `array {title, icon, url, position}` | array or false | Desktop icon when the OpenStation plugin is active; false = none. |
 
 Notification kinds for `flurfunk_notify_recipients` are `mention`, `assigned`, `due`, `remind`,
@@ -703,13 +868,15 @@ yourself.
 | `flurfunk_message_deleted` | `object $thread`, `int $message_id` | After a message was deleted. |
 | `flurfunk_assigned` | `object $thread`, `int[] $added`, `int $actor` | After people were made responsible. |
 | `flurfunk_status_changed` | `object $thread`, `string $status`, `int $actor` | After the task state changed (`open`, `doing`, `waiting`, `done`), or the thread stopped being a task (`''`). |
+| `flurfunk_card_action` | `object $thread`, `int $message_id`, `string $action`, `int $user_id`, `array $snapshot` | After a card action ran and its event line was added. |
 
 Editing a thread's own title or text (`threads/<id>/edit`) fires no action.
 
 ### Cron hooks
 
 `flurfunk_remind` (every 5 minutes), `flurfunk_due` and `flurfunk_digest` (hourly),
-`flurfunk_cleanup_files` (daily; also prunes notifications). See
+`flurfunk_cleanup_files` (daily; also prunes notifications), `flurfunk_comments_daily` (daily, only
+with the module `flurfunk/comments-daily`). See
 [Cron](installation.md#cron-reminders-digests-cleanup).
 
 ## WP-CLI
@@ -909,11 +1076,27 @@ More complete scripts (a GitHub Action, a daily report) are on the [examples](ex
 | Load test (2000 threads, 20000 messages) | `wp eval-file tests/load.php` |
 | Collect JavaScript strings | `python3 tools/strings.py` (writes `inc/strings.php`) |
 | Build translations | `python3 tools/l10n.py` (from `tools/translations/*.json` to `languages/*.l10n.php`) |
+| Card gallery of the website | `node tools/docs-cards.mjs` (from `assets/app.js` and `assets/app.css` to `docs/_includes/card-gallery.html` and `docs/assets/cards.css`) |
 | Release zip | `tools/build-zip.sh` |
 
 The e2e tests read `FF_BASE`, `FF_TEAM`, `FF_TEAM_PASS`, `FF_TEAM2`, `FF_TEAM2_PASS`, `FF_GUEST`,
-`FF_GUEST_PASS` and optionally `FF_QUERY`. `api-edge.php` and `load.php` clean up after
-themselves.
+`FF_GUEST_PASS` and optionally `FF_QUERY`; with `FF_SHOTS=<folder>` the card tests also save
+screenshots there. `api-edge.php` and `load.php` clean up after themselves.
+
+The card tests need the **test provider** `tests/fixtures/flurfunk-test-provider.php` (a card with
+every block and five actions, command `/e2e-card`); without it they are skipped. Load it as a
+must-use plugin and switch it on, only on test sites:
+
+```php
+// wp-config.php
+define( 'FLURFUNK_TEST_PROVIDERS', true );
+```
+
+```bash
+ln -s ../plugins/flurfunk/tests/fixtures/flurfunk-test-provider.php wp-content/mu-plugins/
+# WordPress Playground: --mount=<plugin>/tests/fixtures:/wordpress/wp-content/mu-plugins plus the define,
+# or add_filter( 'flurfunk_test_providers', '__return_true' ) in another mu-plugin.
+```
 
 To change the schema, bump `DB_VERSION` in `inc/schema.php`. `dbDelta` adds columns and indexes;
 anything else (renames, data rewrites) goes into `upgrade()` as a step.
