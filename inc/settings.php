@@ -321,6 +321,7 @@ function render(): void {
 			</table>
 			<?php submit_button(); ?>
 		</form>
+		<?php \Flurfunk\Modules\render_section(); ?>
 		<?php \Flurfunk\Data\render_section(); ?>
 	</div>
 	<?php

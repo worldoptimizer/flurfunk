@@ -531,6 +531,19 @@ $check( 'flurfunk_set_status() changes the state', true === flurfunk_set_status(
 $check( 'the current user is restored afterwards', get_current_user_id() === $team || get_current_user_id() === $team2 || get_current_user_id() === $guest );
 Flurfunk\Notify\deliver();
 
+WP_CLI::log( 'Modules' );
+$loaded_test = 0;
+$check( 'a module with a bad ID is refused', ! @flurfunk_register_module( 'Bad ID!', array( 'label' => 'x', 'load' => '__return_true' ) ) );
+$check( 'a module registers', flurfunk_register_module( 'ff-test/demo', array( 'label' => 'Demo', 'default' => false, 'requires' => array( 'FLURFUNK_VERSION' ), 'load' => static function () use ( &$loaded_test ) { ++$loaded_test; } ) ) );
+$check( 'it is off by its default', ! flurfunk_module_enabled( 'ff-test/demo' ) );
+Flurfunk\Modules\set( array( 'ff-test/demo' => true ) );
+$check( 'switching it on is remembered', flurfunk_module_enabled( 'ff-test/demo' ) );
+$check( 'requirements are checked', Flurfunk\Modules\available( Flurfunk\Modules\registry()['ff-test/demo'] ) && ! Flurfunk\Modules\available( array( 'requires' => array( 'NO_SUCH_CONSTANT_FF' ) ) ) );
+$check( 'Flurfunk\'s own integrations are modules', isset( Flurfunk\Modules\registry()['flurfunk/mailerpress'] ) );
+$opt = (array) get_option( 'flurfunk_modules', array() );
+unset( $opt['ff-test/demo'] );
+update_option( 'flurfunk_modules', $opt );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );

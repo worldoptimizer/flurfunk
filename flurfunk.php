@@ -3,7 +3,7 @@
  * Plugin Name:       Flurfunk
  * Plugin URI:        https://worldoptimizer.github.io/flurfunk/
  * Description:       Team conversations inside WordPress: channels, threads and tasks, attachable to posts, with mentions, files and cards from other plugins via slash commands. Works in plain wp-admin and inside the OpenStation desktop.
- * Version:           0.1.0
+ * Version:           0.2.0-dev
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Max Ziebell
@@ -29,7 +29,8 @@
  *   inc/transfer.php   JSON export and import
  *   inc/data.php       export/import in the settings, welcome after the first activation
  *   inc/cli.php        wp flurfunk …
- *   integrations/      optional cards for other plugins (MailerPress), loaded only when present
+ *   inc/modules.php    module register: optional parts, switchable under Settings → Flurfunk
+ *   integrations/      optional cards for other plugins (MailerPress), loaded as modules
  *
  * Everything site-specific lives outside this plugin and plugs in through the hooks and
  * functions documented in README.md.
@@ -39,7 +40,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const FLURFUNK_VERSION = '0.1.0';
+const FLURFUNK_VERSION = '0.2.0-dev';
 define( 'FLURFUNK_FILE', __FILE__ );
 define( 'FLURFUNK_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FLURFUNK_URL', plugin_dir_url( __FILE__ ) );
@@ -61,15 +62,7 @@ require_once FLURFUNK_DIR . 'inc/standalone.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
 require_once FLURFUNK_DIR . 'inc/data.php';
 
-// Optional integrations with other plugins, each only when that plugin is active.
-add_action(
-	'plugins_loaded',
-	static function (): void {
-		if ( defined( 'MAILERPRESS_VERSION' ) ) {
-			require_once FLURFUNK_DIR . 'integrations/mailerpress.php';
-		}
-	}
-);
+require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. integrations/ (switchable).
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once FLURFUNK_DIR . 'inc/cli.php';
@@ -247,3 +240,24 @@ function flurfunk_set_status( $thread, string $status, int $author = 0 ) {
 	}
 	return flurfunk_as( $author, static fn () => Flurfunk\Store\set_status( (int) $row->id, $status ) );
 }
+
+/**
+ * Register an optional module (see inc/modules.php): it shows up under Settings → Flurfunk with
+ * a switch and is only loaded when switched on. Call it on the `flurfunk_modules` action.
+ *
+ * @param string $id   ID like "vendor/name".
+ * @param array  $args label, description, group, requires, default, load, settings_url.
+ */
+function flurfunk_register_module( string $id, array $args ): bool {
+	return Flurfunk\Modules\register( $id, $args );
+}
+
+/**
+ * Is a module switched on?
+ *
+ * @param string $id Module ID.
+ */
+function flurfunk_module_enabled( string $id ): bool {
+	return Flurfunk\Modules\enabled( $id );
+}
+

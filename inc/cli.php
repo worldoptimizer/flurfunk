@@ -79,6 +79,50 @@ class Command {
 	}
 
 	/**
+	 * List modules or switch one on or off.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [<action>]
+	 * : list (default), on or off.
+	 *
+	 * [<id>]
+	 * : Module ID for on/off.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp flurfunk module
+	 *     wp flurfunk module off flurfunk/mailerpress
+	 *
+	 * @param array $args Arguments.
+	 */
+	public function module( array $args ): void {
+		$action = $args[0] ?? 'list';
+		if ( 'list' === $action ) {
+			$rows = array();
+			foreach ( \Flurfunk\Modules\listing() as $group => $list ) {
+				foreach ( $list as $m ) {
+					$rows[] = array(
+						'id'        => $m['id'],
+						'group'     => $group,
+						'enabled'   => $m['enabled'] ? 'on' : 'off',
+						'available' => $m['available'] ? 'yes' : 'no',
+						'loaded'    => $m['loaded'] ? 'yes' : 'no',
+					);
+				}
+			}
+			\WP_CLI\Utils\format_items( 'table', $rows, array( 'id', 'group', 'enabled', 'available', 'loaded' ) );
+			return;
+		}
+		$id = (string) ( $args[1] ?? '' );
+		if ( ! in_array( $action, array( 'on', 'off' ), true ) || ! isset( \Flurfunk\Modules\registry()[ $id ] ) ) {
+			WP_CLI::error( 'Usage: wp flurfunk module on|off <id> (see wp flurfunk module).' );
+		}
+		\Flurfunk\Modules\set( array( $id => 'on' === $action ) );
+		WP_CLI::success( sprintf( '%s is %s.', $id, $action ) );
+	}
+
+	/**
 	 * Channels and counts.
 	 */
 	public function status(): void {
