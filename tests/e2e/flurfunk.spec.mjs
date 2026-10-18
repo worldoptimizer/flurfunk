@@ -644,6 +644,121 @@ test.describe( 'team', () => {
 		await panel.locator( '.ff-compose .ff-send' ).last().click();
 		await expect( panel.locator( '.ff-box', { hasText: text } ) ).toBeVisible();
 	} );
+	/*
+	 * Card building blocks and actions. Needs the test provider (tests/fixtures/flurfunk-test-provider.php,
+	 * see the developer guide); skipped without it. FF_SHOTS=<dir> also saves screenshots.
+	 */
+	const openCardThread = async ( page, attachments, body ) => {
+		const th = await api( page, 'threads', { channel: 'general', body, attachments } );
+		await openApp( page );
+		await page.locator( `.ff-post[data-id="${ th.id }"]` ).click();
+		await page.locator( '.ff-pane .ff-card' ).first().waitFor();
+		return th;
+	};
+	const testCard = async ( page ) => {
+		const boot = await api( page, 'bootstrap' );
+		test.skip( ! boot.providers.some( ( p ) => 'flurfunk-test/everything' === p.id ), 'test provider not loaded (FLURFUNK_TEST_PROVIDERS)' );
+		return openCardThread( page, [ { provider: 'flurfunk-test/everything', ref: { id: 'e2e' + Date.now() } } ], 'e2e card blocks' );
+	};
+
+	for ( const theme of [ 'light', 'dark' ] ) {
+		test( `card building blocks render accessibly (${ theme })`, async ( { page } ) => {
+			await api( page, 'me/prefs', { theme } );
+			await testCard( page );
+			const c = page.locator( '.ff-pane .ff-card' ).first();
+			for ( const sel of [ '.ff-card-status.is-warning', '.ff-card-fields dt', '.ff-card-check li.is-done', '.ff-card-progress [role="progressbar"]', '.ff-card-people .ff-ava', '.ff-card-table th[scope="col"]', '.ff-card-badges li', '.ff-card-quote', '.ff-card-actions .ff-card-btn.is-primary', '.ff-card-actions .ff-card-btn.is-danger' ] ) {
+				await expect( c.locator( sel ).first(), sel ).toBeVisible();
+			}
+			expect( await c.locator( '[role="progressbar"]' ).getAttribute( 'aria-valuenow' ) ).toBe( '3' );
+			// No coloured edge stripes: borders are the same on all four sides.
+			const sides = await c.locator( '.ff-card-quote, .ff-card-status' ).evaluateAll( ( els ) => els.map( ( e ) => {
+				const s = getComputedStyle( e );
+				return new Set( [ s.borderTopColor, s.borderRightColor, s.borderBottomColor, s.borderLeftColor ] ).size;
+			} ) );
+			expect( sides.every( ( n ) => 1 === n ) ).toBe( true );
+			const r = await new AxeBuilder( { page } ).include( '.ff-pane .ff-card' ).withTags( [ 'wcag2a', 'wcag2aa', 'wcag21aa' ] ).analyze();
+			expect( r.violations.map( ( v ) => v.id + ': ' + v.nodes.slice( 0, 3 ).map( ( n ) => n.target.join( ' ' ) ).join( ' | ' ) ) ).toEqual( [] );
+			if ( process.env.FF_SHOTS ) {
+				await c.scrollIntoViewIfNeeded();
+				await c.screenshot( { path: `${ process.env.FF_SHOTS }/cards-${ theme }.png` } );
+				await page.setViewportSize( { width: 390, height: 844 } );
+				await openApp( page );
+				await page.locator( '.ff-post' ).first().click();
+				await page.locator( '.ff-pane .ff-card' ).first().scrollIntoViewIfNeeded();
+				await page.screenshot( { path: `${ process.env.FF_SHOTS }/cards-${ theme }-phone.png`, fullPage: false } );
+			}
+			await api( page, 'me/prefs', { theme: 'light' } );
+		} );
+	}
+
+	test( 'card actions: inline confirm, keyboard, busy state, error, event line', async ( { page } ) => {
+		await testCard( page );
+		const c = page.locator( '.ff-pane .ff-card' ).first();
+		const approve = c.locator( '.ff-card-actions button[data-act="approve"]' );
+		await approve.focus();
+		await page.keyboard.press( 'Enter' );
+		const confirm = c.locator( '.ff-card-confirm' );
+		await expect( confirm ).toBeVisible();
+		await expect( confirm.locator( '[data-ff="card-act-go"]' ) ).toBeFocused();
+		await expect( c.locator( '.ff-card-actions' ) ).toBeHidden();
+		if ( process.env.FF_SHOTS ) {
+			await c.screenshot( { path: `${ process.env.FF_SHOTS }/cards-confirm.png` } );
+		}
+		await page.keyboard.press( 'Escape' );
+		await expect( confirm ).toHaveCount( 0 );
+		await expect( approve ).toBeFocused();
+		await expect( page.locator( '.ff-pane' ) ).toBeVisible(); // Escape did not close the thread.
+		// A failing action shows its message inside the card and keeps the buttons usable.
+		await c.locator( 'button[data-act="fail"]' ).click();
+		await expect( c.locator( '.ff-card-error[role="alert"]' ) ).toContainText( 'The mail service did not answer.' );
+		await expect( c.locator( 'button[data-act="fail"]' ) ).toBeEnabled();
+		// Busy while the request runs.
+		await page.route( ( u ) => decodeURIComponent( u.href ).includes( '/action/approve' ), async ( route ) => {
+			await new Promise( ( r ) => setTimeout( r, 600 ) );
+			await route.continue();
+		} );
+		await approve.click();
+		await c.locator( '[data-ff="card-act-go"]' ).click();
+		await expect( c.locator( '[data-ff="card-act-go"][aria-busy="true"]' ) ).toBeVisible();
+		await expect( page.locator( '.ff-pane .ff-card .ff-card-status.is-positive' ) ).toBeVisible();
+		await expect( page.locator( '.ff-pane .ff-card button[data-act="approve"]' ) ).toHaveCount( 0 );
+		await expect( page.locator( '.ff-pane .ff-card button[data-act="reopen"]' ) ).toBeVisible();
+		const boot = await api( page, 'bootstrap' );
+		await expect( page.locator( '.ff-pane .ff-event', { hasText: boot.me.name } ).last() ).toContainText( 'Spring newsletter' );
+		if ( process.env.FF_SHOTS ) {
+			await page.locator( '.ff-pane' ).screenshot( { path: `${ process.env.FF_SHOTS }/cards-after.png` } );
+		}
+	} );
+
+	test( 'comment card: approve and trash from the thread', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		test.skip( ! boot.providers.some( ( p ) => 'flurfunk/comment' === p.id ), 'comment cards module is off' );
+		const wp = ( path, method = 'GET', body ) => page.evaluate( async ( [ p, m, b ] ) => {
+			const r = await fetch( '/wp-json/wp/v2/' + p, { method: m, headers: { 'X-WP-Nonce': window.flurfunkConfig.nonce, 'Content-Type': 'application/json' }, body: b ? JSON.stringify( b ) : undefined } );
+			return r.json();
+		}, [ path, method, body ] );
+		const post = ( await wp( 'posts?per_page=1&status=publish' ) )[ 0 ];
+		const comment = await wp( 'comments', 'POST', { post: post.id, content: 'e2e comment ' + Date.now(), author_name: 'E2E Eve', author_email: 'eve@example.test', status: 'hold' } );
+		try {
+			await openCardThread( page, [ { provider: 'flurfunk/comment', ref: { id: comment.id } } ], 'e2e comment card' );
+			const c = page.locator( '.ff-pane .ff-card' ).first();
+			await expect( c.locator( '.ff-card-status.is-warning' ) ).toBeVisible();
+			await expect( c ).not.toContainText( 'eve@example.test' );
+			await expect( c.locator( '.ff-card-quote' ) ).toContainText( 'e2e comment' );
+			await c.locator( 'button[data-act="approve"]' ).click();
+			await expect( page.locator( '.ff-pane .ff-card .ff-card-status.is-positive' ) ).toBeVisible();
+			expect( ( await wp( 'comments/' + comment.id + '?context=edit' ) ).status ).toBe( 'approved' );
+			await page.locator( '.ff-pane .ff-card button[data-act="trash"]' ).click();
+			await page.locator( '.ff-pane .ff-card [data-ff="card-act-go"]' ).click();
+			await expect( page.locator( '.ff-pane .ff-card .ff-card-status.is-neutral' ) ).toBeVisible();
+			await expect( page.locator( '.ff-pane .ff-card .ff-card-btn' ) ).toHaveCount( 0 );
+			expect( ( await wp( 'comments/' + comment.id + '?context=edit' ) ).status ).toBe( 'trash' );
+			await expect( page.locator( '.ff-pane .ff-event' ).last() ).toContainText( boot.me.name );
+		} finally {
+			await wp( 'comments/' + comment.id + '?force=true', 'DELETE' );
+		}
+	} );
+
 } );
 
 test.describe( 'full screen', () => {

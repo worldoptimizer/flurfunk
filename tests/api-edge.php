@@ -12,6 +12,7 @@
 
 // phpcs:disable
 
+use Flurfunk\Providers;
 use Flurfunk\Store;
 
 $args  = $args ?? array();
@@ -531,6 +532,265 @@ $check( 'flurfunk_set_status() changes the state', true === flurfunk_set_status(
 $check( 'the current user is restored afterwards', get_current_user_id() === $team || get_current_user_id() === $team2 || get_current_user_id() === $guest );
 Flurfunk\Notify\deliver();
 
+WP_CLI::log( 'Card building blocks' );
+$state = array();
+$acted = array();
+flurfunk_register_provider(
+	'ff-test/blocks',
+	array(
+		'command'  => 'ff-blocks',
+		'label'    => 'Blocks',
+		'snapshot' => function ( $ref ) use ( &$state ) {
+			$open = 'open' === ( $state[ $ref['id'] ] ?? 'open' );
+			return array(
+				'title'   => 'Item ' . $ref['id'],
+				'status'  => $open ? array( 'label' => 'Open', 'tone' => 'warning' ) : array( 'label' => 'Approved', 'tone' => 'positive' ),
+				'actions' => $open ? array( 'approve', 'fail', 'boom', 'admin', 'nothing' ) : array(),
+			);
+		},
+		'actions'  => array(
+			'approve' => array(
+				'label'    => 'Approve',
+				'done'     => '%s approved',
+				'style'    => 'primary',
+				'confirm'  => 'Sure?',
+				'callback' => function ( $ref, $card, $uid ) use ( &$state, &$acted ) {
+					$acted[]             = $uid;
+					$state[ $ref['id'] ] = 'approved';
+					return array( 'title' => $card['title'], 'status' => array( 'label' => 'Approved', 'tone' => 'positive' ), 'actions' => array(), 'text' => '<b>done</b>' );
+				},
+			),
+			'fail'    => array( 'label' => 'Fail', 'callback' => fn () => new WP_Error( 'x', '<b>Nope</b> from the provider' ) ),
+			'boom'    => array( 'label' => 'Boom', 'callback' => function () { throw new RuntimeException( 'secret path /var/www' ); } ),
+			'admin'   => array( 'label' => 'Admins only', 'capability' => 'manage_options', 'callback' => fn ( $r, $c ) => $c ),
+			'nothing' => array( 'label' => 'Nothing back', 'callback' => fn () => null ),
+			'Bad Key!' => array( 'label' => 'x' ),
+		),
+	)
+);
+$reg = Providers\registry()['ff-test/blocks'];
+$check( 'actions without a callback are not registered; keys are cleaned', array( 'approve', 'fail', 'boom', 'admin', 'nothing' ) === array_keys( $reg['actions'] ), array_keys( $reg['actions'] ) );
+$check( 'actions default to the team capability and the secondary style', 'flurfunk_team' === $reg['actions']['fail']['capability'] && 'secondary' === $reg['actions']['fail']['style'] );
+
+$evil = Providers\clean_snapshot(
+	array(
+		'title'     => '<script>alert(1)</script>Hi <b>there</b>',
+		'subtitle'  => array( 'not', 'a', 'string' ),
+		'text'      => "line one\nline\x00two <img src=x onerror=alert(1)>",
+		'url'       => 'javascript:alert(1)',
+		'image'     => 'data:image/svg+xml;base64,PHN2Zz4=',
+		'audio'     => 'mailto:x@example.org',
+		'metric'    => array( 'value' => array( 'x' ) ),
+		'spark'     => array( 1, 'two', INF, '3', array() ),
+		'fields'    => array_merge( array( 'not an array', array( 'label' => array( 'x' ), 'value' => 'v' ) ), array_fill( 0, 50, array( 'label' => '<i>L</i>', 'value' => '<img src=x onerror=alert(1)>V', 'url' => 'javascript:alert(1)' ) ) ),
+		'checklist' => array( array( 'label' => 'a', 'done' => 'yes' ), array( 'label' => 'b', 'done' => 'false' ), 'str', array( 'label' => array( 'arr' ) ), array( 'label' => '' ) ),
+		'progress'  => array( 'value' => '500', 'max' => '-3', 'label' => '<b>p</b>' ),
+		'status'    => array( 'label' => 'x', 'tone' => 'evil" onclick="x' ),
+		'people'    => array( '1', 'abc', -5, 3, 3, array( 2 ) ),
+		'table'     => array( 'columns' => array_fill( 0, 20, '<th>c' ), 'rows' => array_merge( array( 'no row' ), array_fill( 0, 100, array_fill( 0, 20, '<b>x</b>' ) ) ) ),
+		'badges'    => array_fill( 0, 30, '<em>b</em>' ),
+		'quote'     => str_repeat( 'q', 5000 ),
+		'target'    => array( 'type' => '<x>post', 'id' => 'abc' ),
+		'action'    => array( 'label' => 'Go', 'url' => 'javascript:alert(1)' ),
+		'actions'   => array( 'approve', '<x>', 'nope', array( 'approve' ), 'approve' ),
+		'html'      => '<b>unknown keys go</b>',
+		'data'      => array( 'big' => str_repeat( 'x', 20000 ) ),
+	),
+	'ff-test/blocks'
+);
+$json = (string) wp_json_encode( $evil );
+$check( 'no markup survives in any block', ! str_contains( $json, '<' ) && ! str_contains( $json, 'javascript' ) && ! str_contains( $json, 'onerror' ), $json );
+$check( 'title loses tags and script content', 'Hi there' === ( $evil['title'] ?? '' ), $evil['title'] ?? null );
+$check( 'wrong types are dropped, not turned into "Array"', ! isset( $evil['subtitle'], $evil['metric'], $evil['target'], $evil['action'] ) && ! str_contains( $json, 'Array' ) );
+$check( 'text keeps line breaks, loses control characters', "line one\nlinetwo" === $evil['text'], $evil['text'] );
+$check( 'only http(s) for links and media', ! isset( $evil['url'], $evil['image'], $evil['audio'] ) && ! isset( $evil['fields'][0]['url'] ) );
+$check( 'spark keeps finite numbers only', array( 1.0, 3.0 ) === $evil['spark'], $evil['spark'] );
+$check( 'fields: at most 12, plain values', 12 === count( $evil['fields'] ) && 'L' === $evil['fields'][0]['label'] && 'V' === $evil['fields'][0]['value'], $evil['fields'][0] ?? null );
+$check( 'checklist: labels required, done is a real boolean', array( array( 'label' => 'a', 'done' => true ), array( 'label' => 'b', 'done' => false ) ) === $evil['checklist'], $evil['checklist'] );
+$check( 'progress: bad max becomes 100, value is clamped', 100.0 === $evil['progress']['max'] && 100.0 === $evil['progress']['value'] && 'p' === $evil['progress']['label'], $evil['progress'] );
+$check( 'status: unknown tone becomes neutral', 'neutral' === $evil['status']['tone'] );
+$check( 'people: positive IDs, once each', array( 1, 3 ) === $evil['people'], $evil['people'] );
+$check( 'table: at most 6 columns and 20 rows, plain cells', 6 === count( $evil['table']['columns'] ) && 20 === count( $evil['table']['rows'] ) && array( 6 ) === array_unique( array_map( 'count', $evil['table']['rows'] ) ) && 'x' === $evil['table']['rows'][0][0] && 'c' === $evil['table']['columns'][0], array( count( $evil['table']['columns'] ), count( $evil['table']['rows'] ) ) );
+$check( 'badges: at most 8', 8 === count( $evil['badges'] ) && 'b' === $evil['badges'][0] );
+$check( 'quote: cut at 2000 characters', 2000 === mb_strlen( $evil['quote'] ) );
+$check( 'actions: only registered ones, once', array( 'approve' ) === $evil['actions'], $evil['actions'] );
+$check( 'unknown keys and oversized data are dropped', ! isset( $evil['html'], $evil['data'] ) );
+$check( 'a snapshot of only wrong types is empty', array() === Providers\clean_snapshot( array( 'fields' => 'x', 'table' => 'x', 'progress' => '5', 'status' => 'warning', 'checklist' => 5, 'metric' => '7', 'people' => 'me', 'badges' => 'b', 'quote' => array( 'q' ), 'spark' => 'no' ) ) );
+$good = array(
+	'title'     => 'Q3',
+	'fields'    => array( array( 'label' => 'Lists', 'value' => 'News, Partners', 'url' => 'https://example.org/lists' ) ),
+	'checklist' => array( array( 'label' => 'Proofread', 'done' => true ) ),
+	'progress'  => array( 'value' => 3.0, 'max' => 4.0, 'label' => 'Steps' ),
+	'status'    => array( 'label' => 'Scheduled', 'tone' => 'info' ),
+	'people'    => array( $team, $team2 ),
+	'table'     => array( 'columns' => array( 'A', 'B' ), 'rows' => array( array( '1', '2' ) ) ),
+	'badges'    => array( 'Newsletter' ),
+	'quote'     => "Two\nlines",
+);
+$check( 'a valid snapshot comes through unchanged', $good == Providers\clean_snapshot( $good ), Providers\clean_snapshot( $good ) );
+
+WP_CLI::log( 'Card actions' );
+$as( $team );
+list( $s, $ct ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'body' => 'Karte mit Knöpfen', 'attachments' => array( array( 'provider' => 'ff-test/blocks', 'ref' => array( 'id' => 1 ) ), array( 'provider' => 'ff-test/blocks', 'ref' => array( 'id' => 2 ) ) ) ) );
+$c1 = (int) ( $ct['attachments'][0]['id'] ?? 0 );
+$c2 = (int) ( $ct['attachments'][1]['id'] ?? 0 );
+$check( 'a card lists its available actions', 200 === $s && in_array( 'approve', $ct['attachments'][0]['snapshot']['actions'] ?? array(), true ), $ct['attachments'][0] ?? $s );
+$as( $team2 );
+$boot_p = current( array_filter( $req( 'GET', 'bootstrap' )[1]['providers'], fn ( $p ) => 'ff-test/blocks' === $p['id'] ) );
+$boot_a = (array) $boot_p['actions'];
+$check( 'bootstrap describes the actions, "can" per person', true === $boot_a['approve']['can'] && false === $boot_a['admin']['can'] && 'Sure?' === $boot_a['approve']['confirm'] && ! isset( $boot_a['approve']['callback'] ), $boot_a );
+list( $s, $r ) = $req( 'POST', "cards/$c1/action/nope", array() );
+$check( 'unknown action: 404', 404 === $s && 'flurfunk_action' === ( $r['code'] ?? '' ), $r );
+list( $s ) = $req( 'POST', 'cards/999999/action/approve', array() );
+$check( 'unknown card: 404', 404 === $s, $s );
+list( $s, $r ) = $req( 'POST', "cards/$c1/action/admin", array() );
+$check( 'action needing another capability: 403', 403 === $s, $r );
+$as( $guest );
+list( $s ) = $req( 'POST', "cards/$c1/action/approve", array() );
+$check( 'someone who cannot see the thread: 404', 404 === $s, $s );
+$as( $team2 );
+list( $s, $r ) = $req( 'POST', "cards/$c1/action/fail", array() );
+$check( 'a callback error comes back as plain text', 400 === $s && 'Nope from the provider' === ( $r['message'] ?? '' ), $r );
+list( $s, $r ) = $req( 'POST', "cards/$c1/action/boom", array() );
+$check( 'a callback that throws: 500 without details', 500 === $s && ! str_contains( (string) ( $r['message'] ?? '' ), 'secret' ), $r );
+$check( '… and nothing ran or was logged', ! $acted && ! array_filter( $req( 'GET', 'threads/' . $ct['id'], null, array( 'peek' => 1 ) )[1]['messages'], fn ( $m ) => 'event' === $m['type'] ) );
+list( $notes, $m ) = $flush( function () use ( $req, $c1, &$s, &$r ) {
+	list( $s, $r ) = $req( 'POST', "cards/$c1/action/approve", array() );
+} );
+$card = current( array_filter( $r['attachments'] ?? array(), fn ( $a ) => $a['id'] === $c1 ) );
+$ev   = array_values( array_filter( $r['messages'] ?? array(), fn ( $m ) => 'event' === $m['type'] ) );
+$check( 'success: the returned snapshot replaces the stored one', 200 === $s && 'Approved' === ( $card['snapshot']['status']['label'] ?? '' ) && array() === $card['snapshot']['actions'] && 'done' === $card['snapshot']['text'], $card['snapshot'] ?? $r );
+$check( '… an event line records who did what', 1 === count( $ev ) && 'card_action' === $ev[0]['event'] && $team2 === $ev[0]['author'] && 'approve' === $ev[0]['action'] && Store\person( $team2 )['name'] . ' approved' === $ev[0]['summary'] && 'Item 1' === $ev[0]['title'], $ev );
+$check( '… the thread author is notified like for a reply', 'reply' === ( $notes[ $team ] ?? '' ) && ! isset( $notes[ $team2 ] ), $notes );
+$words = Flurfunk\Notify\list_for( $team, 0, 1 )[0] ?? array();
+$check( '… with the event as headline', Store\person( $team2 )['name'] . ' approved' === ( $words['headline'] ?? '' ) && str_contains( (string) $words['text'], 'Item 1' ), $words );
+list( $s, $r ) = $req( 'POST', "cards/$c1/action/approve", array() );
+$check( 'the same action again: 409, it ran once', 409 === $s && 'flurfunk_action_gone' === ( $r['code'] ?? '' ) && array( $team2 ) === $acted, $r );
+list( $s1 ) = $req( 'POST', "cards/$c2/action/approve", array( 'key' => 'retry-1' ) );
+list( $s2 ) = $req( 'POST', "cards/$c2/action/approve", array( 'key' => 'retry-1' ) );
+$ev = array_filter( $req( 'GET', 'threads/' . $ct['id'], null, array( 'peek' => 1 ) )[1]['messages'], fn ( $m ) => 'event' === $m['type'] );
+$check( 'a retry with the same key answers 200 and runs nothing twice', 200 === $s1 && 200 === $s2 && 2 === count( $acted ) && 2 === count( $ev ), array( $s1, $s2, count( $acted ), count( $ev ) ) );
+$state[3] = 'open';
+list( $s, $x ) = $req( 'POST', 'threads/' . $ct['id'] . '/messages', array( 'body' => 'noch eine', 'attachments' => array( array( 'provider' => 'ff-test/blocks', 'ref' => array( 'id' => 3 ) ) ) ) );
+$c3 = (int) ( end( $x['messages'] )['attachments'][0]['id'] ?? 0 );
+list( $s, $r ) = $req( 'POST', "cards/$c3/action/nothing", array() );
+$check( 'a callback returning nothing: the provider\'s current snapshot is stored', 200 === $s && 'Item 3' === ( end( $r['messages'] )['title'] ?? '' ), $s );
+add_filter( 'flurfunk_rate_limit', $one = fn () => 1 );
+delete_transient( 'flurfunk_rate_' . $team2 . '_' . gmdate( 'YmdHi' ) );
+list( $sa ) = $req( 'POST', "cards/$c3/action/fail", array() );
+list( $sb, $r ) = $req( 'POST', "cards/$c3/action/fail", array() );
+remove_filter( 'flurfunk_rate_limit', $one );
+$check( 'actions count towards the rate limit', 400 === $sa && 429 === $sb, array( $sa, $sb, $r ) );
+$exp  = Flurfunk\Transfer\export();
+$expt = current( array_filter( $exp['threads'], fn ( $t ) => (int) $t['id'] === (int) $ct['id'] ) );
+$check( 'the export keeps the event lines', (bool) array_filter( $expt['messages'] ?? array(), fn ( $m ) => 'card_action' === ( $m['event'] ?? '' ) && 'approve' === $m['action'] ) );
+
+WP_CLI::log( 'Comment cards module' );
+$check( 'the /comment provider is registered', isset( Providers\registry()['flurfunk/comment'] ) );
+$cid = wp_insert_comment(
+	array(
+		'comment_post_ID'      => $other_post,
+		'comment_author'       => 'Eve Commenter',
+		'comment_author_email' => 'eve@secret.example',
+		'comment_author_IP'    => '203.0.113.9',
+		'comment_author_url'   => 'https://eve.example',
+		'comment_agent'        => 'UA-secret',
+		'comment_content'      => "Great <b>post</b>!\nSee you.",
+		'comment_approved'     => 0,
+	)
+);
+$as( $team );
+$snap = Providers\snapshot( 'flurfunk/comment', array( 'id' => $cid ), $team );
+$sj   = (string) wp_json_encode( $snap );
+$check( 'comment card: no email, IP, user agent or website', $snap && ! str_contains( $sj, 'secret' ) && ! str_contains( $sj, '203.0.113' ) && ! str_contains( $sj, 'eve.example' ), $sj );
+$check( '… public name, quote, pending status and three actions', 'Comment by Eve Commenter' === $snap['title'] && str_contains( $snap['quote'], 'Great post' ) && 'warning' === $snap['status']['tone'] && array( 'approve', 'spam', 'trash' ) === $snap['actions'] && 'post' === ( $snap['target']['type'] ?? '' ), $snap );
+$check( 'search finds waiting comments first', $cid === ( Providers\search( 'flurfunk/comment', '', $team )[0]['ref']['id'] ?? 0 ) );
+$check( 'guests without moderate_comments get no card', null === Providers\snapshot( 'flurfunk/comment', array( 'id' => $cid ), $guest ) && null === Providers\search( 'flurfunk/comment', '', $guest ) );
+list( $s, $ct2 ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'body' => 'Kommentar prüfen', 'attachments' => array( array( 'provider' => 'flurfunk/comment', 'ref' => array( 'id' => $cid ) ) ) ) );
+$cc = (int) ( $ct2['attachments'][0]['id'] ?? 0 );
+$as( $team2 );
+$nomod = static fn ( $caps, $c, $a, $u ) => (int) $u->ID === $team2 ? array_merge( $caps, array( 'moderate_comments' => false, 'edit_comment' => false ) ) : $caps;
+add_filter( 'user_has_cap', $nomod, 10, 4 );
+list( $s ) = $req( 'POST', "cards/$cc/action/approve", array() );
+remove_filter( 'user_has_cap', $nomod, 10 );
+$check( 'without moderate_comments: 403, comment unchanged', 403 === $s && 'unapproved' === wp_get_comment_status( $cid ), array( $s, wp_get_comment_status( $cid ) ) );
+list( $s, $r ) = $req( 'POST', "cards/$cc/action/approve", array() );
+$card = $r['attachments'][0]['snapshot'] ?? array();
+$check( 'approve: the comment is approved, the card shows it', 200 === $s && 'approved' === wp_get_comment_status( $cid ) && 'positive' === ( $card['status']['tone'] ?? '' ) && array( 'spam', 'trash' ) === $card['actions'], array( $s, $card ) );
+$ev = array_values( array_filter( $r['messages'] ?? array(), fn ( $m ) => 'event' === $m['type'] ) );
+$check( '… "approved the comment" in the thread', $ev && Store\person( $team2 )['name'] . ' approved the comment' === $ev[0]['summary'], $ev );
+list( $s ) = $req( 'POST', "cards/$cc/action/approve", array() );
+$check( 'approving twice is refused', 409 === $s, $s );
+list( $s, $r ) = $req( 'POST', "cards/$cc/action/spam", array() );
+$check( 'spam: marked as spam, approve offered again', 200 === $s && 'spam' === wp_get_comment_status( $cid ) && array( 'approve', 'trash' ) === ( $r['attachments'][0]['snapshot']['actions'] ?? null ), $s );
+list( $s, $r ) = $req( 'POST', "cards/$cc/action/trash", array() );
+$check( 'trash: in the trash, no actions left', 200 === $s && 'trash' === wp_get_comment_status( $cid ) && array() === ( $r['attachments'][0]['snapshot']['actions'] ?? null ), $s );
+wp_delete_comment( $cid, true );
+list( $s, $r ) = $req( 'POST', 'cards/' . $cc . '/refresh', array() );
+$check( 'a deleted comment: the card keeps its last state', 409 === $s, $s );
+
+WP_CLI::log( 'Daily moderation thread module' );
+require_once FLURFUNK_DIR . 'modules/comments-daily.php';
+Flurfunk\Modules\CommentsDaily\register();
+add_filter( 'flurfunk_comments_channel', $to_test = fn () => 'ff-test' );
+$waiting = get_comments( array( 'status' => 'hold', 'fields' => 'ids' ) );
+foreach ( $waiting as $w ) {
+	wp_set_comment_status( $w, 'approve' ); // Put back below.
+}
+$day_ref = 'flurfunk-comments:' . wp_date( 'Y-m-d' );
+$old_day = Store\thread_by_ref( $day_ref );
+if ( $old_day ) {
+	$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-moved' ), array( 'id' => $old_day->id ) );
+}
+$check( 'nothing waiting: no thread', 0 === Flurfunk\Modules\CommentsDaily\run() && ! Store\thread_by_ref( $day_ref ) );
+$q1 = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Fred', 'comment_author_email' => 'fred@secret.example', 'comment_content' => 'First', 'comment_approved' => 0 ) );
+$daily = Flurfunk\Modules\CommentsDaily\run();
+$dt    = is_int( $daily ) ? Store\full_thread( $daily, $team ) : null;
+$dcard = $dt['attachments'][0]['snapshot'] ?? array();
+$check( 'waiting comments: one thread by the assistant with a table', $dt && Flurfunk\Access\is_bot( $dt['author'] ) && 'ff-test' === $dt['channel'] && array( 'Fred' ) === array_column( $dcard['table']['rows'] ?? array(), 0 ) && ! str_contains( (string) wp_json_encode( $dcard ), 'secret' ), $dcard );
+$q2 = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Gina', 'comment_content' => 'Second', 'comment_approved' => 0 ) );
+$again = Flurfunk\Modules\CommentsDaily\run();
+$dcard = Store\full_thread( $daily, $team )['attachments'][0]['snapshot'] ?? array();
+$check( 'the same day: the card is updated, no second thread', $again === $daily && 2 === count( $dcard['table']['rows'] ?? array() ) && '2' === ( $dcard['fields'][0]['value'] ?? '' ), $dcard );
+remove_filter( 'flurfunk_comments_channel', $to_test );
+wp_delete_comment( $q1, true );
+wp_delete_comment( $q2, true );
+foreach ( $waiting as $w ) {
+	wp_set_comment_status( $w, 'hold' );
+}
+if ( $old_day ) {
+	$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => $day_ref ), array( 'id' => $old_day->id ) );
+}
+$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily' ), array( 'ref_key' => $day_ref, 'id' => $daily ) );
+$check( 'the daily run is scheduled', (bool) wp_next_scheduled( 'flurfunk_comments_daily' ) );
+wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
+
+WP_CLI::log( 'Review requests module' );
+require_once FLURFUNK_DIR . 'modules/review.php';
+add_filter( 'flurfunk_review_channel', $to_test = fn () => 'ff-test' );
+$as( $guest );
+$rp = wp_insert_post( array( 'post_title' => 'ff-test review', 'post_status' => 'draft', 'post_author' => $guest ) );
+wp_update_post( array( 'ID' => $rp, 'post_status' => 'pending' ) );
+$rt = Store\thread_by_ref( 'flurfunk-review:' . $rp );
+$ra = $rt ? Store\assignees( (int) $rt->id ) : array();
+$check( 'submitted for review: a task about the post', $rt && 'open' === $rt->status && 'post' === $rt->target_type && $rp === (int) $rt->target_id && Flurfunk\Access\is_bot( (int) $rt->author_id ), $rt );
+$check( '… for the people who may publish it, not the author or assistants', in_array( $team, $ra, true ) && in_array( $team2, $ra, true ) && ! in_array( $guest, $ra, true ) && ! array_filter( $ra, 'Flurfunk\Access\is_bot' ), $ra );
+$as( $team );
+wp_update_post( array( 'ID' => $rp, 'post_status' => 'draft' ) );
+$check( 'back to draft: question', 'waiting' === Store\thread_row( (int) $rt->id )->status );
+$as( $guest );
+wp_update_post( array( 'ID' => $rp, 'post_status' => 'pending' ) );
+$check( 'submitted again: the same thread, open again', 'open' === Store\thread_row( (int) $rt->id )->status && (int) $rt->id === (int) Store\thread_by_ref( 'flurfunk-review:' . $rp )->id );
+$as( $team );
+wp_update_post( array( 'ID' => $rp, 'post_status' => 'publish' ) );
+$rx = Store\full_thread( (int) $rt->id, $team );
+$rm = array_values( array_filter( $rx['messages'], fn ( $m ) => 'message' === $m['type'] ) );
+$check( 'published: a reply and the task is done', 'done' === $rx['status'] && str_contains( (string) ( end( $rm )['text'] ?? '' ), 'published it' ), array( $rx['status'], end( $rm ) ) );
+remove_action( 'transition_post_status', 'Flurfunk\Modules\Review\transition', 10 );
+remove_filter( 'flurfunk_review_channel', $to_test );
+wp_delete_post( $rp, true );
+Flurfunk\Notify\deliver();
+
 WP_CLI::log( 'Modules' );
 $loaded_test = 0;
 $check( 'a module with a bad ID is refused', ! @flurfunk_register_module( 'Bad ID!', array( 'label' => 'x', 'load' => '__return_true' ) ) );
@@ -539,7 +799,7 @@ $check( 'it is off by its default', ! flurfunk_module_enabled( 'ff-test/demo' ) 
 Flurfunk\Modules\set( array( 'ff-test/demo' => true ) );
 $check( 'switching it on is remembered', flurfunk_module_enabled( 'ff-test/demo' ) );
 $check( 'requirements are checked', Flurfunk\Modules\available( Flurfunk\Modules\registry()['ff-test/demo'] ) && ! Flurfunk\Modules\available( array( 'requires' => array( 'NO_SUCH_CONSTANT_FF' ) ) ) );
-$check( 'Flurfunk\'s own integrations are modules', isset( Flurfunk\Modules\registry()['flurfunk/mailerpress'] ) );
+$check( 'Flurfunk\'s own parts are modules (comments on, daily thread and review off)', Flurfunk\Modules\enabled( 'flurfunk/comments' ) && isset( Flurfunk\Modules\registry()['flurfunk/comments-daily'], Flurfunk\Modules\registry()['flurfunk/review'] ) && ! Flurfunk\Modules\registry()['flurfunk/review']['default'] );
 $opt = (array) get_option( 'flurfunk_modules', array() );
 unset( $opt['ff-test/demo'] );
 update_option( 'flurfunk_modules', $opt );
