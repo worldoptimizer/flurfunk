@@ -160,7 +160,8 @@ function flurfunk_app_url( string $view = '' ): string {
 }
 
 /**
- * Run code as another person (for posting from PHP), then switch back.
+ * Run code as another person (for posting from PHP), then switch back. As an assistant, the code
+ * may also use channels that require a capability (it is the site acting, see inc/access.php).
  *
  * @param int      $user_id User; 0 = the default assistant (created if needed).
  * @param callable $fn      Work.
