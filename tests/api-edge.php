@@ -675,6 +675,8 @@ list( $s, $x ) = $req( 'POST', 'threads/' . $ct['id'] . '/messages', array( 'bod
 $c3 = (int) ( end( $x['messages'] )['attachments'][0]['id'] ?? 0 );
 list( $s, $r ) = $req( 'POST', "cards/$c3/action/nothing", array() );
 $check( 'a callback returning nothing: the provider\'s current snapshot is stored', 200 === $s && 'Item 3' === ( end( $r['messages'] )['title'] ?? '' ), $s );
+list( $s ) = $req( 'POST', "cards/$c3/action/nothing", array( 'key' => array( 'not', 'a', 'string' ) ) );
+$check( 'a key of the wrong type is ignored', 200 === $s, $s );
 add_filter( 'flurfunk_rate_limit', $one = fn () => 1 );
 delete_transient( 'flurfunk_rate_' . $team2 . '_' . gmdate( 'YmdHi' ) );
 list( $sa ) = $req( 'POST', "cards/$c3/action/fail", array() );

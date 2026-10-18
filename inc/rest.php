@@ -186,7 +186,8 @@ function routes(): void {
 		array(
 			'methods'             => 'POST',
 			'callback'            => static function ( WP_REST_Request $r ) {
-				$key = (string) ( $r->get_json_params()['key'] ?? $r->get_header( 'x_flurfunk_key' ) ?? '' );
+				$key = ( (array) $r->get_json_params() )['key'] ?? $r->get_header( 'x_flurfunk_key' ) ?? '';
+				$key = is_string( $key ) ? $key : '';
 				$tid = Store\card_action( (int) $r['id'], (string) $r['action'], preg_replace( '/[^A-Za-z0-9_-]/', '', $key ) );
 				return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
 			},
