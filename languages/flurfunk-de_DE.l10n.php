@@ -241,6 +241,7 @@ return array(
 		'Once a day: a summary at %s' => 'Einmal am Tag: eine Zusammenfassung um %s',
 		'Only in Flurfunk so far. Adding it keeps the file where it is.' => 'Bisher nur im Flurfunk. Beim Übernehmen bleibt die Datei, wo sie ist.',
 		'Only mentions and tasks' => 'Nur Erwähnungen und Aufgaben',
+		'Only people who may change user roles (usually administrators) can change these.' => 'Ändern können das nur Personen, die Benutzerrollen vergeben dürfen (meist Administrator:innen).',
 		'Only threads about their own posts' => 'Nur Threads zu eigenen Artikeln',
 		'Open' => 'Offen',
 		'Open Flurfunk' => 'Flurfunk öffnen',

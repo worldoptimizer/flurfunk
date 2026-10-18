@@ -145,7 +145,7 @@ add_action(
 							'title'    => html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ) ?: __( '(no title)', 'flurfunk' ),
 							'subtitle' => implode( ' · ', array_filter( array( count( \Flurfunk\Settings\get()['post_types'] ) > 1 ? ( get_post_type_object( $p->post_type )->labels->singular_name ?? '' ) : '', get_post_status_object( $p->post_status )->label ?? '', get_the_date( '', $p ) ) ) ),
 						),
-						get_posts( $args )
+						array_values( array_filter( get_posts( $args ), static fn ( \WP_Post $p ): bool => \Flurfunk\Providers\visible_post( $p, $user_id ) ) )
 					);
 				},
 				'info'   => static function ( int $id ): ?array {

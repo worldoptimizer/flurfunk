@@ -539,8 +539,19 @@ function search_posts( string $q, int $user_id ): array {
 			'title'    => get_the_title( $p ) ?: __( '(no title)', 'flurfunk' ),
 			'subtitle' => get_post_status_object( $p->post_status )->label ?? $p->post_status,
 		),
-		get_posts( $args )
+		array_values( array_filter( get_posts( $args ), static fn ( \WP_Post $p ): bool => visible_post( $p, $user_id ) ) )
 	);
+}
+
+/**
+ * May this person see that a post exists (title, status)? Published ones yes; drafts, scheduled
+ * and private posts only for those who may edit them.
+ *
+ * @param \WP_Post $p       Post.
+ * @param int      $user_id User.
+ */
+function visible_post( \WP_Post $p, int $user_id ): bool {
+	return 'publish' === $p->post_status || user_can( $user_id, 'edit_post', $p->ID );
 }
 
 /**
@@ -551,7 +562,7 @@ function search_posts( string $q, int $user_id ): array {
  */
 function post_snapshot( array $ref, int $user_id ): ?array {
 	$p = get_post( (int) ( $ref['id'] ?? 0 ) );
-	if ( ! $p || ! Access\can_target( 'post', $p->ID, $user_id ) ) {
+	if ( ! $p || ! Access\can_target( 'post', $p->ID, $user_id ) || ! visible_post( $p, $user_id ) ) {
 		return null;
 	}
 	$author = get_userdata( (int) $p->post_author );

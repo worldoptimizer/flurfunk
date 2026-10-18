@@ -454,6 +454,10 @@ function render_section(): void {
 		<div class="notice notice-success inline"><p><?php esc_html_e( 'Permissions saved.', 'flurfunk' ); ?></p></div>
 	<?php endif; ?>
 	<p style="max-width:46rem"><?php esc_html_e( 'Which roles may do what in Flurfunk. Team members see channels according to their team setting, guests according to their guest setting. Assistants always count as team. These are normal WordPress capabilities, so role editor plugins (e.g. Members or User Role Editor) can manage them as well, also for single users.', 'flurfunk' ); ?></p>
+	<?php $can_change = current_user_can( 'promote_users' ); ?>
+	<?php if ( ! $can_change ) : ?>
+		<p class="description"><?php esc_html_e( 'Only people who may change user roles (usually administrators) can change these.', 'flurfunk' ); ?></p>
+	<?php endif; ?>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="flurfunk_caps">
 		<?php wp_nonce_field( 'flurfunk_caps' ); ?>
@@ -491,7 +495,7 @@ function render_section(): void {
 							$aria = sprintf( __( '%1$s for %2$s', 'flurfunk' ), $def['label'], translate_user_role( $label ) );
 							?>
 							<td style="text-align:center">
-								<input type="checkbox" name="caps[<?php echo esc_attr( $name ); ?>][<?php echo esc_attr( $cap ); ?>]" value="1" aria-label="<?php echo esc_attr( $aria ); ?>" <?php checked( $fixed || ( $role && $role->has_cap( $cap ) ) ); ?> <?php disabled( $fixed ); ?><?php echo $fixed ? ' title="' . esc_attr__( 'Administrators always keep this.', 'flurfunk' ) . '"' : ''; ?>>
+								<input type="checkbox" name="caps[<?php echo esc_attr( $name ); ?>][<?php echo esc_attr( $cap ); ?>]" value="1" aria-label="<?php echo esc_attr( $aria ); ?>" <?php checked( $fixed || ( $role && $role->has_cap( $cap ) ) ); ?> <?php disabled( $fixed || ! $can_change ); ?><?php echo $fixed ? ' title="' . esc_attr__( 'Administrators always keep this.', 'flurfunk' ) . '"' : ''; ?>>
 							</td>
 						<?php endforeach; ?>
 					</tr>
@@ -500,7 +504,9 @@ function render_section(): void {
 			</tbody>
 		</table>
 		</div>
-		<?php submit_button( __( 'Save permissions', 'flurfunk' ), 'secondary', 'flurfunk-save-permissions' ); ?>
+		<?php if ( $can_change ) : ?>
+			<?php submit_button( __( 'Save permissions', 'flurfunk' ), 'secondary', 'flurfunk-save-permissions' ); ?>
+		<?php endif; ?>
 	</form>
 	<?php
 }
@@ -508,7 +514,8 @@ function render_section(): void {
 add_action(
 	'admin_post_flurfunk_caps',
 	static function (): void {
-		if ( ! Access\can_manage() ) {
+		// Granting capabilities is changing roles: besides managing Flurfunk it takes WordPress's own right to do that.
+		if ( ! Access\can_manage() || ! current_user_can( 'promote_users' ) ) {
 			wp_die( esc_html__( 'You cannot change this.', 'flurfunk' ), 403 );
 		}
 		check_admin_referer( 'flurfunk_caps' );

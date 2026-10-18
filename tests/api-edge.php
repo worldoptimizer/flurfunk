@@ -851,6 +851,17 @@ $opt = (array) get_option( 'flurfunk_modules', array() );
 unset( $opt['ff-test/demo'] );
 update_option( 'flurfunk_modules', $opt );
 
+WP_CLI::log( 'Drafts of others' );
+$draft_other = wp_insert_post( array( 'post_title' => 'ff-test fremder Entwurf ' . wp_generate_password( 4, false ), 'post_status' => 'draft', 'post_author' => $team ) );
+$sub = wp_insert_user( array( 'user_login' => 'ff-test-sub-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
+( new WP_User( $sub ) )->add_cap( 'flurfunk_team' );
+$check( 'a team member who may not edit a draft does not find it', ! in_array( $draft_other, array_map( static fn ( $r ) => (int) $r['ref']['id'], Flurfunk\Providers\search_posts( 'fremder Entwurf', $sub ) ), true ) );
+$check( '… nor can make a card of it', null === Flurfunk\Providers\post_snapshot( array( 'id' => $draft_other ), $sub ) );
+$check( 'an editor does find it', in_array( $draft_other, array_map( static fn ( $r ) => (int) $r['ref']['id'], Flurfunk\Providers\search_posts( 'fremder Entwurf', $team2 ) ), true ) );
+wp_delete_post( $draft_other, true );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $sub );
+
 WP_CLI::log( 'Reminders' );
 $as( $team2 );
 list( $s, $r ) = $req( 'POST', 'threads/' . $t2['id'] . '/remind', array( 'when' => 'tomorrow' ) );
