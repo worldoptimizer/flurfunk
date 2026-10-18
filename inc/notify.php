@@ -142,6 +142,8 @@ function wants( string $level, string $kind ): bool {
  */
 add_action( 'flurfunk_thread_created', static fn ( object $t ) => event( $t, 0 ) );
 add_action( 'flurfunk_message_added', static fn ( object $t, int $mid ) => event( $t, $mid ), 10, 2 );
+// A card action ("Ana approved: …") reaches the same people as a reply would.
+add_action( 'flurfunk_card_action', static fn ( object $t, int $mid ) => event( $t, $mid ), 10, 2 );
 add_action(
 	'flurfunk_assigned',
 	static function ( object $t, array $added, int $actor ): void {
@@ -176,8 +178,8 @@ function event( object $thread, int $message_id ): void {
 	$m      = table( 'messages' );
 	$sender = get_current_user_id();
 	if ( $message_id ) {
-		$type = $wpdb->get_var( $wpdb->prepare( 'SELECT type FROM %i WHERE id = %d', $m, $message_id ) );
-		if ( 'message' !== $type ) {
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT type, body FROM %i WHERE id = %d', $m, $message_id ) );
+		if ( ! $row || ( 'message' !== $row->type && ! is_card_action( $row ) ) ) {
 			return;
 		}
 	}
@@ -216,6 +218,15 @@ function event( object $thread, int $message_id ): void {
 	// Whoever a filter adds must still be allowed to read the thread.
 	$to = array_filter( $to, static fn ( $kind, $uid ) => Access\can_see( $thread, (int) $uid ), ARRAY_FILTER_USE_BOTH );
 	dispatch( $thread, $message_id, $to, $sender );
+}
+
+/**
+ * Is a message row the event line of a card action?
+ *
+ * @param object|null $row Message row (type, body).
+ */
+function is_card_action( $row ): bool {
+	return $row && 'event' === $row->type && 'card_action' === ( json_decode( (string) $row->body, true )['event'] ?? '' );
 }
 
 /**
@@ -312,9 +323,17 @@ function words( array $n ): array {
 	$t     = $n['thread'];
 	$who   = $n['actor'] ? Store\person( (int) $n['actor'] )['name'] : \Flurfunk\Settings\name();
 	$topic = '' !== $t->title ? $t->title : wp_trim_words( readable( $t->body ), 8, '…' );
-	$text  = $n['message_id']
-		? (string) $wpdb->get_var( $wpdb->prepare( 'SELECT body FROM %i WHERE id = %d', table( 'messages' ), $n['message_id'] ) )
-		: trim( $t->title . "\n\n" . $t->body );
+	$row   = $n['message_id'] ? $wpdb->get_row( $wpdb->prepare( 'SELECT type, body FROM %i WHERE id = %d', table( 'messages' ), $n['message_id'] ) ) : null;
+	$text  = $n['message_id'] ? (string) ( $row->body ?? '' ) : trim( $t->title . "\n\n" . $t->body );
+	if ( is_card_action( $row ) ) {
+		// "Ana approved" as the headline, the card's title as the text.
+		$e = (array) json_decode( (string) $row->body, true );
+		return array(
+			'headline' => (string) ( $e['summary'] ?? $who ),
+			'text'     => (string) ( $e['title'] ?? '' ),
+			'topic'    => $topic,
+		);
+	}
 	$due   = ! empty( $t->due_date ) ? wp_date( get_option( 'date_format' ), (int) strtotime( $t->due_date . ' 12:00' ) ) : '';
 	switch ( $n['kind'] ) {
 		case 'mention':

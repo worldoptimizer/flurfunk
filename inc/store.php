@@ -5,7 +5,8 @@
  *   thread  { id, channel, ref_key, target: {type,id}|null, title|null, body, author, created,
  *             status: 'open'|'doing'|'waiting'|'done'|null, resolved: {by,at}|null, mentions[], attachments[] }
  *   message { id, type: 'message'|'status'|'event'|'deleted', author, created, text, mentions[],
- *             files[], attachments[], status?, edited } – events carry event: due|assign and its data
+ *             files[], attachments[], status?, edited } – events carry event: due|assign|card_action
+ *             and its data
  *   Text: plain text, mentions as <@ID>. Times in UTC (ISO 8601).
  *
  * @package Flurfunk
@@ -437,7 +438,7 @@ function add_message( int $thread_id, array $args, bool $check = true ) {
 	}
 	// Task history ("event") only comes in through the import; it is written by set_task otherwise.
 	$type  = in_array( $args['type'] ?? '', $check ? array( 'status', 'deleted' ) : array( 'status', 'deleted', 'event' ), true ) ? $args['type'] : 'message';
-	$body  = 'message' === $type ? clean_text( $args['body'] ?? '' ) : ( 'event' === $type ? (string) wp_json_encode( array_intersect_key( (array) ( $args['event'] ?? array() ), array_flip( array( 'event', 'due', 'added', 'removed' ) ) ) ) : '' );
+	$body  = 'message' === $type ? clean_text( $args['body'] ?? '' ) : ( 'event' === $type ? (string) wp_json_encode( array_intersect_key( (array) ( $args['event'] ?? array() ), array_flip( array( 'event', 'due', 'added', 'removed', 'card', 'provider', 'action', 'label', 'summary', 'title' ) ) ) ) : '' );
 	$rate  = $check && 'message' === $type ? rate_limit( $author ) : true;
 	if ( is_wp_error( $rate ) ) {
 		return $rate;
@@ -842,6 +843,93 @@ function refresh_card( int $attachment_id ) {
 	}
 	$wpdb->update( table( 'attachments' ), array( 'snapshot' => (string) wp_json_encode( $snap ) ), array( 'id' => $attachment_id ) );
 	bump();
+	return (int) $t->id;
+}
+
+/**
+ * Run a card action (a button on a card, see inc/providers.php): the provider's callback
+ * returns the new snapshot, which replaces the stored one, and an event line in the thread
+ * records who did what. The same idempotency key from the same person within ten minutes runs
+ * the action only once; an action the card no longer offers is refused (409).
+ *
+ * @param int    $attachment_id Card row.
+ * @param string $action        Action ID.
+ * @param string $key           Idempotency key from the client ('' = none).
+ * @return int|\WP_Error Thread ID.
+ */
+function card_action( int $attachment_id, string $action, string $key = '' ) {
+	global $wpdb;
+	$user   = get_current_user_id();
+	$action = sanitize_key( $action );
+	$row    = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', table( 'attachments' ), $attachment_id ) );
+	$t      = $row ? thread_row( (int) $row->thread_id ) : null;
+	if ( ! $row || ! $t || ! Access\can_see( $t, $user ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+	}
+	$info = \Flurfunk\Providers\action_info( (string) $row->provider, $action );
+	if ( ! $info ) {
+		return new \WP_Error( 'flurfunk_action', __( 'Unknown action.', 'flurfunk' ), array( 'status' => 404 ) );
+	}
+	$once = '' !== $key ? 'flurfunk_act_' . md5( $user . ':' . $attachment_id . ':' . $action . ':' . substr( $key, 0, 64 ) ) : '';
+	if ( $once && get_transient( $once ) ) {
+		return (int) $t->id; // A retry of a request that went through: same answer, nothing runs twice.
+	}
+	$rate = rate_limit( $user );
+	if ( is_wp_error( $rate ) ) {
+		return $rate;
+	}
+	// One action per card at a time: two people clicking at once run one after the other, and
+	// the second sees the state the first left behind.
+	$lock = 'flurfunk_card_' . $attachment_id;
+	$wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) );
+	try {
+		$snapshot = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT snapshot FROM %i WHERE id = %d', table( 'attachments' ), $attachment_id ) );
+		$card     = json_decode( $snapshot, true ) ?: array();
+		$snap     = \Flurfunk\Providers\run_action( (string) $row->provider, $action, (array) json_decode( $row->ref, true ), $card, $user );
+		if ( is_wp_error( $snap ) ) {
+			return $snap;
+		}
+		$wpdb->update( table( 'attachments' ), array( 'snapshot' => (string) wp_json_encode( $snap ) ), array( 'id' => $attachment_id ) );
+		$who     = person( $user )['name'];
+		$summary = '' !== $info['done'] && str_contains( $info['done'], '%s' )
+			? str_replace( '%s', $who, $info['done'] )
+			/* translators: 1: person, 2: button label */
+			: sprintf( __( '%1$s chose "%2$s"', 'flurfunk' ), $who, $info['label'] );
+		$wpdb->insert(
+			table( 'messages' ),
+			array(
+				'thread_id' => (int) $t->id,
+				'type'      => 'event',
+				'author_id' => $user,
+				'body'      => (string) wp_json_encode(
+					array(
+						'event'    => 'card_action',
+						'card'     => $attachment_id,
+						'provider' => (string) $row->provider,
+						'action'   => $action,
+						'label'    => $info['label'],
+						'summary'  => $summary,
+						'title'    => (string) ( $snap['title'] ?? $card['title'] ?? '' ),
+					)
+				),
+				'status'    => '',
+				'files'     => '[]',
+				'created'   => now(),
+			)
+		);
+		$mid = (int) $wpdb->insert_id;
+	} finally {
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+	}
+	$wpdb->query( $wpdb->prepare( 'UPDATE %i SET last_activity = %s WHERE id = %d', table( 'threads' ), now(), (int) $t->id ) );
+	bump();
+	if ( $once ) {
+		set_transient( $once, (int) $t->id, 10 * MINUTE_IN_SECONDS );
+	}
+	if ( $mid ) {
+		mark_read( (int) $t->id, $user, $mid );
+		do_action( 'flurfunk_card_action', thread_row( (int) $t->id ), $mid, $action, $user, $snap );
+	}
 	return (int) $t->id;
 }
 

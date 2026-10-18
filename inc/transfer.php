@@ -190,7 +190,7 @@ function import( array $data, string $bundle = '' ): array {
 						'due'     => $m['due'] ?? null,
 						'added'   => array_values( array_filter( array_map( $user, (array) ( $m['added'] ?? array() ) ) ) ),
 						'removed' => array_values( array_filter( array_map( $user, (array) ( $m['removed'] ?? array() ) ) ) ),
-					) : null,
+					) + ( 'card_action' === ( $m['event'] ?? '' ) ? array_map( 'sanitize_text_field', array_intersect_key( $m, array_flip( array( 'provider', 'action', 'label', 'summary', 'title' ) ) ) ) : array() ) : null,
 					'body'        => $text( (string) ( $m['text'] ?? '' ) ),
 					// Media IDs belong to the source site: files from a bundle are stored again,
 					// otherwise name, type and a link to the original remain.

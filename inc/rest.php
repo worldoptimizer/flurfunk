@@ -19,6 +19,7 @@
  *   GET  providers/<id>/search     suggestions for a slash command
  *   GET  targets?q=                things a thread can be attached to
  *   POST cards/<id>/refresh        fetch a fresh snapshot for a card
+ *   POST cards/<id>/action/<name>  run a card action ({ key } optional: idempotency key)
  *   POST files                     upload a Flurfunk file (raw body, Content-Disposition: filename)
  *   POST files/<id>/adopt          add a Flurfunk file to the media library
  *   POST me/prefs                  theme, avatar, mail, push, quiet, badge, hour, channel {slug, level}
@@ -179,6 +180,20 @@ function routes(): void {
 		$tid = Store\refresh_card( (int) $r['id'] );
 		return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
 	}, 'permission_callback' => $auth, 'args' => $id ) );
+	register_rest_route(
+		NS,
+		'/cards/(?P<id>\d+)/action/(?P<action>[a-z0-9_-]+)',
+		array(
+			'methods'             => 'POST',
+			'callback'            => static function ( WP_REST_Request $r ) {
+				$key = (string) ( $r->get_json_params()['key'] ?? $r->get_header( 'x_flurfunk_key' ) ?? '' );
+				$tid = Store\card_action( (int) $r['id'], (string) $r['action'], preg_replace( '/[^A-Za-z0-9_-]/', '', $key ) );
+				return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
+			},
+			'permission_callback' => $auth,
+			'args'                => $id,
+		)
+	);
 	register_rest_route( NS, '/files', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\upload', 'permission_callback' => $auth ) );
 	register_rest_route( NS, '/files/(?P<id>\d+)/adopt', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\adopt', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/targets', array( 'methods' => 'GET', 'callback' => static fn ( WP_REST_Request $r ) => \Flurfunk\Targets\search( sanitize_text_field( (string) $r->get_param( 'q' ) ), get_current_user_id() ), 'permission_callback' => $auth ) );

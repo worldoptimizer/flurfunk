@@ -60,7 +60,7 @@
 				sessionEnded();
 				throw new Error( t( 'Your session has ended. Please log in again.' ) );
 			}
-			throw new Error( ( data && data.message ) || res.statusText );
+			throw Object.assign( new Error( ( data && data.message ) || res.statusText ), { status: res.status, code } );
 		}
 		return data;
 	};
@@ -184,16 +184,87 @@
 	/* ------------------------------------------------------------------ cards */
 
 	const renderers = {};
-	const cardHelpers = { esc, rich, when };
+	/*
+	 * Card building blocks. Providers send data only; these turn it into markup. The same
+	 * functions are the helpers (h) for custom renderers, so custom cards look native.
+	 */
+	const TONES = [ 'neutral', 'positive', 'warning', 'critical', 'info' ];
+	const num = ( v ) => ( Number.isFinite( +v ) ? +v : 0 );
+	const block = {
+		// [ { label, value, url? } ] → label/value pairs.
+		fields: ( list ) => ( list && list.length ? '<dl class="ff-card-fields">' + list.map( ( f ) => '<div><dt>' + esc( f.label ) + '</dt><dd>'
+			+ ( f.url ? '<a href="' + esc( f.url ) + '" target="_top">' + esc( f.value ) + '</a>' : esc( f.value ) ) + '</dd></div>' ).join( '' ) + '</dl>' : '' ),
+		// [ { label, done } ] → ticked and open items.
+		list: ( items ) => ( items && items.length ? '<ul class="ff-card-check">' + items.map( ( c ) => '<li class="' + ( c.done ? 'is-done' : 'is-open' ) + '"><span class="ff-card-tick" aria-hidden="true">' + ( c.done ? '✓' : '' ) + '</span><span>' + esc( c.label )
+			+ '<span class="screen-reader-text"> (' + esc( c.done ? t( 'done' ) : t( 'open' ) ) + ')</span></span></li>' ).join( '' ) + '</ul>' : '' ),
+		// value of max (default 100), optional label.
+		progress: ( value, max, label ) => {
+			const m = num( max ) > 0 ? num( max ) : 100;
+			const v = Math.max( 0, Math.min( m, num( value ) ) );
+			const pct = Math.round( v / m * 100 );
+			return '<div class="ff-card-progress"><span class="ff-card-progress-head"><span>' + esc( label || '' ) + '</span><span>' + esc( new Intl.NumberFormat( locale(), { style: 'percent' } ).format( pct / 100 ) ) + '</span></span>'
+				+ '<span class="ff-card-bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + m + '" aria-valuenow="' + v + '" aria-label="' + esc( label || t( 'Progress' ) ) + '"><i style="width:' + pct + '%"></i></span></div>';
+		},
+		// Pill in a tone: neutral | positive | warning | critical | info.
+		status: ( label, tone ) => ( label ? '<span class="ff-card-status is-' + ( TONES.includes( tone ) ? tone : 'neutral' ) + '">' + esc( label ) + '</span>' : '' ),
+		// User IDs → avatars and names (people Flurfunk knows; others are left out).
+		people: ( ids ) => {
+			const known = ( ids || [] ).map( ( id ) => person( +id ) ).filter( ( p ) => '?' !== p.name );
+			if ( ! known.length ) {
+				return '';
+			}
+			const shown = known.slice( 0, 4 ).map( ( p ) => p.name );
+			const text = known.length > 4 ? t( '%1$s and %2$s more', shown.join( ', ' ), known.length - 4 ) : shown.join( ', ' );
+			return '<p class="ff-card-people"><span class="ff-stack">' + known.slice( 0, 6 ).map( ( p ) => ava( p.id ) ).join( '' ) + '</span><span>' + esc( text ) + '</span></p>';
+		},
+		// Columns (may be empty) and rows of plain text; scrolls sideways on narrow screens.
+		table: ( columns, rows ) => ( rows && rows.length ? '<div class="ff-card-table" role="region" tabindex="0" aria-label="' + esc( t( 'Table' ) ) + '"><table>'
+			+ ( columns && columns.length ? '<thead><tr>' + columns.map( ( c ) => '<th scope="col">' + esc( c ) + '</th>' ).join( '' ) + '</tr></thead>' : '' )
+			+ '<tbody>' + rows.map( ( r ) => '<tr>' + r.map( ( c ) => '<td>' + esc( c ) + '</td>' ).join( '' ) + '</tr>' ).join( '' ) + '</tbody></table></div>' : '' ),
+		badges: ( list ) => ( list && list.length ? '<ul class="ff-card-badges">' + list.map( ( b ) => '<li>' + esc( b ) + '</li>' ).join( '' ) + '</ul>' : '' ),
+		quote: ( text ) => ( text ? '<blockquote class="ff-card-quote">' + esc( text ).replace( /\n/g, '<br>' ) + '</blockquote>' : '' ),
+		// A button. With o.action it runs that card action (confirm, busy state and errors included).
+		button: ( label, o = {} ) => '<button type="button" class="ff-card-btn is-' + ( [ 'primary', 'secondary', 'danger' ].includes( o.style ) ? o.style : 'secondary' ) + '"'
+			+ ( o.action ? ' data-ff="card-act" data-act="' + esc( o.action ) + '"' + ( o.confirm ? ' data-confirm="' + esc( o.confirm ) + '"' : '' ) : '' ) + '>' + esc( label ) + '</button>',
+	};
+	// The actions a card offers right now that this person may run, as a row of buttons.
+	const cardActions = ( provider, s ) => {
+		const defs = providerOf( provider ).actions || {};
+		const list = ( s.actions || [] ).filter( ( a ) => defs[ a ] && defs[ a ].can );
+		return list.length ? '<div class="ff-card-actions" role="group" aria-label="' + esc( t( 'Actions' ) ) + '">' + list.map( ( a ) => block.button( defs[ a ].label, { style: defs[ a ].style, action: a, confirm: defs[ a ].confirm } ) ).join( '' ) + '</div>' : '';
+	};
+	const cardHelpers = {
+		esc, rich, when,
+		fields: block.fields,
+		list: block.list,
+		checklist: block.list,
+		progress: block.progress,
+		status: block.status,
+		pill: block.status,
+		people: block.people,
+		table: block.table,
+		badges: block.badges,
+		quote: block.quote,
+		button: block.button,
+		card: ( s ) => genericCard( s ),
+	};
 	const genericCard = ( s ) => {
 		const max = s.spark ? Math.max( 1, ...s.spark ) : 1;
 		return ( s.image ? '<img class="ff-card-img" src="' + esc( s.image ) + '" alt="">' : '' )
 			+ '<div class="ff-card-body">'
-			+ ( s.title ? '<b class="ff-card-title">' + ( s.url ? '<a href="' + esc( s.url ) + '" target="_top">' + esc( s.title ) + '</a>' : esc( s.title ) ) + '</b>' : '' )
+			+ ( s.title || s.status ? '<span class="ff-card-head">' + ( s.title ? '<b class="ff-card-title">' + ( s.url ? '<a href="' + esc( s.url ) + '" target="_top">' + esc( s.title ) + '</a>' : esc( s.title ) ) + '</b>' : '' )
+				+ ( s.status ? block.status( s.status.label, s.status.tone ) : '' ) + '</span>' : '' )
 			+ ( s.subtitle ? '<span class="ff-card-sub">' + esc( s.subtitle ) + '</span>' : '' )
+			+ block.badges( s.badges )
 			+ ( s.metric ? '<span class="ff-card-metric">' + esc( s.metric.value ) + ' <small>' + esc( s.metric.label ) + '</small></span>' : '' )
 			+ ( s.spark ? '<span class="ff-card-spark" aria-hidden="true">' + s.spark.map( ( v ) => '<i style="height:' + Math.max( 2, Math.round( v / max * 28 ) ) + 'px"></i>' ).join( '' ) + '</span>' : '' )
+			+ ( s.progress ? block.progress( s.progress.value, s.progress.max, s.progress.label ) : '' )
 			+ ( s.text ? '<span class="ff-card-text">' + esc( s.text ) + '</span>' : '' )
+			+ block.quote( s.quote )
+			+ block.fields( s.fields )
+			+ block.list( s.checklist )
+			+ block.table( s.table && s.table.columns, s.table && s.table.rows )
+			+ block.people( s.people )
 			+ ( s.audio ? '<audio controls preload="none" src="' + esc( s.audio ) + '"></audio>' : '' )
 			+ ( s.meta ? '<span class="ff-card-meta">' + s.meta.map( esc ).join( ' · ' ) + '</span>' : '' )
 			+ ( s.action ? '<a class="ff-card-action" href="' + esc( s.action.url ) + '" target="_top">' + esc( s.action.label ) + '</a>' : '' )
@@ -211,9 +282,12 @@
 		} catch ( e ) {
 			inner = genericCard( s );
 		}
-		const canRefresh = a.id && remove === undefined && boot && boot.providers.some( ( x ) => x.id === a.provider );
-		return '<div class="ff-card"><span class="ff-card-kind">' + esc( p.label ) + ( p.command ? ' <small>/' + esc( p.command ) + '</small>' : '' )
-			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' + inner
+		const stored = a.id && remove === undefined;
+		const canRefresh = stored && boot && boot.providers.some( ( x ) => x.id === a.provider );
+		// Custom renderers may place action buttons themselves (h.button with an action).
+		const acts = stored && ! /data-ff="card-act"/.test( inner ) ? cardActions( a.provider, s ) : '';
+		return '<div class="ff-card"' + ( stored ? ' data-cid="' + ( +a.id ) + '"' : '' ) + '><span class="ff-card-kind">' + esc( p.label ) + ( p.command ? ' <small>/' + esc( p.command ) + '</small>' : '' )
+			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' + inner + acts
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};
 	const cards = ( list ) => ( list && list.length ? '<div class="ff-cards">' + list.map( ( a ) => card( a ) ).join( '' ) + '</div>' : '' );
@@ -416,6 +490,11 @@
 					}
 				} else if ( 'due' === m.event ) {
 					parts.push( m.due ? t( '%1$s set the due date to %2$s', who, fmtDate( m.due ) ) : t( '%s removed the due date', who ) );
+				} else if ( 'card_action' === m.event ) {
+					// In the reader's language if the provider is still there, else as it was written.
+					const def = ( providerOf( m.provider ).actions || {} )[ m.action ];
+					const said = def && def.done && def.done.includes( '%s' ) ? def.done.split( '%s' ).join( who ) : def ? t( '%1$s chose "%2$s"', who, def.label ) : ( m.summary || who );
+					parts.push( m.title ? t( '%1$s: %2$s', said, m.title ) : said );
 				}
 				if ( parts.length ) {
 					html += '<li class="ff-event">' + esc( parts.join( ' · ' ) ) + ' · ' + esc( when( m.created ) ) + '</li>';
@@ -597,6 +676,90 @@
 		} );
 	};
 	/**
+	 * A card action button: asks inline first if the action wants a confirmation, shows that it
+	 * is busy, and shows errors inside the card. The result (the thread with the new snapshot
+	 * and the event line) goes to onUpdate like every other change.
+	 *
+	 * @param {Element}  el       card-act, card-act-go or card-act-cancel button.
+	 * @param {Object[]} threads  Full threads shown in this view.
+	 * @param {Function} onUpdate Called with the updated thread.
+	 */
+	const cardAction = async ( el, threads, onUpdate ) => {
+		const box = el.closest( '.ff-card' );
+		const row = el.closest( '.ff-card-actions' ) || el.parentElement;
+		if ( ! box || ! box.dataset.cid ) {
+			return;
+		}
+		const act = el.dataset.ff;
+		const old = $( '.ff-card-error', box );
+		if ( old ) {
+			old.remove();
+		}
+		if ( 'card-act-cancel' === act ) {
+			const group = el.closest( '.ff-card-confirm' );
+			const back = group.previousElementSibling;
+			group.remove();
+			back.hidden = false;
+			$( 'button[data-act="' + el.dataset.act + '"]', back )?.focus();
+			return;
+		}
+		if ( 'card-act' === act && el.dataset.confirm ) {
+			// Inline confirmation instead of window.confirm: the question, "Yes, …" and Cancel.
+			const holder = el.closest( '.ff-card-actions' ) || el.parentElement;
+			const group = document.createElement( 'div' );
+			group.className = 'ff-card-confirm';
+			group.setAttribute( 'role', 'group' );
+			group.setAttribute( 'aria-label', el.dataset.confirm );
+			group.innerHTML = '<p>' + esc( el.dataset.confirm ) + '</p>'
+				+ '<button type="button" class="ff-card-btn is-' + ( el.classList.contains( 'is-danger' ) ? 'danger' : 'primary' ) + '" data-ff="card-act-go" data-act="' + esc( el.dataset.act ) + '">' + esc( el.textContent ) + '</button>'
+				+ '<button type="button" class="ff-card-btn is-secondary" data-ff="card-act-cancel" data-act="' + esc( el.dataset.act ) + '">' + esc( t( 'Cancel' ) ) + '</button>';
+			group.addEventListener( 'keydown', ( e ) => {
+				if ( 'Escape' === e.key ) {
+					e.stopPropagation();
+					$( '[data-ff="card-act-cancel"]', group ).click();
+				}
+			} );
+			holder.hidden = true;
+			holder.after( group );
+			$( '[data-ff="card-act-go"]', group ).focus();
+			return;
+		}
+		const buttons = [ ...box.querySelectorAll( '.ff-card-actions button, .ff-card-confirm button, button[data-ff="card-act"]' ) ];
+		buttons.forEach( ( b ) => {
+			b.disabled = true;
+		} );
+		el.setAttribute( 'aria-busy', 'true' );
+		el.classList.add( 'is-busy' );
+		// The same key for retries of this click, so the action runs at most once.
+		el.dataset.key = el.dataset.key || ( window.crypto && crypto.randomUUID ? crypto.randomUUID() : String( Date.now() ) + Math.random().toString( 36 ).slice( 2 ) );
+		try {
+			onUpdate( await api( 'cards/' + box.dataset.cid + '/action/' + encodeURIComponent( el.dataset.act ), { method: 'POST', body: { key: el.dataset.key } } ) );
+		} catch ( x ) {
+			buttons.forEach( ( b ) => {
+				b.disabled = false;
+			} );
+			el.removeAttribute( 'aria-busy' );
+			el.classList.remove( 'is-busy' );
+			const msg = document.createElement( 'p' );
+			msg.className = 'ff-card-error';
+			msg.setAttribute( 'role', 'alert' );
+			msg.textContent = x.message;
+			( row && row.parentElement === box ? row : box.lastElementChild ).after( msg );
+			// Someone else was faster: show the card as it is now.
+			if ( 409 === x.status ) {
+				const th = threads.find( ( y ) => [ ...( y.attachments || [] ), ...( y.messages || [] ).flatMap( ( m ) => m.attachments || [] ) ].some( ( c ) => c.id === +box.dataset.cid ) );
+				if ( th ) {
+					const fresh = await api( 'threads/' + th.id + '?peek=1' ).catch( () => null );
+					if ( fresh ) {
+						onUpdate( fresh );
+						document.querySelectorAll( '.ff-card[data-cid="' + box.dataset.cid + '"]' ).forEach( ( c ) => c.append( msg.cloneNode( true ) ) );
+					}
+				}
+			}
+		}
+	};
+
+	/**
 	 * Edit/delete buttons inside any view. Returns true when the click was one of them.
 	 *
 	 * @param {Element}  el       Clicked element with data-ff.
@@ -642,6 +805,10 @@
 				el.disabled = false;
 				el.textContent = x.message;
 			}
+			return true;
+		}
+		if ( 'card-act' === act || 'card-act-go' === act || 'card-act-cancel' === act ) {
+			await cardAction( el, threads, onUpdate );
 			return true;
 		}
 		if ( 'adopt' === act ) {
@@ -926,7 +1093,7 @@
 			}
 			const sm = b.match( SLASH );
 			if ( sm ) {
-				const prov = boot.providers.find( ( p ) => p.command === sm[ 1 ].toLowerCase() );
+				const prov = boot.providers.find( ( p ) => ! p.hidden && p.command === sm[ 1 ].toLowerCase() );
 				if ( prov && undefined !== sm[ 2 ] ) {
 					const seq = ++searchSeq;
 					clearTimeout( searchTimer );
@@ -943,7 +1110,7 @@
 					}, 180 );
 					return;
 				}
-				const list = boot.providers.filter( ( p ) => p.command.startsWith( sm[ 1 ].toLowerCase() ) );
+				const list = boot.providers.filter( ( p ) => ! p.hidden && p.command.startsWith( sm[ 1 ].toLowerCase() ) );
 				return menu( list.length ? t( 'Insert a card' ) : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-cmd" data-cmd="' + esc( p.command ) + '"><span><b>/' + esc( p.command ) + '</b><small>' + esc( p.hint ) + '</small></span></button>' ) );
 			}
 			menu( '', [] );
