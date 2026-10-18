@@ -17,8 +17,14 @@
  *           'capabilities' => array(                                 // optional, see inc/caps.php
  *               'acme_review' => array( 'label' => 'Approve reviews', 'roles' => array( 'editor' ) ),
  *           ),
+ *           'settings'     => array(                                 // optional, shown under the switch
+ *               array( 'key' => 'channel', 'type' => 'channel', 'label' => 'Channel', 'default' => 'general' ),
+ *               array( 'key' => 'days', 'type' => 'number', 'label' => 'Days', 'default' => 7, 'min' => 1, 'max' => 90 ),
+ *           ),
  *       ) );
  *   } );
+ *
+ *   flurfunk_module_setting( 'acme/review', 'channel' );   // the saved value, or the default
  *
  * Registration happens on `flurfunk_modules` (init, priority 0, so labels can be translated);
  * enabled modules whose requirements are met load right after. A module can therefore hook into
@@ -32,7 +38,9 @@ namespace Flurfunk\Modules;
 
 defined( 'ABSPATH' ) || exit;
 
-const OPTION = 'flurfunk_modules';
+const OPTION   = 'flurfunk_modules';
+const SETTINGS = 'flurfunk_module_settings'; // module ID => key => value.
+const TYPES    = array( 'channel', 'checkbox', 'number', 'text', 'select', 'roles' );
 
 /**
  * All registered modules.
@@ -52,7 +60,9 @@ function &registry(): array {
  *                     functions/classes/constants that must exist), default (bool), load
  *                     (callable), settings_url (string, optional link next to the switch),
  *                     capabilities (cap => label, description, roles; the roles get it once the
- *                     module is on, unless the site already decided).
+ *                     module is on, unless the site already decided), settings (fields: key,
+ *                     type channel|checkbox|number|text|select|roles, label, description,
+ *                     default, options for select, min/max for number).
  * @return bool Registered.
  */
 function register( string $id, array $args ): bool {
@@ -71,10 +81,185 @@ function register( string $id, array $args ): bool {
 		'default'      => (bool) ( $args['default'] ?? true ),
 		'load'         => $args['load'],
 		'settings_url' => (string) ( $args['settings_url'] ?? '' ),
+		'settings'     => fields( (array) ( $args['settings'] ?? array() ) ),
 		'loaded'       => false,
 	);
 	\Flurfunk\Caps\register_list( $args['capabilities'] ?? array(), $modules[ $id ]['label'], $id );
 	return true;
+}
+
+/**
+ * Clean up a module's settings fields; fields without a key or with an unknown type are left out.
+ *
+ * @param array $list Fields as registered.
+ * @return array<string, array> Key => field.
+ */
+function fields( array $list ): array {
+	$out = array();
+	foreach ( $list as $f ) {
+		$f    = (array) $f;
+		$key  = sanitize_key( (string) ( $f['key'] ?? '' ) );
+		$type = (string) ( $f['type'] ?? 'text' );
+		if ( '' === $key || ! in_array( $type, TYPES, true ) ) {
+			_doing_it_wrong( __FUNCTION__, esc_html__( 'A Flurfunk module setting needs a key and one of the types channel, checkbox, number, text, select or roles.', 'flurfunk' ), '0.2.0' );
+			continue;
+		}
+		$field = array(
+			'key'         => $key,
+			'type'        => $type,
+			'label'       => (string) ( $f['label'] ?? $key ),
+			'description' => (string) ( $f['description'] ?? '' ),
+			'options'     => array_map( 'strval', (array) ( $f['options'] ?? array() ) ),
+			'min'         => isset( $f['min'] ) && is_numeric( $f['min'] ) ? 0 + $f['min'] : null,
+			'max'         => isset( $f['max'] ) && is_numeric( $f['max'] ) ? 0 + $f['max'] : null,
+		);
+		$defaults         = array(
+			'checkbox' => false,
+			'number'   => 0,
+			'roles'    => array(),
+		);
+		$field['default'] = $f['default'] ?? ( $defaults[ $type ] ?? '' );
+		$out[ $key ]      = $field;
+	}
+	return $out;
+}
+
+/**
+ * Sanitize one value for a settings field. Anything that does not fit becomes the default.
+ *
+ * @param array $f   Field.
+ * @param mixed $raw Input.
+ * @return mixed
+ */
+function sanitize_value( array $f, $raw ) {
+	switch ( $f['type'] ) {
+		case 'checkbox':
+			return is_bool( $raw ) ? $raw : in_array( (string) ( is_scalar( $raw ) ? $raw : '' ), array( '1', 'on', 'yes', 'true' ), true );
+		case 'number':
+			if ( ! is_numeric( $raw ) ) {
+				return $f['default'];
+			}
+			$n = str_contains( (string) $raw, '.' ) || str_contains( strtolower( (string) $raw ), 'e' ) ? (float) $raw : (int) $raw;
+			if ( null !== $f['min'] && $n < $f['min'] ) {
+				$n = $f['min'];
+			}
+			if ( null !== $f['max'] && $n > $f['max'] ) {
+				$n = $f['max'];
+			}
+			return $n;
+		case 'select':
+			$v = is_scalar( $raw ) ? (string) $raw : '';
+			return array_key_exists( $v, $f['options'] ) ? $v : $f['default'];
+		case 'channel':
+			$v = sanitize_key( is_scalar( $raw ) ? (string) $raw : '' );
+			return '' !== $v && \Flurfunk\Store\channel_by_slug( $v ) ? $v : $f['default'];
+		case 'roles':
+			$roles = array_keys( wp_roles()->get_names() );
+			return array_values( array_intersect( $roles, array_map( 'sanitize_key', array_filter( (array) $raw, 'is_scalar' ) ) ) );
+		default:
+			return sanitize_text_field( is_scalar( $raw ) ? (string) $raw : '' );
+	}
+}
+
+/**
+ * A module's setting: the saved value, or the field's default. Unknown module or key: null.
+ *
+ * @param string $id  Module ID.
+ * @param string $key Setting key.
+ * @return mixed
+ */
+function setting( string $id, string $key ) {
+	$f = registry()[ $id ]['settings'][ $key ] ?? null;
+	if ( ! $f ) {
+		$value = null;
+	} else {
+		$all   = (array) get_option( SETTINGS, array() );
+		$saved = (array) ( $all[ $id ] ?? array() );
+		$value = array_key_exists( $key, $saved ) ? $saved[ $key ] : $f['default'];
+	}
+	return apply_filters( 'flurfunk_module_setting', $value, $id, $key );
+}
+
+/**
+ * Save a module's settings from input. Keys that are not in $in keep their value, except
+ * checkboxes and role lists, which a form leaves out when nothing is ticked: pass $complete.
+ *
+ * @param string $id       Module ID.
+ * @param array  $in       Key => raw value.
+ * @param bool   $complete $in is the whole form (missing checkboxes are off, missing roles none).
+ * @return array The module's stored settings.
+ */
+function save_settings( string $id, array $in, bool $complete = false ): array {
+	$fields = registry()[ $id ]['settings'] ?? array();
+	$all    = (array) get_option( SETTINGS, array() );
+	$mine   = (array) ( $all[ $id ] ?? array() );
+	foreach ( $fields as $key => $f ) {
+		if ( array_key_exists( $key, $in ) ) {
+			$mine[ $key ] = sanitize_value( $f, $in[ $key ] );
+		} elseif ( $complete && 'checkbox' === $f['type'] ) {
+			$mine[ $key ] = false;
+		} elseif ( $complete && 'roles' === $f['type'] ) {
+			$mine[ $key ] = array();
+		}
+	}
+	if ( $fields ) {
+		$all[ $id ] = $mine;
+		update_option( SETTINGS, $all, false );
+	}
+	return $mine;
+}
+
+/**
+ * One settings field in the modules form.
+ *
+ * @param string $id Module ID.
+ * @param array  $f  Field.
+ */
+function render_field( string $id, array $f ): void {
+	$name  = 'module_settings[' . $id . '][' . $f['key'] . ']';
+	$value = setting( $id, $f['key'] );
+	$html  = 'ff-ms-' . preg_replace( '/[^a-z0-9_-]/', '-', $id . '-' . $f['key'] );
+	echo '<span class="ff-module-setting" style="display:block;margin:.4em 0 .4em 1.8em">';
+	switch ( $f['type'] ) {
+		case 'checkbox':
+			echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="0">';
+			echo '<label><input type="checkbox" id="' . esc_attr( $html ) . '" name="' . esc_attr( $name ) . '" value="1"' . checked( (bool) $value, true, false ) . '> ' . esc_html( $f['label'] ) . '</label>';
+			break;
+		case 'roles':
+			echo '<span>' . esc_html( $f['label'] ) . ':</span> <input type="hidden" name="' . esc_attr( $name ) . '[]" value="">';
+			foreach ( wp_roles()->get_names() as $role => $label ) {
+				echo '<label style="margin-right:1em"><input type="checkbox" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( $role ) . '"' . checked( in_array( $role, (array) $value, true ), true, false ) . '> ' . esc_html( translate_user_role( $label ) ) . '</label>';
+			}
+			break;
+		case 'select':
+		case 'channel':
+			$options = $f['options'];
+			if ( 'channel' === $f['type'] ) {
+				$options = array();
+				foreach ( \Flurfunk\Store\channels() as $c ) {
+					$options[ $c->slug ] = '#' . $c->slug . ( $c->name && $c->name !== $c->slug ? ' – ' . $c->name : '' ) . ( $c->archived ? ' ' . __( '(not active)', 'flurfunk' ) : '' );
+				}
+				if ( '' !== (string) $value && ! isset( $options[ (string) $value ] ) ) {
+					/* translators: %s: channel short name */
+					$options[ (string) $value ] = sprintf( __( '#%s (created when needed)', 'flurfunk' ), (string) $value );
+				}
+			}
+			echo '<label for="' . esc_attr( $html ) . '">' . esc_html( $f['label'] ) . '</label> <select id="' . esc_attr( $html ) . '" name="' . esc_attr( $name ) . '">';
+			foreach ( $options as $v => $l ) {
+				echo '<option value="' . esc_attr( (string) $v ) . '"' . selected( (string) $value, (string) $v, false ) . '>' . esc_html( $l ) . '</option>';
+			}
+			echo '</select>';
+			break;
+		case 'number':
+			echo '<label for="' . esc_attr( $html ) . '">' . esc_html( $f['label'] ) . '</label> <input type="number" style="width:6em" id="' . esc_attr( $html ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $value ) . '"' . ( null !== $f['min'] ? ' min="' . esc_attr( (string) $f['min'] ) . '"' : '' ) . ( null !== $f['max'] ? ' max="' . esc_attr( (string) $f['max'] ) . '"' : '' ) . ( is_float( $value ) ? ' step="any"' : '' ) . '>';
+			break;
+		default:
+			echo '<label for="' . esc_attr( $html ) . '">' . esc_html( $f['label'] ) . '</label> <input class="regular-text" id="' . esc_attr( $html ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $value ) . '">';
+	}
+	if ( '' !== $f['description'] ) {
+		echo '<br><span class="description">' . esc_html( $f['description'] ) . '</span>';
+	}
+	echo '</span>';
 }
 
 /**
@@ -166,6 +351,7 @@ function listing(): array {
 			'enabled'      => enabled( $id ),
 			'loaded'       => $m['loaded'],
 			'settings_url' => $m['settings_url'],
+			'settings'     => $m['settings'],
 		);
 	}
 	ksort( $out );
@@ -265,6 +451,11 @@ function render_section(): void {
 								<?php if ( $m['description'] ) : ?>
 									<br><span class="description"><?php echo esc_html( $m['description'] ); ?></span>
 								<?php endif; ?>
+								<?php
+								foreach ( $m['settings'] as $f ) {
+									render_field( $m['id'], $f );
+								}
+								?>
 							</p>
 						<?php endforeach; ?>
 					</td>
@@ -289,6 +480,14 @@ add_action(
 			$changes[ sanitize_text_field( (string) $id ) ] = '1' === (string) $on;
 		}
 		set( $changes );
+		// Settings fields under the switches. Keys are checked against the registry, values sanitized by type.
+		$values = isset( $_POST['module_settings'] ) && is_array( $_POST['module_settings'] ) ? wp_unslash( $_POST['module_settings'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized per field type in save_settings().
+		foreach ( $values as $id => $fields ) {
+			$id = sanitize_text_field( (string) $id );
+			if ( isset( registry()[ $id ] ) && is_array( $fields ) ) {
+				save_settings( $id, $fields, true );
+			}
+		}
 		wp_safe_redirect( admin_url( 'options-general.php?page=flurfunk-settings&modules=saved#flurfunk-modules' ) );
 		exit;
 	}

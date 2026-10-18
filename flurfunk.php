@@ -253,7 +253,8 @@ function flurfunk_set_status( $thread, string $status, int $author = 0 ) {
  *
  * @param string $id   ID like "vendor/name".
  * @param array  $args label, description, group, requires, default, load, settings_url,
- *                     capabilities (cap => label, description, roles: granted once it is on).
+ *                     capabilities (cap => label, description, roles: granted once it is on),
+ *                     settings (fields shown under the switch; read with flurfunk_module_setting()).
  */
 function flurfunk_register_module( string $id, array $args ): bool {
 	return Flurfunk\Modules\register( $id, $args );
@@ -266,6 +267,18 @@ function flurfunk_register_module( string $id, array $args ): bool {
  */
 function flurfunk_module_enabled( string $id ): bool {
 	return Flurfunk\Modules\enabled( $id );
+}
+
+/**
+ * A module's setting (see the `settings` argument of flurfunk_register_module()): the value saved
+ * under Settings → Flurfunk → Modules, or the field's default. Null for an unknown module or key.
+ *
+ * @param string $module_id Module ID.
+ * @param string $key       Setting key.
+ * @return mixed
+ */
+function flurfunk_module_setting( string $module_id, string $key ) {
+	return Flurfunk\Modules\setting( $module_id, $key );
 }
 
 /**
