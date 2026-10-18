@@ -681,6 +681,21 @@ $check(
 	array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ), Caps\roles_with( Caps\MANAGE ), Caps\roles_with( Caps\MODERATE ) )
 );
 
+// Which roles have a WordPress capability (sorted), so the checks hold on sites with extra roles.
+$having = static function ( string $cap, string $not = '' ): array {
+	$out = array();
+	foreach ( wp_roles()->role_objects as $name => $role ) {
+		if ( $role->has_cap( $cap ) && ( '' === $not || ! $role->has_cap( $not ) ) ) {
+			$out[] = $name;
+		}
+	}
+	sort( $out );
+	return $out;
+};
+$sorted = static function ( array $a ): array {
+	sort( $a );
+	return $a;
+};
 // Migration from 0.1 settings: team = publish_posts (authors and up), no guests.
 foreach ( wp_roles()->role_objects as $r ) {
 	foreach ( array_keys( Caps\core_roles() ) as $c ) {
@@ -693,7 +708,7 @@ Caps\install();
 $s = get_option( 'flurfunk_settings' );
 $check(
 	'0.1 settings migrate once: team capability → flurfunk_team, no guests stays no guests',
-	array( 'administrator', 'editor', 'author' ) === Caps\roles_with( Caps\TEAM ) && array() === Caps\roles_with( Caps\GUEST ),
+	$having( 'publish_posts' ) === $sorted( Caps\roles_with( Caps\TEAM ) ) && array() === Caps\roles_with( Caps\GUEST ),
 	array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ) )
 );
 $check( '… manage_options roles get manage and moderate, editors no moderation (as in 0.1)', array( 'administrator' ) === Caps\roles_with( Caps\MANAGE ) && array( 'administrator' ) === Caps\roles_with( Caps\MODERATE ), Caps\roles_with( Caps\MODERATE ) );
@@ -715,7 +730,7 @@ foreach ( wp_roles()->role_objects as $r ) {
 	$r->remove_cap( Caps\GUEST );
 }
 Caps\install();
-$check( 'without a team setting the 0.1 default (edit_others_posts) applies; guests are the other edit_posts roles', array( 'administrator', 'editor' ) === Caps\roles_with( Caps\TEAM ) && array( 'author', 'contributor' ) === Caps\roles_with( Caps\GUEST ), array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ) ) );
+$check( 'without a team setting the 0.1 default (edit_others_posts) applies; guests are the other edit_posts roles', $having( 'edit_others_posts' ) === $sorted( Caps\roles_with( Caps\TEAM ) ) && $having( 'edit_posts', 'edit_others_posts' ) === $sorted( Caps\roles_with( Caps\GUEST ) ), array( Caps\roles_with( Caps\TEAM ), Caps\roles_with( Caps\GUEST ) ) );
 $restore_roles();
 update_option( 'flurfunk_settings', $opts_snap['flurfunk_settings'] ?? array() );
 update_option( Caps\OPTION, Caps\VERSION );
