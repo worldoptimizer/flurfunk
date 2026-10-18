@@ -5,7 +5,8 @@
  *   wp eval-file tests/api-edge.php <team-user-id> <second-team-user-id> <guest-user-id>
  *
  * The team users need flurfunk_team, the guest flurfunk_guest (e.g. an administrator, an editor and
- * an author on a fresh site) and at least one post of their own. Everything happens in a temporary channel
+ * an author on a fresh site) and at least one post of their own. The first team user also needs
+ * flurfunk_manage: the tests post far more than the rate limit allows, and managers are exempt. Everything happens in a temporary channel
  * "ff-test" (plus one archived channel) that is removed at the end, so it is safe on staging.
  *
  * @package Flurfunk

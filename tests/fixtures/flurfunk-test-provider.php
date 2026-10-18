@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Flurfunk test provider
- * Description: A card that uses every building block and four actions, for the e2e tests and
+ * Description: A card that uses every building block and five actions, for the e2e tests and
  *              the screenshots. Test sites only.
  *
  * Load it as a must-use plugin (copy or symlink into wp-content/mu-plugins/) and switch it on
