@@ -253,9 +253,16 @@ function render_field( string $id, array $f ): void {
 			break;
 		case 'users':
 			echo '<span>' . esc_html( $f['label'] ) . ':</span> <input type="hidden" name="' . esc_attr( $name ) . '[]" value="">';
+			$people = array();
 			foreach ( user_choices( $f ) as $uid ) {
-				$user = get_userdata( $uid );
-				echo '<label style="margin-right:1em;white-space:nowrap"><input type="checkbox" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( (string) $uid ) . '"' . checked( in_array( $uid, array_map( 'intval', (array) $value ), true ), true, false ) . '> ' . esc_html( $user ? $user->display_name : '#' . $uid ) . '</label> ';
+				$user           = get_userdata( $uid );
+				$people[ $uid ] = $user ? array( $user->display_name, $user->user_login ) : array( '#' . $uid, '' );
+			}
+			$names = array_count_values( array_column( $people, 0 ) );
+			foreach ( $people as $uid => list( $display, $login ) ) {
+				// Two people with the same name: the login tells them apart.
+				$label = $names[ $display ] > 1 && '' !== $login ? $display . ' (' . $login . ')' : $display;
+				echo '<label style="margin-right:1em;white-space:nowrap"><input type="checkbox" name="' . esc_attr( $name ) . '[]" value="' . esc_attr( (string) $uid ) . '"' . checked( in_array( $uid, array_map( 'intval', (array) $value ), true ), true, false ) . '> ' . esc_html( $label ) . '</label> ';
 			}
 			break;
 		case 'select':
