@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -121,6 +121,9 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 * First version.
 
 == Upgrade Notice ==
+
+= 0.2.1 =
+Small update: module settings can pick people, and review requests close when their post is trashed or deleted.
 
 = 0.2.0 =
 Permissions move to Flurfunk's own capabilities. On the first request after the update, the 0.1 "team" and "guest" settings become role permissions once, so everyone keeps their access. Check Settings → Flurfunk → Permissions afterwards.
