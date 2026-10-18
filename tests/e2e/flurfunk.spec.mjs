@@ -618,6 +618,78 @@ test.describe( 'team', () => {
 		await expect( page.locator( '.notice-success', { hasText: /Imported|Importiert/ } ) ).toContainText( /: 0 /, { timeout: 60_000 } ); // Nothing new: all of it is here already.
 	} );
 
+	test( 'settings: a channel can require a capability; mentions there only suggest who can read it', async ( { page } ) => {
+		const SETTINGS = '/wp-admin/options-general.php?page=flurfunk-settings' + Q;
+		const form = page.locator( 'form:has(input[name=action][value=flurfunk_settings])' );
+		const save = async () => {
+			await form.locator( '[type=submit]' ).first().click();
+			await expect( page.locator( '.notice-success', { hasText: /Settings saved|Einstellungen gespeichert/ } ).first() ).toBeVisible(); // WordPress adds its own notice too.
+		};
+		await page.goto( SETTINGS );
+		const sel = page.locator( 'select[name="channels[e2e-gate][capability]"]' );
+		if ( ! await sel.count() ) {
+			await page.fill( 'input[name="new_channel[name]"]', 'e2e gate' );
+			await page.selectOption( 'select[name="new_channel[capability]"]', 'moderate_comments' );
+			await save();
+			await expect( sel ).toHaveValue( 'moderate_comments' );
+		}
+		await page.locator( 'input[type=checkbox][name="channels[e2e-gate][active]"]' ).check();
+		await sel.selectOption( 'flurfunk_moderate' );
+		await save();
+		await expect( sel ).toHaveValue( 'flurfunk_moderate' );
+		await openApp( page );
+		const boot = await api( page, 'bootstrap' );
+		const ch = boot.channels.find( ( c ) => 'e2e-gate' === c.id );
+		expect( ch.capability ).toBe( 'flurfunk_moderate' );
+		expect( ch.members ).toContain( boot.me.id );
+		const guest = boot.people.find( ( p ) => 'guest' === p.kind && ! ch.members.includes( p.id ) );
+		if ( guest ) {
+			const prefix = '@' + guest.name.split( ' ' )[ 0 ].slice( 0, 3 );
+			const ta = page.locator( '.ff-new-thread textarea' );
+			for ( const [ view, shown ] of [ [ 'channel:general', 1 ], [ 'channel:e2e-gate', 0 ] ] ) {
+				await page.goto( APP + '&view=' + view, { waitUntil: 'domcontentloaded' } );
+				await page.waitForSelector( '.ff-app .ff-new-thread textarea' );
+				await ta.click();
+				await ta.pressSequentially( prefix );
+				await expect( page.locator( '.ff-new-thread .ff-menu button', { hasText: guest.name } ) ).toHaveCount( shown );
+				await ta.fill( '' );
+			}
+		}
+		// Leave it switched off, so the other tests see the usual channels.
+		await page.goto( SETTINGS );
+		await page.locator( 'input[type=checkbox][name="channels[e2e-gate][active]"]' ).uncheck();
+		await save();
+		await expect( sel ).toHaveValue( 'flurfunk_moderate' );
+	} );
+
+	test( 'settings: a module setting is saved and shown again', async ( { page } ) => {
+		await page.goto( '/wp-admin/options-general.php?page=flurfunk-settings' + Q );
+		const form = page.locator( 'form:has(input[name=action][value=flurfunk_modules])' );
+		const ch = form.locator( 'select[name="module_settings[flurfunk/review][channel]"]' );
+		const assign = form.locator( 'input[type=checkbox][name="module_settings[flurfunk/review][assign]"]' );
+		const save = async () => {
+			await form.locator( '[type=submit]' ).click();
+			await expect( page.locator( '.notice-success', { hasText: /Modules saved|Module gespeichert/ } ) ).toBeVisible();
+		};
+		await expect( ch ).toBeVisible();
+		const before = await ch.inputValue();
+		const wasOn = await assign.isChecked();
+		const values = await ch.locator( 'option' ).evaluateAll( ( os ) => os.map( ( o ) => o.value ) );
+		const pick = values.find( ( v ) => v !== before ) || before;
+		await ch.selectOption( pick );
+		await assign.setChecked( ! wasOn );
+		await save();
+		await expect( ch ).toHaveValue( pick );
+		await expect( assign ).toBeChecked( { checked: ! wasOn } );
+		await page.reload();
+		await expect( ch ).toHaveValue( pick );
+		await ch.selectOption( before );
+		await assign.setChecked( wasOn );
+		await save();
+		await expect( ch ).toHaveValue( before );
+		await expect( assign ).toBeChecked( { checked: wasOn } );
+	} );
+
 	test( 'editor panel starts a conversation about the post', async ( { page } ) => {
 		const boot = await api( page, 'bootstrap' );
 		const post = boot.targets[ 0 ];

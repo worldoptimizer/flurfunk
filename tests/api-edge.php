@@ -790,6 +790,28 @@ $again = Flurfunk\Modules\CommentsDaily\run();
 $dcard = Store\full_thread( $daily, $team )['attachments'][0]['snapshot'] ?? array();
 $check( 'the same day: the card is updated, no second thread', $again === $daily && 2 === count( $dcard['table']['rows'] ?? array() ) && '2' === ( $dcard['fields'][0]['value'] ?? '' ), $dcard );
 remove_filter( 'flurfunk_comments_channel', $to_test );
+// Without the filter: the module's own channel #comments, only for people who may moderate comments.
+$extra_threads = array();
+$had_comments  = (bool) Store\channel_by_slug( 'comments' );
+$mod_opt       = get_option( 'flurfunk_modules', null );
+Flurfunk\Modules\set( array( 'flurfunk/comments-daily' => true ) );
+$cch = Store\channel_by_slug( 'comments' );
+if ( ! $had_comments ) {
+	$check( 'switching the module on creates #comments: moderate_comments only, no guests, translated name', $cch && 'moderate_comments' === $cch->capability && 'none' === $cch->access_guests && __( 'Comments', 'flurfunk' ) === $cch->name, $cch );
+}
+$check( 'its channel setting defaults to #comments', 'comments' === flurfunk_module_setting( 'flurfunk/comments-daily', 'channel' ) );
+$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily' ), array( 'id' => $daily ) );
+$gdaily = Flurfunk\Modules\CommentsDaily\run();
+$extra_threads[] = (int) $gdaily;
+$grow   = is_int( $gdaily ) ? Store\thread_row( $gdaily ) : null;
+$nomodu = wp_insert_user( array( 'user_login' => 'ff-test-nomod-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
+( new WP_User( $nomodu ) )->add_cap( 'flurfunk_team' );
+$check( 'the daily thread lands in #comments, posted by the assistant', $grow && 'comments' === Store\channel( (int) $grow->channel_id )->slug && Flurfunk\Access\is_bot( (int) $grow->author_id ), $gdaily );
+$check( '… readable for people who may moderate comments, not for team members who may not, nor guests', Flurfunk\Access\can_see( $grow, $team ) && Flurfunk\Access\can_see( $grow, $team2 ) && ! Flurfunk\Access\can_see( $grow, $nomodu ) && ! Flurfunk\Access\can_see( $grow, $guest ) );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $nomodu );
+$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily-gated' ), array( 'id' => $gdaily ) );
+null === $mod_opt ? delete_option( 'flurfunk_modules' ) : update_option( 'flurfunk_modules', $mod_opt );
 wp_delete_comment( $q1, true );
 wp_delete_comment( $q2, true );
 foreach ( $waiting as $w ) {
@@ -823,9 +845,21 @@ wp_update_post( array( 'ID' => $rp, 'post_status' => 'publish' ) );
 $rx = Store\full_thread( (int) $rt->id, $team );
 $rm = array_values( array_filter( $rx['messages'], fn ( $m ) => 'message' === $m['type'] ) );
 $check( 'published: a reply and the task is done', 'done' === $rx['status'] && str_contains( (string) ( end( $rm )['text'] ?? '' ), trim( sprintf( __( '%s published it.', 'flurfunk' ), '' ), ' .' ) ), array( $rx['status'], end( $rm ) ) );
-remove_action( 'transition_post_status', 'Flurfunk\Modules\Review\transition', 10 );
 remove_filter( 'flurfunk_review_channel', $to_test );
 wp_delete_post( $rp, true );
+// The module settings instead of the filters: channel, and nobody assigned.
+$review_opt = get_option( 'flurfunk_module_settings', null );
+$check( 'review settings default to #general and assigning', 'general' === flurfunk_module_setting( 'flurfunk/review', 'channel' ) && true === flurfunk_module_setting( 'flurfunk/review', 'assign' ) );
+Flurfunk\Modules\save_settings( 'flurfunk/review', array( 'channel' => 'ff-test', 'assign' => '0' ), true );
+$as( $guest );
+$rp = wp_insert_post( array( 'post_title' => 'ff-test review 2', 'post_status' => 'draft', 'post_author' => $guest ) );
+wp_update_post( array( 'ID' => $rp, 'post_status' => 'pending' ) );
+$rt = Store\thread_by_ref( 'flurfunk-review:' . $rp );
+$check( 'with the settings: the request lands in the chosen channel, nobody assigned', $rt && 'ff-test' === Store\channel( (int) $rt->channel_id )->slug && array() === Store\assignees( (int) $rt->id ) && 'open' === $rt->status, $rt );
+$as( $team );
+remove_action( 'transition_post_status', 'Flurfunk\Modules\Review\transition', 10 );
+wp_delete_post( $rp, true );
+null === $review_opt ? delete_option( 'flurfunk_module_settings' ) : update_option( 'flurfunk_module_settings', $review_opt );
 Flurfunk\Notify\deliver();
 
 WP_CLI::log( 'Modules' );
@@ -850,6 +884,140 @@ $check( 'Flurfunk\'s own parts are modules (comments on, daily thread and review
 $opt = (array) get_option( 'flurfunk_modules', array() );
 unset( $opt['ff-test/demo'] );
 update_option( 'flurfunk_modules', $opt );
+
+WP_CLI::log( 'Module settings' );
+$ms_opt = get_option( 'flurfunk_module_settings', null );
+$check(
+	'a module with settings registers; a field with an unknown type is left out',
+	@flurfunk_register_module(
+		'ff-test/set',
+		array(
+			'label'    => 'Set',
+			'default'  => false,
+			'load'     => '__return_true',
+			'settings' => array(
+				array( 'key' => 'on', 'type' => 'checkbox', 'label' => 'On', 'default' => true ),
+				array( 'key' => 'n', 'type' => 'number', 'label' => 'N', 'default' => 5, 'min' => 1, 'max' => 10 ),
+				array( 'key' => 'txt', 'type' => 'text', 'label' => 'T', 'default' => 'hallo' ),
+				array( 'key' => 'pick', 'type' => 'select', 'label' => 'P', 'default' => 'a', 'options' => array( 'a' => 'A', 'b' => 'B' ) ),
+				array( 'key' => 'ch', 'type' => 'channel', 'label' => 'C', 'default' => 'general' ),
+				array( 'key' => 'who', 'type' => 'roles', 'label' => 'W', 'default' => array( 'editor' ) ),
+				array( 'key' => 'bad', 'type' => 'colour', 'label' => 'X' ),
+			),
+		)
+	) && ! isset( Flurfunk\Modules\registry()['ff-test/set']['settings']['bad'] ) && 6 === count( Flurfunk\Modules\registry()['ff-test/set']['settings'] )
+);
+$ms = static fn ( string $k ) => flurfunk_module_setting( 'ff-test/set', $k );
+$check( 'unset settings return their defaults', true === $ms( 'on' ) && 5 === $ms( 'n' ) && 'hallo' === $ms( 'txt' ) && 'a' === $ms( 'pick' ) && 'general' === $ms( 'ch' ) && array( 'editor' ) === $ms( 'who' ), array( $ms( 'on' ), $ms( 'n' ), $ms( 'txt' ), $ms( 'pick' ), $ms( 'ch' ), $ms( 'who' ) ) );
+$check( 'an unknown key or module gives null', null === $ms( 'nope' ) && null === flurfunk_module_setting( 'ff-test/none', 'n' ) );
+Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '99', 'txt' => '<b>fett</b> <script>x</script>und', 'pick' => 'zzz', 'ch' => 'no-such-channel', 'who' => array( 'editor', 'no-such-role', 'administrator', array( 'x' ) ) ), true );
+$check( 'a whole form: a missing checkbox is off, numbers are clamped, text loses markup', false === $ms( 'on' ) && 10 === $ms( 'n' ) && ! str_contains( $ms( 'txt' ), '<' ) && str_contains( $ms( 'txt' ), 'fett' ), array( $ms( 'on' ), $ms( 'n' ), $ms( 'txt' ) ) );
+$who = $ms( 'who' );
+sort( $who );
+$check( '… unknown choices, channels and roles fall back or are dropped', 'a' === $ms( 'pick' ) && 'general' === $ms( 'ch' ) && array( 'administrator', 'editor' ) === $who, array( $ms( 'pick' ), $ms( 'ch' ), $who ) );
+Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => '0', 'pick' => 'b', 'ch' => 'ff-test', 'on' => '1' ) );
+$check( 'valid values are kept; below min becomes min', 1 === $ms( 'n' ) && 'b' === $ms( 'pick' ) && 'ff-test' === $ms( 'ch' ) && true === $ms( 'on' ), array( $ms( 'n' ), $ms( 'pick' ), $ms( 'ch' ), $ms( 'on' ) ) );
+Flurfunk\Modules\save_settings( 'ff-test/set', array( 'n' => 'viele' ) );
+$check( 'a partial save keeps the other values; nonsense numbers become the default', 5 === $ms( 'n' ) && 'b' === $ms( 'pick' ) && true === $ms( 'on' ), array( $ms( 'n' ), $ms( 'pick' ) ) );
+add_filter( 'flurfunk_module_setting', $ms_filter = fn ( $v, $id, $k ) => 'ff-test/set' === $id && 'txt' === $k ? 'gefiltert' : $v, 10, 3 );
+$check( 'the flurfunk_module_setting filter has the last word', 'gefiltert' === $ms( 'txt' ) && 5 === $ms( 'n' ) );
+remove_filter( 'flurfunk_module_setting', $ms_filter, 10 );
+require_once ABSPATH . 'wp-admin/includes/template.php';
+ob_start();
+Flurfunk\Modules\render_section();
+$ms_html = (string) ob_get_clean();
+$check( 'the fields are shown under the switch, with the saved values', str_contains( $ms_html, 'name="module_settings[ff-test/set][n]" value="5"' ) && str_contains( $ms_html, 'name="module_settings[ff-test/set][pick]"' ) && (bool) preg_match( '/<option value="b" selected/', $ms_html ) && str_contains( $ms_html, 'name="module_settings[ff-test/set][who][]" value="administrator" checked' ), substr( $ms_html, 0, 200 ) );
+$check( 'the review module shows its channel and assignment settings', str_contains( $ms_html, 'name="module_settings[flurfunk/review][channel]"' ) && str_contains( $ms_html, 'name="module_settings[flurfunk/review][assign]"' ) );
+$reg = &Flurfunk\Modules\registry();
+unset( $reg['ff-test/set'], $reg['ff-test/demo'] );
+unset( $reg );
+null === $ms_opt ? delete_option( 'flurfunk_module_settings' ) : update_option( 'flurfunk_module_settings', $ms_opt );
+
+WP_CLI::log( 'Channel capability' );
+$gate = 'ff_test_gate';
+( new WP_User( $team ) )->add_cap( $gate );
+Store\ensure_channel( 'ff-test-gate', array( 'name' => 'Gate', 'access_guests' => 'all', 'capability' => '' ), true );
+$word = 'torwort' . strtolower( wp_generate_password( 6, false, false ) );
+$as( $team );
+$gt = null;
+list( $notes ) = $flush( function () use ( $req, $word, $team2, &$gt ) {
+	list( , $gt ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test-gate', 'body' => "Vorher $word <@$team2>" ) );
+} );
+$check( 'without a capability: team2 is mentioned and notified', 'mention' === ( $notes[ $team2 ] ?? '' ), $notes );
+$unread_before = Flurfunk\Notify\unread( $team2 );
+Store\ensure_channel( 'ff-test-gate', array( 'capability' => $gate ), true );
+$gc = Store\channel_by_slug( 'ff-test-gate' );
+$check( 'ensure_channel() stores the capability', $gate === $gc->capability, $gc );
+$check( 'level: none without it (team and guests alike), all with it', 'none' === Flurfunk\Access\level( $gc, $team2 ) && 'none' === Flurfunk\Access\level( $gc, $guest ) && 'all' === Flurfunk\Access\level( $gc, $team ) );
+$as( $team2 );
+list( $s, $b ) = $req( 'GET', 'bootstrap' );
+$check( 'without the capability the channel is not listed', 200 === $s && ! in_array( 'ff-test-gate', array_column( $b['channels'], 'id' ), true ) );
+$check( '… and not counted', ! isset( $b['counts']['channels']['ff-test-gate'] ), $b['counts']['channels'] ?? null );
+list( $s ) = $req( 'GET', 'threads/' . $gt['id'] );
+$check( '… its threads do not open', 404 === $s, $s );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'channel' => 'ff-test-gate' ) );
+$check( '… the channel lists nothing', ! in_array( $gt['id'], array_column( 200 === $s ? $l : array(), 'id' ), true ), array( $s, $l ) );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'q' => $word ) );
+$check( '… search does not find them', 200 === $s && array() === $l, $l );
+list( $s ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test-gate', 'body' => 'x' ) );
+$check( '… no new threads there', 403 === $s, $s );
+list( $s ) = $req( 'POST', 'threads/' . $gt['id'] . '/messages', array( 'body' => 'x' ) );
+$check( '… nor replies', 404 === $s, $s );
+$check( 'notifications from before are gone from the list and the number', ! in_array( $gt['id'], array_column( Flurfunk\Notify\list_for( $team2 ), 'thread' ), true ) && Flurfunk\Notify\unread( $team2 ) === $unread_before - 1, array( $unread_before, Flurfunk\Notify\unread( $team2 ) ) );
+$as( $team );
+$gt2 = null;
+list( $notes ) = $flush( function () use ( $req, $word, $team2, &$gt2 ) {
+	list( , $gt2 ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test-gate', 'body' => "Nachher $word <@$team2>" ) );
+} );
+$check( 'with the capability: the thread is posted, team2 is neither mentioned nor notified', isset( $gt2['id'] ) && array() === $gt2['mentions'] && ! isset( $notes[ $team2 ] ), array( $gt2['mentions'] ?? $gt2, $notes ) );
+list( $s, $b ) = $req( 'GET', 'bootstrap' );
+$gb = array_values( array_filter( $b['channels'], fn ( $c ) => 'ff-test-gate' === $c['id'] ) )[0] ?? null;
+$check( 'with the capability the channel is listed, with its capability and who may be mentioned', $gb && $gate === $gb['capability'] && in_array( $team, $gb['members'], true ) && ! in_array( $team2, $gb['members'], true ) && ! in_array( $guest, $gb['members'], true ), $gb );
+$check( '… channels without one carry no member list', ! isset( array_values( array_filter( $b['channels'], fn ( $c ) => 'ff-test' === $c['id'] ) )[0]['members'] ) );
+list( $s, $l ) = $req( 'GET', 'threads', null, array( 'q' => $word ) );
+$check( '… search finds both threads', 2 === count( array_intersect( array( $gt['id'], $gt2['id'] ), array_column( (array) $l, 'id' ) ) ), $l );
+$fresh = wp_insert_user( array( 'user_login' => 'ff-test-gate-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
+( new WP_User( $fresh ) )->add_cap( 'flurfunk_team' );
+add_filter( 'flurfunk_channel_level', $open_gate = fn ( $level, $c, $uid ) => 'ff-test-gate' === $c->slug && (int) $uid === (int) $fresh ? 'all' : $level, 10, 3 );
+$check( 'flurfunk_channel_level runs after the capability and has the last word', 'all' === Flurfunk\Access\level( $gc, (int) $fresh ) );
+remove_filter( 'flurfunk_channel_level', $open_gate, 10 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $fresh );
+
+// Flurfunk's own team capability: guests are out whatever the guest level, assistants are in.
+$bot = (int) flurfunk_as( 0, 'get_current_user_id' );
+Store\ensure_channel( 'ff-test-gate', array( 'capability' => 'flurfunk_team' ), true );
+$gc = Store\channel_by_slug( 'ff-test-gate' );
+$check( 'requiring flurfunk_team: team and assistants in, guests out', 'all' === Flurfunk\Access\level( $gc, $team2 ) && 'all' === Flurfunk\Access\level( $gc, $bot ) && 'none' === Flurfunk\Access\level( $gc, $guest ) );
+$check( '… and the audience hint no longer names guests', array() === Store\audience( (object) array( 'channel_id' => $gc->id, 'target_type' => 'post', 'target_id' => $guest_post ) ) );
+
+// Any other capability: assistants only with it, through flurfunk_bot_can, or when PHP code acts as them.
+Store\ensure_channel( 'ff-test-gate', array( 'capability' => $gate ), true );
+$as( $bot );
+list( $s ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test-gate', 'body' => 'Agent' ) );
+$check( 'an assistant over REST is kept out by default', 403 === $s, $s );
+$as( $team );
+$mod_tid = flurfunk_post( array( 'channel' => 'ff-test-gate', 'body' => 'Vom Modul' ) );
+$check( 'flurfunk_post() as the assistant still posts into the channel', is_int( $mod_tid ) && Flurfunk\Access\is_bot( (int) Store\thread_row( $mod_tid )->author_id ), $mod_tid );
+$check( '… and flurfunk_reply() replies there', is_int( flurfunk_reply( $mod_tid, 'Nachtrag' ) ) );
+$check( '… while outside of it the assistant still cannot read it', ! Flurfunk\Access\can_see( Store\thread_row( $mod_tid ), $bot ) );
+Store\ensure_channel( 'ff-test-gate', array( 'capability' => 'ff_test_gate2' ), true );
+add_filter( 'flurfunk_bot_can', $bot_can = fn ( $ok, $cap ) => $ok || 'ff_test_gate2' === $cap, 10, 2 );
+$as( $bot );
+list( $s ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test-gate', 'body' => 'Agent darf' ) );
+$check( 'flurfunk_bot_can lets an assistant in', 200 === $s, $s );
+remove_filter( 'flurfunk_bot_can', $bot_can, 10 );
+$as( $team );
+
+// Export and import carry it.
+$exp = Flurfunk\Transfer\export();
+$ec  = array_values( array_filter( $exp['channels'], fn ( $c ) => 'ff-test-gate' === $c['id'] ) )[0] ?? null;
+$check( 'the export carries the capability', $ec && 'ff_test_gate2' === $ec['capability'], $ec );
+$ec['id'] = 'ff-test-gate-imported';
+Flurfunk\Transfer\import( array( 'format' => 'flurfunk/1', 'site' => 'https://elsewhere.example/', 'channels' => array( $ec ), 'people' => array(), 'threads' => array() ) );
+$check( '… and the import keeps it', 'ff_test_gate2' === ( Store\channel_by_slug( 'ff-test-gate-imported' )->capability ?? '' ) );
+$check( 'the settings offer Flurfunk\'s and common WordPress capabilities, nothing made up', Flurfunk\Settings\known_cap( 'moderate_comments' ) && Flurfunk\Settings\known_cap( 'flurfunk_team' ) && Flurfunk\Settings\known_cap( '' ) && ! Flurfunk\Settings\known_cap( 'do_anything' ) && Flurfunk\Settings\known_cap( 'do_anything', array( 'do_anything' ) ) );
+( new WP_User( $team ) )->remove_cap( $gate );
 
 WP_CLI::log( 'Drafts of others' );
 $draft_other = wp_insert_post( array( 'post_title' => 'ff-test fremder Entwurf ' . wp_generate_password( 4, false ), 'post_status' => 'draft', 'post_author' => $team ) );
@@ -1258,7 +1426,8 @@ $check( 'roles are back as before the tests', get_option( $roles_key ) === $role
 
 WP_CLI::log( 'Clean up' );
 global $wpdb;
-$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived')" ) );
+$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported')" ) );
+$ids = array_values( array_unique( array_merge( $ids, array_filter( array_map( 'intval', $extra_threads ?? array() ) ) ) ) );
 if ( $ids ) {
 	$in = implode( ',', $ids );
 	foreach ( array( 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications' ) as $tb ) {
@@ -1266,7 +1435,10 @@ if ( $ids ) {
 	}
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_threads WHERE id IN ($in)" );
 }
-$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived')" );
+$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported')" );
+if ( isset( $had_comments ) && ! $had_comments ) {
+	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug = 'comments'" );
+}
 WP_CLI::log( "  removed " . count( $ids ) . ' test threads' );
 
 WP_CLI::log( '' );
