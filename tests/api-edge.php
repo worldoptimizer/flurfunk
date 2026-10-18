@@ -701,6 +701,13 @@ $check( '… the old settings keys are gone, the rest stays', ! isset( $s['team_
 get_role( 'author' )->remove_cap( Caps\TEAM );
 Caps\install();
 $check( '… and it runs only once', ! get_role( 'author' )->has_cap( Caps\TEAM ) && Caps\VERSION === (int) get_option( Caps\OPTION ) );
+delete_option( Caps\OPTION );
+$wpdb->insert( $wpdb->options, array( 'option_name' => Caps\OPTION . '_lock', 'option_value' => (string) time(), 'autoload' => 'no' ) );
+Caps\install();
+$check( 'a second request waits while another one migrates', false === get_option( Caps\OPTION ) );
+$wpdb->update( $wpdb->options, array( 'option_value' => (string) ( time() - HOUR_IN_SECONDS ) ), array( 'option_name' => Caps\OPTION . '_lock' ) );
+Caps\install();
+$check( '… and a stale lock does not block it forever', Caps\VERSION === (int) get_option( Caps\OPTION ) && ! $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", Caps\OPTION . '_lock' ) ) );
 update_option( 'flurfunk_settings', array( 'guest_cap' => 'edit_posts' ) );
 delete_option( Caps\OPTION );
 foreach ( wp_roles()->role_objects as $r ) {

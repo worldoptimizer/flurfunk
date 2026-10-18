@@ -36,6 +36,7 @@ $flurfunk_remove_caps = static function (): void {
 	}
 	delete_option( 'flurfunk_caps_version' );
 	delete_option( 'flurfunk_caps_seeded' );
+	delete_option( 'flurfunk_caps_version_lock' );
 };
 if ( is_multisite() ) {
 	foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $flurfunk_site ) {

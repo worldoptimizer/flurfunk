@@ -213,18 +213,38 @@ function grant( string $cap, array $roles ): void {
  * a fresh site gets the defaults.
  */
 function install(): void {
+	global $wpdb;
 	if ( (int) get_option( OPTION, 0 ) >= VERSION ) {
 		return;
 	}
-	$legacy = legacy();
-	null === $legacy ? grant_defaults() : migrate( $legacy );
-	ensure_manager();
-	$seeded = (array) get_option( SEEDED, array() );
-	foreach ( array_keys( core_roles() ) as $cap ) {
-		$seeded[ $cap ] = array( 'new' => true );
+	// One request at a time: a second one running the migration after the first removed the old
+	// settings would fall back to the 0.1 defaults. A lock older than five minutes is stale.
+	$lock = OPTION . '_lock';
+	$got  = $wpdb->query( $wpdb->prepare( 'INSERT IGNORE INTO %i (option_name, option_value, autoload) VALUES (%s, %s, %s)', $wpdb->options, $lock, (string) time(), 'no' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- an atomic lock; add_option() would overwrite.
+	if ( ! $got ) {
+		$since = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM %i WHERE option_name = %s', $wpdb->options, $lock ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- see above.
+		if ( $since > time() - 5 * MINUTE_IN_SECONDS ) {
+			return;
+		}
 	}
-	update_option( SEEDED, $seeded, true );
-	update_option( OPTION, VERSION, true );
+	wp_cache_delete( OPTION, 'options' );
+	wp_cache_delete( 'alloptions', 'options' );
+	if ( (int) get_option( OPTION, 0 ) < VERSION ) {
+		$legacy = legacy();
+		if ( null === $legacy ) {
+			grant_defaults();
+		} else {
+			migrate( $legacy );
+		}
+		ensure_manager();
+		$seeded = (array) get_option( SEEDED, array() );
+		foreach ( array_keys( core_roles() ) as $cap ) {
+			$seeded[ $cap ] = array( 'new' => true );
+		}
+		update_option( SEEDED, $seeded, true );
+		update_option( OPTION, VERSION, true );
+	}
+	$wpdb->delete( $wpdb->options, array( 'option_name' => $lock ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- see above.
 }
 
 /**
