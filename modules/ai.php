@@ -42,6 +42,7 @@ const MAX_POST_CHARS = 20000;
 
 add_action( 'flurfunk_thread_created', __NAMESPACE__ . '\\thread_created' );
 add_action( 'flurfunk_message_added', __NAMESPACE__ . '\\message_added', 10, 2 );
+add_action( 'flurfunk_message_edited', __NAMESPACE__ . '\\message_added', 10, 2 ); // A mention added later still counts; answered ones are not answered again.
 add_action( HOOK, __NAMESPACE__ . '\\run', 10, 3 );
 add_filter( 'flurfunk_thread_view', __NAMESPACE__ . '\\thread_view', 10, 2 );
 add_filter( 'flurfunk_channel_view', __NAMESPACE__ . '\\channel_view', 10, 2 );
@@ -277,8 +278,11 @@ function queue( object $thread, int $message_id, int $author, string $text ): ar
 		return array();
 	}
 	$queued = array();
-	foreach ( Store\mentions_in( $text, $thread ) as $agent ) {
-		if ( ! may_answer( $agent, $author, $channel ) ) {
+	// Mentions of agents straight from the text: an agent the site allowed in a channel that requires
+	// a capability its account lacks is not in the stored mentions, but may answer there.
+	preg_match_all( '/<@(\d+)>/', $text, $m );
+	foreach ( array_unique( array_map( 'intval', $m[1] ) ) as $agent ) {
+		if ( ! Access\is_bot( $agent ) || ! may_answer( $agent, $author, $channel ) || ! Access\can_see( $thread, $author ) ) {
 			continue;
 		}
 		$args = array( (int) $thread->id, $message_id, $agent );
@@ -399,6 +403,11 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		return null; // Already running (cron and the shutdown run met).
 	}
 	try {
+		// The question was deleted (or is no message) meanwhile: nothing to answer.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table.
+		if ( $message_id && 'message' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT type FROM %i WHERE id = %d AND thread_id = %d', table( 'messages' ), $message_id, $thread_id ) ) ) {
+			return null;
+		}
 		// Answered already (a second trigger for the same message)?
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table.
 		if ( $wpdb->get_var( $wpdb->prepare( "SELECT id FROM %i WHERE thread_id = %d AND author_id = %d AND type = 'message' AND id > %d LIMIT 1", table( 'messages' ), $thread_id, $agent, $message_id ) ) ) {
@@ -414,7 +423,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 				return null;
 			}
 			add_usage( $agent, 0, true );
-			return flurfunk_reply( $thread_id, __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ), array( 'author' => $agent ) );
+			return reply( $thread_id, $agent, __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ) );
 		}
 		$answer = flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) );
 		$ch     = Store\channel( (int) $thread->channel_id );
@@ -431,8 +440,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		);
 		if ( is_wp_error( $answer ) ) {
 			do_action( 'flurfunk_ai_error', $answer, $thread_id, $agent );
-			/* translators: %s: error message */
-			return flurfunk_reply( $thread_id, sprintf( __( 'That did not work: %s', 'flurfunk' ), $answer->get_error_message() ), array( 'author' => $agent ) );
+			return reply( $thread_id, $agent, friendly_error( $answer ) );
 		}
 		$before = usage( $agent )['tokens'];
 		add_usage( $agent, $answer['tokens'] );
@@ -444,12 +452,56 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		if ( '' === $text ) {
 			return null;
 		}
-		return flurfunk_reply( $thread_id, $text, array( 'author' => $agent ) );
+		return reply( $thread_id, $agent, $text );
 	} finally {
 		answering( $agent, 0 );
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		set_busy( $thread_id, $agent, false );
 	}
+}
+
+/**
+ * Post as the agent. Its own budget limits it, so the per-minute limit for assistants does not
+ * (a busy thread must not lose answers).
+ *
+ * @param int    $thread_id Thread.
+ * @param int    $agent     Assistant.
+ * @param string $text      Text.
+ * @return int|\WP_Error Message ID.
+ */
+function reply( int $thread_id, int $agent, string $text ) {
+	$free = static fn ( $max, $user_id ) => (int) $user_id === $agent ? 0 : $max;
+	add_filter( 'flurfunk_rate_limit', $free, 99, 2 );
+	try {
+		return flurfunk_reply( $thread_id, $text, array( 'author' => $agent ) );
+	} finally {
+		remove_filter( 'flurfunk_rate_limit', $free, 99 );
+	}
+}
+
+/**
+ * A provider error in words people understand (the log keeps the original).
+ *
+ * @param \WP_Error $error Error.
+ */
+function friendly_error( \WP_Error $error ): string {
+	$data   = $error->get_error_data();
+	$status = is_array( $data ) ? (int) ( $data['status'] ?? 0 ) : 0;
+	$msg    = $error->get_error_message();
+	if ( 429 === $status || 529 === $status || preg_match( '/rate.?limit|overload|too many/i', $msg ) ) {
+		return __( 'The AI provider is busy right now. Please mention me again in a minute.', 'flurfunk' );
+	}
+	if ( 401 === $status || 403 === $status || preg_match( '/api.?key|unauthori[sz]ed|authentication/i', $msg ) ) {
+		return __( 'The AI provider does not accept the key. An administrator can check it under Settings → Connectors.', 'flurfunk' );
+	}
+	if ( preg_match( '/time.?d?.?out|timed out/i', $msg ) ) {
+		return __( 'The AI provider did not answer in time. Please try again, maybe with a shorter question.', 'flurfunk' );
+	}
+	if ( preg_match( '/no models found|not supported|no provider/i', $msg ) ) {
+		return __( 'No suitable AI model is available. An administrator can check the provider under Settings → Connectors and the preferred models of this assistant.', 'flurfunk' );
+	}
+	/* translators: %s: error message */
+	return sprintf( __( 'That did not work: %s', 'flurfunk' ), $msg );
 }
 
 /**

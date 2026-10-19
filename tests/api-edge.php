@@ -1034,6 +1034,51 @@ delete_option( 'flurfunk_ai_settings' );
 list( $s, $x ) = $ai_sum_none;
 $check( 'no assistant in the channel: a clear refusal', 400 === $s && 'flurfunk_ai_none' === ( $x['code'] ?? '' ), array( $s, $x ) );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'instructions' => 'Sei knapp.' ) );
+// Edge cases.
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'budget' => 0 ) );
+delete_user_meta( $ai_bot, 'flurfunk_ai_usage' );
+$ai_bot2 = Flurfunk\Access\create_bot( 'KI-Zwei', 'ff-test-ai2-' . strtolower( wp_generate_password( 5, false, false ) ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot2, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+$ai_e  = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Randfälle' ) );
+$ai_q2 = Flurfunk\Modules\Ai\queue( Store\thread_row( $ai_e ), 0, $team, "<@$ai_bot> und <@$ai_bot2>, beide bitte" );
+$check( 'two agents in one message: both are asked', array( $ai_bot, $ai_bot2 ) === $ai_q2, $ai_q2 );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+$ai_md = Store\add_message( $ai_e, array( 'body' => "<@$ai_bot> Frage, die ich gleich lösche" ) );
+Store\delete_message( $ai_md );
+$check( 'a question deleted before the run is not answered', null === Flurfunk\Modules\Ai\run( $ai_e, $ai_md, $ai_bot ) );
+$ai_mx = Store\add_message( $ai_e, array( 'body' => 'Frage ohne Erwähnung' ) );
+Store\edit_message( $ai_mx, "<@$ai_bot> Frage ohne Erwähnung" );
+$check( 'a mention added by editing still asks the agent', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ai_e, $ai_mx, $ai_bot ) ) );
+Flurfunk\Modules\Ai\run( $ai_e, $ai_mx, $ai_bot );
+$ai_n = count( $ai_seen );
+Store\edit_message( $ai_mx, "<@$ai_bot> Frage ohne Erwähnung (Tippfehler korrigiert)" );
+$check( '… and editing an answered question again does not ask twice', null === Flurfunk\Modules\Ai\run( $ai_e, $ai_mx, $ai_bot ) && count( $ai_seen ) === $ai_n );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+Store\ensure_channel( 'ff-test', array( 'capability' => 'moderate_comments' ), true );
+Store\channels( true );
+$ai_mg = Store\add_message( $ai_e, array( 'body' => "<@$ai_bot> Im geschützten Kanal?" ) );
+$check( 'in a channel that requires a capability the agent lacks, the site\'s choice counts: it is asked and can read', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ai_e, $ai_mg, $ai_bot ) ) && is_int( Flurfunk\Modules\Ai\run( $ai_e, $ai_mg, $ai_bot ) ) );
+Store\ensure_channel( 'ff-test', array( 'capability' => '' ), true );
+Store\channels( true );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+$ai_long = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Langer Thread' ) );
+for ( $i = 1; $i <= 70; $i++ ) {
+	Store\add_message( $ai_long, array( 'body' => "Beitrag Nummer $i", 'author' => $team ), false );
+}
+$ai_lc = Flurfunk\Modules\Ai\context( Store\thread_row( $ai_long ), 0, $ai_bot );
+$check( 'a long thread is cut: the start and the newest messages, not the middle', str_contains( $ai_lc['prompt'], 'Langer Thread' ) && str_contains( $ai_lc['prompt'], 'Beitrag Nummer 70' ) && ! str_contains( $ai_lc['prompt'], "Beitrag Nummer 5\n" ) );
+$ai_fe = array(
+	Flurfunk\Modules\Ai\friendly_error( new WP_Error( 'x', 'Rate limit exceeded', array( 'status' => 429 ) ) ),
+	Flurfunk\Modules\Ai\friendly_error( new WP_Error( 'x', 'invalid x-api-key', array( 'status' => 401 ) ) ),
+	Flurfunk\Modules\Ai\friendly_error( new WP_Error( 'x', 'cURL error 28: Operation timed out' ) ),
+);
+$check( 'provider errors come in plain words', __( 'The AI provider is busy right now. Please mention me again in a minute.', 'flurfunk' ) === $ai_fe[0] && str_contains( $ai_fe[1], __( 'Settings → Connectors', 'flurfunk' ) ) && $ai_fe[2] === __( 'The AI provider did not answer in time. Please try again, maybe with a shorter question.', 'flurfunk' ), $ai_fe );
+Flurfunk\Modules\set( array( 'flurfunk/ai' => false ) );
+$ai_mo = Store\add_message( $ai_e, array( 'body' => "<@$ai_bot> Modul aus?" ) );
+$check( 'with the module switched off meanwhile, a queued run does nothing', null === Flurfunk\Modules\Ai\run( $ai_e, $ai_mo, $ai_bot ) );
+Flurfunk\Modules\set( array( 'flurfunk/ai' => true ) );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+wp_delete_user( $ai_bot2 );
 remove_filter( 'flurfunk_ai_pre_answer', $ai_fake, 10 );
 require_once ABSPATH . 'wp-admin/includes/template.php';
 ob_start();
