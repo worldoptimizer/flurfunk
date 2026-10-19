@@ -434,6 +434,20 @@ $check( '"never" gets no mail even when mentioned', ! in_array( $team2, $m, true
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'all' ) );
 list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Für alle' ) ) );
 $check( '"everything" gets mail without mention', in_array( $team2, $m, true ) && 'message' === ( $notes[ $team2 ] ?? '' ), array( $notes, $m ) );
+// Each person gets mail in their own language, not in the language of whoever wrote.
+$lang_before = array( get_user_meta( $team, 'locale', true ), get_user_meta( $team2, 'locale', true ) );
+update_user_meta( $team, 'locale', 'en_US' );
+update_user_meta( $team2, 'locale', 'de_DE' );
+$subjects = array();
+add_filter( 'flurfunk_mail', $subj = function ( $mail, $user ) use ( &$subjects ) {
+	$subjects[ (int) $user->ID ] = $mail['body'];
+	return $mail;
+}, 5, 2 );
+$flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Sprache der Mail' ) ) );
+remove_filter( 'flurfunk_mail', $subj, 5 );
+$check( 'mail is in the recipient\'s language', str_contains( $subjects[ $team2 ] ?? '', 'Welche Mails du bekommst' ) && __( 'Reply', 'flurfunk' ) === 'Reply', $subjects[ $team2 ] ?? null );
+update_user_meta( $team, 'locale', $lang_before[0] );
+update_user_meta( $team2, 'locale', $lang_before[1] );
 Flurfunk\Notify\save_prefs( $team2, array( 'mail' => 'mentions' ) );
 list( $notes, $m ) = $flush( fn () => Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Ohne Erwähnung' ) ) );
 $check( '"mentions" gets nothing for unrelated threads', ! isset( $notes[ $team2 ] ) && ! in_array( $team2, $m, true ), array( $notes, $m ) );
@@ -981,18 +995,30 @@ $ai_t = Store\create_thread( array( 'channel' => 'ff-test', 'title' => 'KI-Frage
 $ai_m = Store\add_message( $ai_t, array( 'body' => "<@$ai_bot> Was steht oben?" ) );
 $check( 'a mention queues a run and shows the agent as thinking', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ai_t, $ai_m, $ai_bot ) ) && in_array( $ai_bot, Store\full_thread( $ai_t, $team )['thinking'] ?? array(), true ) );
 $check( 'the channel tells which AI assistants answer there', in_array( $ai_bot, Store\format_channel( $ai_ch )['agents'] ?? array(), true ) );
+$ai_steps = (array) ( Store\full_thread( $ai_t, $team )['thinking_steps'] ?? array() );
+$check( '… and what it is doing right now (reading the thread first)', 'read' === ( $ai_steps[ $ai_bot ] ?? '' ), $ai_steps );
+$ai_cv = Store\format_channel( $ai_ch );
+$ai_ci = array_values( array_filter( $ai_cv['agents_info'] ?? array(), static fn ( $i ) => $ai_bot === (int) $i['id'] ) );
+$check( 'the channel explains what each assistant does there and where its reading goes', $ai_ci && in_array( 'answers when you mention it', $ai_ci[0]['does'], true ) && str_contains( $ai_cv['ai_note'] ?? '', 'AI provider' ), $ai_cv['agents_info'] ?? null );
 $as( $team2 );
 Store\add_message( $ai_t, array( 'body' => 'Ich lese mit.' ) );
 $as( $team );
 $ai_r = null;
 Flurfunk\Notify\deliver(); // Earlier notifications (the mention itself) out of the way first.
-list( $ai_notes ) = $flush( function () use ( &$ai_r, $ai_t, $ai_m, $ai_bot ) {
+list( $ai_sent ) = $flush( function () use ( &$ai_r, $ai_t, $ai_m, $ai_bot ) {
 	$ai_r = Flurfunk\Modules\Ai\run( $ai_t, $ai_m, $ai_bot );
 } );
-$check( 'an AI answer notifies only the person who asked, not everyone in the thread', 'reply' === ( $ai_notes[ $team ] ?? '' ) && ! isset( $ai_notes[ $team2 ] ), $ai_notes );
+$check( 'an AI answer notifies only the person who asked, not everyone in the thread', 'reply' === ( $ai_sent[ $team ] ?? '' ) && ! isset( $ai_sent[ $team2 ] ), $ai_sent );
 $ai_full = Store\full_thread( $ai_t, $team );
 $ai_last = end( $ai_full['messages'] );
 $check( 'the run answers in the thread as the agent and stops thinking', is_int( $ai_r ) && $ai_bot === (int) $ai_last['author'] && 'Kurze Antwort der KI.' === $ai_last['text'] && array() === $ai_full['thinking'], array( $ai_r, $ai_last ) );
+$ai_meta = (array) ( $ai_full['ai_meta'] ?? array() );
+$check( 'under the answer: what it was based on and who was notified', isset( $ai_meta[ $ai_r ] ) && $team === $ai_meta[ $ai_r ]['asker'] && array() === $ai_meta[ $ai_r ]['posts'] && ! isset( $ai_meta[ $ai_m ] ), $ai_meta );
+if ( function_exists( 'wp_get_ability' ) ) {
+	Flurfunk\Modules\Ai\remember_meta( $ai_r, array( 'threads' => array( $ai_t ), 'tools' => array( 'flurfunk/list-threads', 'no/such-ability' ), 'asker' => $team ) );
+	$ai_meta2 = (array) Store\full_thread( $ai_t, $team )['ai_meta'];
+	$check( '… with the conversations it opened and the other tools it used, by name', array( 'List conversations' ) === $ai_meta2[ $ai_r ]['tools'] && 'KI-Frage' === $ai_meta2[ $ai_r ]['threads'][0]['title'], $ai_meta2[ $ai_r ] ?? null );
+}
 $ai_ctx = $ai_seen[0] ?? array();
 add_filter( 'flurfunk_ai_guidelines', $ai_gl = static fn () => 'Wir gendern mit Doppelpunkt.' );
 $ai_glc = Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), $ai_m, $ai_bot );
@@ -1055,6 +1081,9 @@ $ai_before = count( Store\full_thread( $ai_t, $team )['messages'] );
 list( $s, $x ) = $req( 'POST', 'threads/' . $ai_t . '/summary', array() );
 $check( 'a summary comes back to the person who asked and is not posted in the thread', 200 === $s && 'Kurze Antwort der KI.' === ( $x['text'] ?? '' ) && $ai_bot === ( $x['agent'] ?? 0 ) && count( Store\full_thread( $ai_t, $team )['messages'] ) === $ai_before, array( $s, $x ) );
 $check( '… the AI is asked for a summary of this thread, for this person', str_contains( $ai_seen[0]['prompt'] ?? '', 'private summary' ) && $team === ( $ai_seen[0]['asker'] ?? 0 ) );
+$ai_seen = array();
+list( $s ) = $req( 'POST', 'threads/' . $ai_t . '/summary', array( 'since' => $ai_m ) );
+$check( '… or only of what is new since the last message read', 200 === $s && str_contains( $ai_seen[0]['prompt'] ?? '', 'what happened since' ) && ! str_contains( $ai_seen[0]['prompt'] ?? '', 'private summary of this thread' ), array( $s, substr( $ai_seen[0]['prompt'] ?? '', -400 ) ) );
 $ai_log2 = (array) get_option( 'flurfunk_ai_log', array() );
 $check( '… and it is logged as a summary', 'summary' === ( end( $ai_log2 )['kind'] ?? '' ) );
 $as( $guest );
@@ -1136,7 +1165,8 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	Flurfunk\Modules\Ai\language( $ai_bot, 'en_US' );
 	$ai_pen = Flurfunk\Modules\Ai\proposal_snapshot( array( 'id' => Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'text' => 'x' ), $ai_bot, $ai_e ) ) );
 	Flurfunk\Modules\Ai\language( $ai_bot, '' );
-	$check( 'a proposal card is in the language of the conversation, whatever the site\'s language', 'Gespräch beginnen' === $ai_pde['title'] && 'Als Aufgabe' === end( $ai_pde['fields'] )['label'] && 'Start a conversation' === $ai_pen['title'], array( $ai_pde['title'], $ai_pen['title'] ) );
+	$check( 'a proposal card is in the language of the conversation, whatever the site\'s language', str_starts_with( $ai_pde['title'], 'Aufgabe: ' ) && 'Als Aufgabe' === end( $ai_pde['fields'] )['label'] && str_starts_with( $ai_pen['title'], 'New conversation: ' ), array( $ai_pde['title'], $ai_pen['title'] ) );
+	$check( '… with a button that says what happens („Aufgabe anlegen“ / "Start conversation")', 'task' === ( $ai_pde['data']['kind'] ?? '' ) && 'Aufgabe anlegen' === ( $ai_pde['data']['run'] ?? '' ) && 'thread' === ( $ai_pen['data']['kind'] ?? '' ) && 'Start conversation' === ( $ai_pen['data']['run'] ?? '' ), array( $ai_pde['data'] ?? null, $ai_pen['data'] ?? null ) );
 	$check( '… and the language is back afterwards', determine_locale() === get_locale() || determine_locale() === get_user_locale() );
 	$ai_pid = Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'title' => 'Vorgeschlagene Aufgabe', 'text' => 'Bitte erledigen', 'task' => true ), $ai_bot, $ai_e );
 	$ai_pm  = Flurfunk\Modules\Ai\reply( $ai_e, $ai_bot, 'Ich schlage eine Aufgabe vor.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ai_pid ) ) ) );
@@ -1154,6 +1184,8 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	$check( 'Run: the ability runs as the person who clicked', 200 === $s && $ai_new && $team2 === (int) $ai_new[0]['author'] && 'open' === $ai_new[0]['status'], array( $s, $ai_new[0] ?? null ) );
 	$ai_ps = Flurfunk\Modules\Ai\proposal_snapshot( array( 'id' => $ai_pid ) );
 	$check( '… the card says who ran it, links the result and offers no more buttons', 'positive' === $ai_ps['status']['tone'] && array() === $ai_ps['actions'] && ! empty( end( $ai_ps['fields'] )['url'] ), $ai_ps );
+	$ai_cc = Flurfunk\Modules\Ai\context( Store\thread_row( $ai_e ), 0, $ai_bot );
+	$check( '… and the AI sees the card with what it says and that it was run', (bool) preg_match( '/\[Card: Task: Vorgeschlagene Aufgabe[^\]]*Run by[^\]]*Bitte erledigen/', $ai_cc['prompt'] ), substr( $ai_cc['prompt'], -500 ) );
 	list( $s ) = $req( 'POST', 'cards/' . (int) $ai_pc['id'] . '/action/run', array( 'key' => 'k2' ) );
 	$check( '… and cannot be run twice', 409 === $s || 1 === count( array_filter( Store\list_threads( $team2, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Vorgeschlagene Aufgabe' === $t['title'] ) ), $s );
 	$as( $team );
@@ -1163,12 +1195,32 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	list( $s ) = $req( 'POST', 'cards/' . (int) $ai_l2['attachments'][0]['id'] . '/action/dismiss', array( 'key' => 'k3' ) );
 	$check( 'Dismiss: nothing runs, the card says who dismissed it', 200 === $s && 'dismissed' === Flurfunk\Modules\Ai\proposal( $ai_pid2 )['state'] && ! array_filter( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Lieber nicht' === $t['body'] ), $s );
 }
+$check( 'Markdown habits of the models become the chat\'s format', "*Stand*\n*Topic:* Folge 13\n- Punkt\n  - Unterpunkt\n2 * 3 und __init__" === Flurfunk\Modules\Ai\chat_format( "## Stand\n**Topic:** Folge 13\n* Punkt\n  * Unterpunkt\n2 * 3 und __init__" ) );
+// Capability packs: one tick stands for several single choices.
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+$ai_k0 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'proofread', 'lookup', 'tasks' ), 'role' => 'liest gegen <b>und</b> prüft' ) );
+$ai_pk = Flurfunk\Modules\Ai\packs();
+$check( 'packs: proofreading switches on reading the post; the role is kept as plain text', $ai_k0['posts'] && 'liest gegen und prüft' === $ai_k0['role'], $ai_k0 );
+if ( function_exists( 'wp_get_ability' ) ) {
+	$check( '… looking things up gives the Flurfunk read tools, tasks the proposal to start a conversation', ! array_diff( array( 'flurfunk/list-threads', 'flurfunk/get-thread' ), $ai_k0['tools'] ) && in_array( 'flurfunk/start-thread', $ai_k0['proposals'], true ) && Flurfunk\Modules\Ai\pack_on( $ai_k0, $ai_pk['lookup'] ), $ai_k0 );
+	$check( '… a pack whose abilities are missing cannot be ticked', ! $ai_pk['seo']['available'] || ! empty( $ai_pk['seo']['proposals'] ) || ! empty( $ai_pk['seo']['tools'] ) );
+	add_filter( 'flurfunk_ai_packs', $ai_pf = static fn ( $p ) => $p + array( 'mine' => array( 'label' => 'Mein Paket', 'tools' => array( 'flurfunk/get-thread', 'no/such-ability' ) ) ) );
+	$ai_mine = Flurfunk\Modules\Ai\packs()['mine'] ?? array();
+	remove_filter( 'flurfunk_ai_packs', $ai_pf );
+	$check( '… plugins can add a pack; only abilities the site has count', array( 'flurfunk/get-thread' ) === ( $ai_mine['tools'] ?? null ) && $ai_mine['available'] && 'read' === $ai_mine['kind'] && array() === $ai_mine['proposals'], $ai_mine );
+}
+$ai_k1 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'lookup' ), 'tools' => $ai_k0['tools'], 'proposals' => $ai_k0['proposals'] ) );
+$check( '… unticking a pack takes away what it stands for, the other packs stay', ! $ai_k1['posts'] && ! in_array( 'flurfunk/start-thread', $ai_k1['proposals'], true ) && ( ! function_exists( 'wp_get_ability' ) || in_array( 'flurfunk/get-thread', $ai_k1['tools'], true ) ), $ai_k1 );
+$ai_k2 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'lookup' ), 'tools' => array( 'flurfunk/get-thread' ) ) );
+$check( '… a pack left ticked keeps the single choices made below it', ! function_exists( 'wp_get_ability' ) || ( array( 'flurfunk/get-thread' ) === $ai_k2['tools'] ), $ai_k2['tools'] );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'proofread', 'tasks' ), 'role' => 'liest gegen' ) );
 remove_filter( 'flurfunk_ai_pre_answer', $ai_fake, 10 );
 require_once ABSPATH . 'wp-admin/includes/template.php';
 ob_start();
 Flurfunk\Modules\Ai\render_section();
 $ai_html = (string) ob_get_clean();
 $check( 'the settings section shows the profile of each assistant', str_contains( $ai_html, 'name="ai[' . $ai_bot . '][instructions]"' ) && (bool) preg_match( '/name="ai\[' . $ai_bot . '\]\[channels\]\[\]" value="ff-test"\s+checked/', $ai_html ) && str_contains( $ai_html, 'name="ai_channels[ff-test]"' ), array( str_contains( $ai_html, 'name="ai[' . $ai_bot . '][instructions]"' ), preg_match( '/name="ai\[' . $ai_bot . '\]\[channels\]\[\]" value="ff-test"[^>]*/', $ai_html, $mm ) ? $mm[0] : 'kein ff-test', str_contains( $ai_html, 'name="ai_channels[ff-test]"' ) ) );
+$check( '… as packs to tick, with a role and a line that says what it reads, suggests and changes', (bool) preg_match( '/name="ai\[' . $ai_bot . '\]\[packs\]\[\]" value="proofread"\s+checked/', $ai_html ) && str_contains( $ai_html, 'name="ai[' . $ai_bot . '][packs_form]"' ) && str_contains( $ai_html, 'value="liest gegen"' ) && str_contains( $ai_html, 'Changes by itself: nothing' ) && ! str_contains( $ai_html, 'name="ai[' . $ai_bot . '][posts]"' ) );
 remove_filter( 'flurfunk_ai_run_now', '__return_false' );
 wp_unschedule_hook( 'flurfunk_ai_run' );
 delete_transient( 'flurfunk_ai_busy_' . $ai_t );

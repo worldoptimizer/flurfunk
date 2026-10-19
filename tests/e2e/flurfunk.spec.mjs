@@ -88,6 +88,27 @@ test.describe( 'team', () => {
 		expect( th[ 0 ].mentions ).toContain( other.id );
 	} );
 
+	test( 'Enter or Tab takes the first suggestion, as in Slack', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		const other = boot.people.find( ( p ) => p.id !== boot.me.id && 'team' === p.kind );
+		test.skip( ! other, 'needs a second team member' );
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		await ta.pressSequentially( 'e2e @' + other.name.slice( 0, 3 ) );
+		const first = page.locator( '.ff-new-thread .ff-menu button' ).first();
+		await first.waitFor();
+		const name = ( await first.getAttribute( 'data-name' ) ) || '';
+		await ta.press( 'Enter' );
+		await expect( ta ).toHaveValue( 'e2e @' + name + ' ' );
+		await expect( page.locator( '.ff-new-thread .ff-menu' ) ).toHaveCount( 0 );
+		await ta.fill( '' );
+		await ta.pressSequentially( '/' );
+		await page.locator( '.ff-new-thread .ff-menu button' ).first().waitFor();
+		await ta.press( 'Tab' );
+		await expect( ta ).toHaveValue( /^\/[a-z0-9_-]+ $/ );
+		await ta.fill( '' );
+	} );
+
 	test( 'slash menu: unknown command, keyboard, card insert and remove', async ( { page } ) => {
 		const ta = page.locator( '.ff-new-thread textarea' );
 		await ta.click();
@@ -928,7 +949,7 @@ test.describe( 'AI assistants', () => {
 		const boot = await api( page, 'bootstrap' );
 		const general = boot.channels.find( ( c ) => 'general' === c.id );
 		test.skip( ! general || ! ( general.agents || [] ).length, 'no AI assistant in #general' );
-		await expect( page.locator( '.ff-head-text p' ) ).toContainText( /KI|AI/ );
+		await expect( page.locator( '.ff-head-text > p' ) ).toContainText( /KI|AI/ );
 		const agent = boot.people.find( ( p ) => p.id === general.agents[ 0 ] );
 		const th = await api( page, 'threads', { channel: 'general', body: 'e2e KI ' + Date.now() } );
 		await page.goto( APP + '&view=thread:' + th.id, { waitUntil: 'domcontentloaded' } );
@@ -936,8 +957,25 @@ test.describe( 'AI assistants', () => {
 		await ta.fill( '@' + agent.name + ' Antworte nur mit dem Wort: Funkprobe' );
 		await page.locator( '.ff-pane .ff-send' ).last().click();
 		await expect( page.locator( '.ff-pane .ff-thinking' ) ).toBeVisible( { timeout: 15_000 } );
-		await expect( page.locator( '.ff-pane .ff-msg', { hasText: agent.name } ).last() ).toContainText( /Funkprobe/i, { timeout: 90_000 } );
+		const answer = page.locator( '.ff-pane .ff-msg', { hasText: agent.name } ).last();
+		await expect( answer ).toContainText( /Funkprobe/i, { timeout: 90_000 } );
 		await expect( page.locator( '.ff-pane .ff-thinking' ) ).toHaveCount( 0 );
+		// Marked as AI, with a line about what it read and who was notified.
+		await expect( answer.locator( '.ff-ava.is-ai' ) ).toHaveCount( 1 );
+		await expect( answer.locator( '.ff-pill.is-ai' ) ).toBeVisible();
+		await expect( answer.locator( '.ff-ai-meta' ) ).toBeVisible();
+	} );
+
+	test( 'the channel header explains which assistants take part and what they read', async ( { page } ) => {
+		const chip = page.locator( '.ff-ai-chip' );
+		test.skip( ! await chip.count(), 'no AI assistant in #general' );
+		await expect( page.locator( '#ff-ai-info' ) ).toBeHidden();
+		await chip.click();
+		await expect( chip ).toHaveAttribute( 'aria-expanded', 'true' );
+		await expect( page.locator( '#ff-ai-info' ) ).toBeVisible();
+		await expect( page.locator( '#ff-ai-info .ff-ai-note' ) ).toBeVisible();
+		await chip.click();
+		await expect( page.locator( '#ff-ai-info' ) ).toBeHidden();
 	} );
 
 	test( '"Summarize" shows a private summary and posts nothing', async ( { page } ) => {

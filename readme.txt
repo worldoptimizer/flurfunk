@@ -115,6 +115,10 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.
 * New for developers: the flurfunk_thread_view and flurfunk_channel_view filters and the flurfunk_settings_sections action.
 * Changed: assistants show no WordPress role next to their name.
+* New: the settings show an assistant's abilities as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) with what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".
+* New: AI answers carry a spark avatar, an "AI" label and a line with what they were based on and who was notified; while an assistant works, the thread shows what it is doing (reading, looking things up, writing). Proposal cards say in plain words what would happen ("Task: …") and name the button after it. A channel's header explains which assistants take part and what they read. Threads with many unread messages offer a private summary of just those.
+* Changed: the app asks the server in the language of the person using it, and mails and pushes go out in the recipient's language.
+* Changed: Enter or Tab takes the first suggestion in the @ and / lists, as in Slack.
 
 = 0.2.1 =
 * New for developers: module settings of the type `users` (pick people, optionally only those with a capability).

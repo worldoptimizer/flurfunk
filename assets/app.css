@@ -534,11 +534,7 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-tcard-last b { color: var(--ff-ink); font-weight: 600; }
 @media (max-width: 700px) { .ff-app.is-board .ff-pane { position: static; width: auto; box-shadow: none; border-left: 0; } }
 
-/* An AI assistant working on the thread */
-.ff-root .ff-thinking { margin: .25rem 0 .75rem 3rem; color: var(--ff-muted); font-size: .875rem; font-style: italic; }
-.ff-root .ff-thinking::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: ff-dots 1.2s steps( 4, end ) infinite; }
-@keyframes ff-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
-@media ( prefers-reduced-motion: reduce ) { .ff-root .ff-thinking::after { animation: none; } }
+
 
 /* Long messages start folded ("Show more"), like in Slack */
 .ff-root .ff-text.is-long:not(.is-open) { max-height: 13.5em; overflow: hidden; -webkit-mask-image: linear-gradient( to bottom, #000 70%, transparent ); mask-image: linear-gradient( to bottom, #000 70%, transparent ); }
@@ -549,3 +545,55 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-ai-summary header { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .35rem; }
 .ff-root .ff-ai-summary header span { color: var(--ff-muted); font-size: .8125rem; flex: 1; }
 .ff-root .ff-ai-summary .ff-thinking { margin: 0; }
+
+/* AI assistants (design: Flurfunk KI-Design, variants B) */
+.ff-root { --ff-ai-soft: color-mix(in srgb, var(--ff-accent) 12%, var(--ff-paper)); }
+.ff-root .ff-ava.is-ai { background: var(--ff-ai-soft); color: var(--ff-accent-text); display: inline-grid; place-items: center; }
+.ff-root .ff-ava.is-ai svg { width: 55%; height: 55%; }
+.ff-root .ff-pill.is-ai { background: var(--ff-ai-soft); color: var(--ff-accent-text); }
+.ff-root .ff-ai-meta { margin: .3rem 0 0; font-size: 12px; color: var(--ff-muted); line-height: 1.45; }
+/* "… is reading the thread": a placeholder answer with the current step */
+.ff-root .ff-thinking { display: flex; flex-direction: column; gap: 10px; margin: .25rem 0 .75rem; }
+.ff-root .ff-thinking-msg { display: flex; gap: 10px; align-items: flex-start; }
+.ff-root .ff-thinking-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; padding-top: 2px; }
+.ff-root .ff-thinking-body p { margin: 0; font-size: 13px; }
+.ff-root .ff-thinking-body p span { color: var(--ff-muted); }
+.ff-root .ff-skel { display: block; height: 9px; width: 90%; border-radius: 6px; background: var(--ff-soft2); animation: ff-skel 1.4s ease-in-out infinite; }
+.ff-root .ff-skel.is-short { width: 62%; }
+@keyframes ff-skel { 50% { opacity: .45; } }
+@media ( prefers-reduced-motion: reduce ) { .ff-root .ff-skel { animation: none; } }
+/* Offer of a private summary, and the summary itself */
+.ff-root .ff-ai-offer { display: flex; gap: 10px; align-items: center; width: 100%; margin: 0 0 1rem; padding: 11px 13px; border: 1px solid var(--ff-line); border-radius: 12px; background: var(--ff-soft); color: var(--ff-ink); text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
+.ff-root .ff-ai-offer:hover { border-color: var(--ff-accent); }
+.ff-root .ff-ai-offer > svg { width: 16px; height: 16px; flex: none; color: var(--ff-accent-text); }
+.ff-root .ff-ai-offer > span:nth-of-type(1) { flex: 1; min-width: 0; color: var(--ff-muted); }
+.ff-root .ff-ai-offer > span b { color: var(--ff-ink); }
+.ff-root .ff-ai-offer-yes { color: var(--ff-accent-text); font-weight: 700; }
+.ff-root .ff-ai-summary header > svg { width: 14px; height: 14px; color: var(--ff-accent-text); align-self: center; }
+/* The marker in a channel's header and what it explains */
+.ff-root .ff-ai-chip { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; padding: 2px 10px; border: 0; border-radius: 999px; background: var(--ff-ai-soft); color: var(--ff-accent-text); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; vertical-align: 1px; }
+.ff-root .ff-ai-chip svg { width: 11px; height: 11px; }
+.ff-root .ff-ai-info { margin-top: 8px; max-width: 34rem; padding: 10px 13px; border: 1px solid var(--ff-line); border-radius: 12px; background: var(--ff-paper); font-size: 13px; line-height: 1.5; box-shadow: 0 6px 20px rgb(0 0 0 / .08); }
+.ff-root .ff-ai-info p { margin: 0 0 6px; }
+.ff-root .ff-ai-info p span { color: var(--ff-muted); }
+.ff-root .ff-ai-info .ff-ai-note { margin: 0; font-size: 12px; color: var(--ff-muted); }
+.ff-root .ff-glyph svg { width: 12px; height: 12px; color: #e8b84a; vertical-align: -1px; }
+/* Proposal card: a card of its own (no kind line), with a bar for the buttons */
+.ff-root .ff-card.is-bare { display: block; padding: 0; background: var(--ff-paper); border-radius: 12px; overflow: hidden; }
+.ff-root .ff-prop-top { display: flex; gap: 12px; padding: 12px 14px; }
+.ff-root .ff-prop.is-done, .ff-root .ff-prop.is-dismissed { display: flex; gap: 12px; align-items: center; padding: 11px 14px; }
+.ff-root .ff-prop-ico { width: 32px; height: 32px; border-radius: 8px; background: var(--ff-soft2); display: grid; place-items: center; flex: none; color: var(--ff-ink); }
+.ff-root .ff-prop-ico svg { width: 16px; height: 16px; }
+.ff-root .ff-prop.is-done .ff-prop-ico { background: color-mix(in srgb, var(--ff-ok) 14%, var(--ff-paper)); color: var(--ff-ok); }
+.ff-root .ff-prop.is-dismissed { background: var(--ff-soft); color: var(--ff-muted); }
+.ff-root .ff-prop.is-dismissed .ff-prop-ico { background: none; border: 1px dashed var(--ff-line); }
+.ff-root .ff-prop.is-dismissed .ff-prop-line { text-decoration: line-through; font-weight: 400; }
+.ff-root .ff-prop-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ff-root .ff-prop-main p { margin: 0; }
+.ff-root .ff-prop-k { font-size: 12px; color: var(--ff-muted); }
+.ff-root .ff-prop-line { font-weight: 700; font-size: 14px; color: var(--ff-ink); }
+.ff-root .ff-prop-sub, .ff-root .ff-prop-text { font-size: 13px; color: var(--ff-muted); }
+.ff-root .ff-prop-text { color: var(--ff-ink); white-space: pre-line; }
+.ff-root .ff-prop-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; padding: 10px 14px; border-top: 1px solid var(--ff-line); background: var(--ff-soft); }
+.ff-root .ff-prop-bar > span { margin-right: auto; font-size: 12px; color: var(--ff-muted); }
+.ff-root .ff-prop + .ff-card-confirm, .ff-root .ff-card.is-bare .ff-card-confirm { padding: 10px 14px; }

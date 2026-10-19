@@ -40,10 +40,13 @@
 		document.body.append( bar );
 	};
 	const api = async ( path, opts = {}, retried = false ) => {
-		const res = await fetch( cfg.root + path, {
+		// In the language of the person using it (as the block editor does), not the site's.
+		const url = cfg.root + path;
+		const res = await fetch( url + ( url.includes( '?' ) ? '&' : '?' ) + '_locale=user', {
 			method: opts.method || 'GET',
 			credentials: 'same-origin',
-			headers: Object.assign( { 'X-WP-Nonce': cfg.nonce }, opts.body ? { 'Content-Type': 'application/json' } : {} ),
+			// WordPress only honours _locale=user for requests that say they want JSON.
+			headers: Object.assign( { 'X-WP-Nonce': cfg.nonce, Accept: 'application/json' }, opts.body ? { 'Content-Type': 'application/json' } : {} ),
 			body: opts.body ? JSON.stringify( opts.body ) : undefined,
 		} );
 		const data = await res.json().catch( () => null );
@@ -120,8 +123,23 @@
 
 	const initials = ( name ) => String( name || '?' ).trim().split( /\s+/ ).slice( 0, 2 ).map( ( w ) => w[ 0 ] ).join( '' ).toUpperCase();
 	const photo = ( p ) => ( p.avatar ? '<img src="' + esc( p.avatar ) + '" alt="" loading="lazy" onerror="this.remove()">' : '' );
+	// AI assistants: everyone who takes part in a channel as one (from the channels' data).
+	const spark = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg>';
+	const isAi = ( id ) => !! boot && boot.channels.some( ( c ) => ( c.agents || [] ).includes( id ) );
+	const aiRole = ( id ) => {
+		for ( const c of ( boot ? boot.channels : [] ) ) {
+			const info = ( c.agents_info || [] ).find( ( a ) => a.id === id );
+			if ( info && info.role ) {
+				return info.role;
+			}
+		}
+		return '';
+	};
 	const ava = ( id, cls ) => {
 		const p = person( id );
+		if ( isAi( id ) ) {
+			return '<span class="ff-ava is-ai' + ( cls ? ' ' + cls : '' ) + '" aria-hidden="true">' + spark + '</span>';
+		}
 		return '<span class="ff-ava' + ( 'guest' === p.kind ? ' is-guest' : '' ) + ( boot && id === boot.me.id ? ' is-me' : '' ) + ( cls ? ' ' + cls : '' ) + '" aria-hidden="true">' + esc( initials( p.name ) ) + photo( p ) + '</span>';
 	};
 
@@ -190,6 +208,31 @@
 	/* ------------------------------------------------------------------ cards */
 
 	const renderers = {};
+	// Proposal of an AI assistant: one sentence for what would happen, where, and a button named after it.
+	renderers[ 'flurfunk/ai-proposal' ] = ( s, h ) => {
+		const d = s.data || {};
+		const icons = {
+			task: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>',
+			thread: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M4 5h16v11H9l-5 4z"/></svg>',
+			reply: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M10 9V5l-7 7 7 7v-4c5 0 8 1.5 11 5-1-6-4-11-11-11z"/></svg>',
+			action: spark,
+		};
+		const ico = icons[ d.kind ] || icons.action;
+		if ( 'done' === d.state ) {
+			return '<div class="ff-prop is-done"><span class="ff-prop-ico">' + '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12l5 5 9-10"/></svg>' + '</span><div class="ff-prop-main"><p class="ff-prop-line">' + h.esc( d.line ) + '</p><p class="ff-prop-sub">'
+				+ h.esc( t( 'Done by %s', d.by || '' ) ) + ( d.at ? ', ' + h.esc( h.when( d.at ) ) : '' ) + ( d.url ? ' · <a href="' + h.esc( d.url ) + '" target="_top">' + h.esc( t( 'open' ) ) + '</a>' : '' ) + '</p></div></div>';
+		}
+		if ( 'dismissed' === d.state ) {
+			return '<div class="ff-prop is-dismissed"><span class="ff-prop-ico">–</span><div class="ff-prop-main"><p class="ff-prop-line">' + h.esc( d.line ) + '</p><p class="ff-prop-sub">' + h.esc( t( 'Dismissed by %s', d.by || '' ) ) + ( d.at ? ', ' + h.esc( h.when( d.at ) ) : '' ) + '</p></div></div>';
+		}
+		return '<div class="ff-prop"><div class="ff-prop-top"><span class="ff-prop-ico">' + ico + '</span><div class="ff-prop-main"><p class="ff-prop-k">' + h.esc( t( 'Suggestion · waiting for you' ) ) + '</p><p class="ff-prop-line">' + h.esc( d.line ) + '</p>'
+			+ ( d.sub ? '<p class="ff-prop-sub">' + h.esc( d.sub ) + '</p>' : '' )
+			+ ( d.text ? '<p class="ff-prop-text">' + h.esc( d.text ) + '</p>' : '' )
+			+ ( d.fields && d.fields.length ? h.fields( d.fields ) : '' ) + '</div></div>'
+			+ '<div class="ff-prop-bar"><span>' + h.esc( t( 'Runs with your rights' ) ) + '</span>'
+			+ h.button( t( 'Dismiss' ), { action: 'dismiss' } )
+			+ h.button( d.run || t( 'Run' ), { style: 'primary', action: 'run', confirm: 'action' === d.kind ? t( 'Run this now, with your rights?' ) : '' } ) + '</div></div>';
+	};
 	/*
 	 * Card building blocks. Providers send data only; these turn it into markup. The same
 	 * functions are the helpers (h) for custom renderers, so custom cards look native.
@@ -293,8 +336,10 @@
 		const canRefresh = stored && boot && boot.providers.some( ( x ) => x.id === a.provider );
 		// Custom renderers may place action buttons themselves (h.button with an action).
 		const acts = stored && ! /data-ff="card-act"/.test( inner ) ? cardActions( a.provider, s ) : '';
-		return '<div class="ff-card"' + ( stored ? ' data-cid="' + ( +a.id ) + '"' : '' ) + '><span class="ff-card-kind">' + esc( p.label ) + ( p.command && ! p.hidden ? ' <small>/' + esc( p.command ) + '</small>' : '' )
-			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' + inner + acts
+		// A card with its own complete look (data.bare) has no kind line above it.
+		const bare = !! ( s.data && s.data.bare && renderers[ a.provider ] );
+		return '<div class="ff-card' + ( bare ? ' is-bare' : '' ) + '"' + ( stored ? ' data-cid="' + ( +a.id ) + '"' : '' ) + '>' + ( bare ? '' : '<span class="ff-card-kind">' + esc( p.label ) + ( p.command && ! p.hidden ? ' <small>/' + esc( p.command ) + '</small>' : '' )
+			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' ) + inner + acts
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};
 	const cards = ( list ) => ( list && list.length ? '<div class="ff-cards">' + list.map( ( a ) => card( a ) ).join( '' ) + '</div>' : '' );
@@ -473,7 +518,7 @@
 	};
 
 	// Name in bold; assistants (agents, scripts) are marked so nobody mistakes them for a person.
-	const nameHtml = ( id ) => '<b>' + esc( person( id ).name ) + '</b>' + ( person( id ).bot ? ' <span class="ff-pill is-bot">' + esc( t( 'Assistant' ) ) + '</span>' : '' );
+	const nameHtml = ( id ) => '<b>' + esc( person( id ).name ) + '</b>' + ( isAi( id ) ? ' <span class="ff-pill is-ai">' + esc( t( 'AI' ) ) + '</span>' : person( id ).bot ? ' <span class="ff-pill is-bot">' + esc( t( 'Assistant' ) ) + '</span>' : '' );
 	// One-line preview for lists: mentions and links stay, formatting and line structure don't.
 	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.moderate );
@@ -483,6 +528,27 @@
 		const long = text.length > 700 || text.split( '\n' ).length > 12;
 		return '<div class="ff-text' + ( long ? ' is-long' : '' ) + '">' + rich( text ) + '</div>'
 			+ ( long ? '<button type="button" class="ff-link ff-more-text" data-ff="expand" aria-expanded="false">' + esc( t( 'Show more' ) ) + '</button>' : '' );
+	};
+	// Under an AI answer: what it read and looked up, and who was notified.
+	const aiMetaLine = ( th, m ) => {
+		const meta = th.ai_meta && th.ai_meta[ m.id ];
+		if ( ! meta ) {
+			return '';
+		}
+		const q = ( s ) => t( '“%s”', s );
+		const read = [ t( 'the thread' ) ].concat( ( meta.posts || [] ).map( ( title ) => ( title ? t( 'the post %s', q( title ) ) : t( 'a post' ) ) ) );
+		const parts = [ t( 'Read: %s', read.join( ', ' ) ) ];
+		const looked = ( meta.threads || [] ).map( ( x ) => ( x.id ? q( x.title ) : t( 'a conversation' ) ) );
+		if ( looked.length ) {
+			parts.push( t( 'Looked up: %s', looked.join( ', ' ) ) );
+		}
+		if ( meta.tools && meta.tools.length ) {
+			parts.push( t( 'Used: %s', meta.tools.join( ', ' ) ) );
+		}
+		if ( meta.asker ) {
+			parts.push( meta.asker === boot.me.id ? t( 'only you were notified' ) : t( 'only %s was notified', person( meta.asker ).name ) );
+		}
+		return '<p class="ff-ai-meta">' + esc( parts.join( ' · ' ) ) + '</p>';
 	};
 	const messagesHtml = ( th ) => {
 		let html = '';
@@ -532,6 +598,7 @@
 			html += '<li class="ff-msg' + ( cont ? ' is-cont' : '' ) + ( unread ? ' is-unread' : '' ) + '" id="ff-m-' + m.id + '">' + ava( m.author ) + '<div class="ff-msg-body">'
 				+ ( cont ? '' : '<p class="ff-who">' + nameHtml( m.author ) + ' <span>' + esc( person( m.author ).role ) + ' · ' + esc( when( m.created ) ) + '</span></p>' )
 				+ ( m.text ? longText( m.text ) : '' )
+				+ aiMetaLine( th, m )
 				+ ( m.edited ? '<small class="ff-edited">' + esc( t( '(edited)' ) ) + '</small>' : '' )
 				+ cards( m.attachments ) + files( m.files )
 				+ actions( m ) + '</div></li>';
@@ -1106,7 +1173,7 @@
 				const here = ( channelOf( chan ) || {} ).agents || [];
 				const ai = new Set( boot.channels.flatMap( ( c ) => c.agents || [] ) );
 				const list = readers( chan ).filter( ( p ) => ! ai.has( p.id ) || here.includes( p.id ) ).filter( ( p ) => p.name.toLowerCase().split( /\s+/ ).some( ( w ) => w.startsWith( q ) ) || p.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
-				return menu( list.length ? '' : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-person" data-name="' + esc( p.name ) + '">' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( here.includes( p.id ) ? t( 'AI assistant' ) : p.bot ? t( 'Assistant' ) : p.role ) + '</small></span></button>' ) );
+				return menu( list.length ? '' : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-person" data-name="' + esc( p.name ) + '">' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( here.includes( p.id ) ? [ t( 'AI' ), aiRole( p.id ) ].filter( Boolean ).join( ' · ' ) : p.bot ? t( 'Assistant' ) : p.role ) + '</small></span></button>' ) );
 			}
 			const sm = b.match( SLASH );
 			if ( sm ) {
@@ -1160,6 +1227,12 @@
 				return;
 			}
 			const i = opts.indexOf( e.target );
+			// As in Slack: Enter or Tab takes the first suggestion while the list is open.
+			if ( e.target === ta && ( 'Tab' === e.key || 'Enter' === e.key ) && ! e.shiftKey && ! e.isComposing ) {
+				e.preventDefault();
+				opts[ 0 ].click();
+				return;
+			}
 			if ( 'ArrowDown' === e.key && ( e.target === ta || i >= 0 ) ) {
 				e.preventDefault();
 				opts[ Math.min( opts.length - 1, i + 1 ) ].focus();
@@ -1344,11 +1417,7 @@
 			const [ kind, a, b ] = ui.view.split( ':' );
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
-				// AI assistants that answer here when mentioned: say so in the header.
-				const auto = ( c && c.auto ) || [];
-				const onMention = c && c.agents ? c.agents.filter( ( id ) => ! auto.includes( id ) ) : [];
-				const agents = [ auto.length ? t( 'AI answers new threads: %s' ).replace( '%s', auto.map( ( id ) => person( id ).name ).join( ', ' ) ) : '', onMention.length ? t( 'AI on mention: %s' ).replace( '%s', onMention.map( ( id ) => person( id ).name ).join( ', ' ) ) : '' ].filter( Boolean ).join( ' · ' );
-				return { title: '#' + chName( a ), sub: [ c ? c.topic : '', agents ].filter( Boolean ).join( ' · ' ), args: { channel: a }, channel: a };
+				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a }, channel: a, ai: c && c.agents && c.agents.length ? c : null };
 			}
 			if ( 'target' === kind ) {
 				const info = boot.recent.concat( boot.targets ).find( ( x ) => x.type === a && x.id === +b );
@@ -1469,7 +1538,7 @@
 				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 )
 				+ btn( 'board', '▦', t( 'Board' ), 0 )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
-				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
+				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, ch.auto && ch.auto.length ? spark : '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
@@ -1533,9 +1602,14 @@
 			+ boot.channels.map( ( c ) => '<option value="' + esc( c.id ) + '"' + ( ui.boardChannel === c.id ? ' selected' : '' ) + '>#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>'
 			+ '<select data-ff="board-filter" data-key="boardPerson" aria-label="' + esc( t( 'Responsible' ) ) + '"><option value="">' + esc( t( 'Everyone' ) ) + '</option>'
 			+ boot.people.filter( ( p ) => 'team' === p.kind && ! p.bot ).map( ( p ) => '<option value="' + p.id + '"' + ( String( ui.boardPerson ) === String( p.id ) ? ' selected' : '' ) + '>' + esc( p.id === boot.me.id ? t( 'Me' ) : p.name ) + '</option>' ).join( '' ) + '</select>';
+		// The marker for AI assistants in a channel's header, and what they do here when you open it.
+		// Open stays open when the header is redrawn (the list refreshes it now and then); another channel closes it.
+		const aiOpen = () => ui.aiInfo === ui.view;
+		const aiChip = ( c ) => '<button type="button" class="ff-ai-chip" data-ff="ai-info" aria-expanded="' + aiOpen() + '" aria-controls="ff-ai-info">' + spark + esc( 1 === c.agents.length ? t( '1 AI assistant' ) : t( '%s AI assistants', c.agents.length ) ) + '</button>';
+		const aiInfo = ( c ) => '<div class="ff-ai-info" id="ff-ai-info"' + ( aiOpen() ? '' : ' hidden' ) + '>' + ( c.agents_info || [] ).map( ( a ) => '<p><b>' + esc( person( a.id ).name ) + '</b>' + ( a.role ? ' <span>(' + esc( a.role ) + ')</span>' : '' ) + ' ' + esc( a.does.join( ', ' ) ) + '.</p>' ).join( '' ) + ( c.ai_note ? '<p class="ff-ai-note">' + esc( c.ai_note ) + '</p>' : '' ) + '</div>';
 		const renderHead = () => {
 			const v = viewInfo();
-			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + '</p></div>'
+			head.innerHTML = '<div class="ff-head-text"><h1>' + esc( v.title ) + '</h1><p>' + esc( v.sub ) + ( v.url ? ' · <a href="' + esc( v.url ) + '" target="_top">' + esc( t( 'Open post' ) ) + '</a>' : '' ) + ( v.ai ? aiChip( v.ai ) : '' ) + '</p>' + ( v.ai ? aiInfo( v.ai ) : '' ) + '</div>'
 				+ '<div class="ff-head-tools">' + ( v.notifications ? ( boot.counts.notifications ? '<button type="button" class="ff-link" data-ff="notes-read">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' ) : unreadHere() && ! v.target && ! v.search ? '<button type="button" class="ff-link" data-ff="read-all">' + esc( t( 'Mark all as read' ) ) + '</button>' : '' )
 				+ ( v.channel ? channelNotify( v.channel ) : '' )
 				+ ( v.board ? boardFilters() : '' )
@@ -1755,7 +1829,21 @@
 			const replies = ( th.messages || [] ).filter( ( m ) => 'message' === m.type ).length;
 			return ch && ch.summary && replies >= 4 ? '<button type="button" class="ff-link" data-ff="summary" title="' + esc( t( 'A short summary from the AI assistant, only for you' ) ) + '">' + esc( t( 'Summarize' ) ) + '</button>' : '';
 		};
-		const showSummary = async ( th ) => {
+		// Many new messages since my last visit: offer a short private summary of just those.
+		const summaryOffer = ( th ) => {
+			const ch = channelOf( th.channel );
+			if ( ! ch || ! ch.summary || ( ui.summaries && ui.summaries[ th.id ] ) ) {
+				return '';
+			}
+			const msgs = ( th.messages || [] ).filter( ( m ) => 'message' === m.type && m.author !== boot.me.id );
+			const fresh = th.read >= 0 ? msgs.filter( ( m ) => m.id > th.read ) : msgs;
+			if ( fresh.length < 6 ) {
+				return '';
+			}
+			return '<button type="button" class="ff-ai-offer" data-ff="summary" data-since="' + ( th.read > 0 ? th.read : 0 ) + '">' + spark
+				+ '<span><b>' + esc( th.read > 0 ? t( '%s new messages since your last visit.', fresh.length ) : t( '%s messages in this thread.', fresh.length ) ) + '</b><br>' + esc( t( 'Summarize briefly, only for you?' ) ) + '</span><span class="ff-ai-offer-yes">' + esc( t( 'Yes' ) ) + '</span></button>';
+		};
+		const showSummary = async ( th, since ) => {
 			const body = $( '.ff-pane-body', pane );
 			let box = $( '.ff-ai-summary', pane );
 			if ( ! box ) {
@@ -1767,8 +1855,12 @@
 			box.innerHTML = '<p class="ff-thinking">' + esc( t( 'Summarizing' ) ) + '</p>';
 			body.scrollTop = 0;
 			try {
-				const r = await api( 'threads/' + th.id + '/summary', { method: 'POST', body: {} } );
-				box.innerHTML = '<header><strong>' + esc( t( 'Summary' ) ) + '</strong> <span>' + esc( t( 'only for you · by %s', person( r.agent ).name ) ) + '</span><button type="button" class="ff-x" data-ff="summary-close" aria-label="' + esc( t( 'Close summary' ) ) + '">×</button></header><div class="ff-text">' + rich( r.text ) + '</div>';
+				const r = await api( 'threads/' + th.id + '/summary', { method: 'POST', body: since ? { since } : {} } );
+				const offer = $( '.ff-ai-offer', pane );
+				if ( offer ) {
+					offer.remove();
+				}
+				box.innerHTML = '<header>' + spark + '<strong>' + esc( t( 'Summary' ) ) + '</strong> <span>' + esc( t( 'only for you · by %s', person( r.agent ).name ) ) + '</span><button type="button" class="ff-x" data-ff="summary-close" aria-label="' + esc( t( 'Close summary' ) ) + '">×</button></header><div class="ff-text">' + rich( r.text ) + '</div>';
 				// Kept while the thread is open, also when new messages redraw it.
 				ui.summaries = Object.assign( ui.summaries || {}, { [ th.id ]: box.innerHTML } );
 			} catch ( err ) {
@@ -1776,7 +1868,8 @@
 			}
 		};
 		// AI assistants working on the thread: a line under the messages, and a quicker look until they are done.
-		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<p class="ff-thinking" role="status">' + esc( t( '%s is thinking' ).replace( '%s', th.thinking.map( ( id ) => person( id ).name ).join( ', ' ) ) ) + '</p>' : '' );
+		const stepText = ( step ) => ( 'look' === step ? t( 'is looking things up' ) : 'write' === step ? t( 'is writing the answer' ) : t( 'is reading the thread' ) );
+		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<div class="ff-thinking" role="status">' + th.thinking.map( ( id ) => '<div class="ff-thinking-msg">' + ava( id ) + '<div class="ff-thinking-body"><p><b>' + esc( person( id ).name ) + '</b> <span>' + esc( stepText( ( th.thinking_steps || {} )[ id ] ) ) + '</span></p><span class="ff-skel"></span><span class="ff-skel is-short"></span></div></div>' ).join( '' ) + '</div>' : '' );
 		let thinkingTimer = 0;
 		// After a reply: the line under the messages may appear (the reply mentioned an assistant).
 		const paintThinking = ( th ) => {
@@ -1811,6 +1904,8 @@
 			watchThinking( th );
 			if ( ui.summaries && ui.summaries[ th.id ] ) {
 				$( '.ff-pane-body', pane ).insertAdjacentHTML( 'afterbegin', '<section class="ff-ai-summary" aria-live="polite">' + ui.summaries[ th.id ] + '</section>' );
+			} else {
+				$( '.ff-pane-body', pane ).insertAdjacentHTML( 'afterbegin', summaryOffer( th ) );
 			}
 			const c = composer( {
 				key: 'thread:' + th.id,
@@ -1992,9 +2087,17 @@
 				closeThread();
 			} else if ( 'more' === act ) {
 				loadList( true );
+			} else if ( 'ai-info' === act ) {
+				const box = $( '#ff-ai-info', root );
+				const open = 'true' !== el.getAttribute( 'aria-expanded' );
+				ui.aiInfo = open ? ui.view : '';
+				el.setAttribute( 'aria-expanded', String( open ) );
+				if ( box ) {
+					box.hidden = ! open;
+				}
 			} else if ( 'summary' === act ) {
 				if ( ui.current ) {
-					showSummary( ui.current );
+					showSummary( ui.current, +( el.dataset.since || 0 ) );
 				}
 			} else if ( 'summary-close' === act ) {
 				el.closest( '.ff-ai-summary' ).remove();

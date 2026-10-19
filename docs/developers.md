@@ -963,14 +963,22 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_guidelines` (filter) | `string $text` | Editorial guidelines for the assistants. Default: the site's guidelines from the WordPress plugin "AI" (categories site, copy, additional), if it is active. |
 | `flurfunk_ai_summaries_per_hour` (filter) | `int $max` (20) | Private summaries per person and hour. |
 | `flurfunk_ability_channel` (filter) | `bool $ok`, `string $channel` | Narrow the channels Flurfunk's reading abilities return; the AI module uses it while an assistant looks things up. |
+| `flurfunk_ai_packs` (filter) | `array $packs` | The capability packs on the settings page (key → `label`, `desc`, `kind` read/propose, `posts`, `tools`, `proposals`, `needs`, `available`). A pack stands for those settings; ticking it adds them to a profile, unticking removes them. Add a pack for your plugin's abilities here. |
 
-REST: `POST flurfunk/v1/threads/<id>/summary` returns `{ text, agent }` for the person asking
-(400 `flurfunk_ai_none` if no assistant takes part in the channel, 403 if summaries are off, 429
-over the hourly limit or the budget).
+REST: `POST flurfunk/v1/threads/<id>/summary` (optional `since`: a message ID – then only what came
+after it) returns `{ text, agent }` for the person asking (400 `flurfunk_ai_none` if no assistant
+takes part in the channel, 403 if summaries are off, 429 over the hourly limit or the budget).
+
+In the thread and channel data (`flurfunk_thread_view`, `flurfunk_channel_view`) the module adds
+`thinking` (assistants at work) with `thinking_steps` (`read`, `look`, `write`), `ai_meta` per AI
+answer (`posts` and `threads` it read or opened – titles only if the viewer may see them –,
+`tools` it used, `asker`), and per channel `agents`, `auto`, `agents_info` (`id`, `role`, `does`)
+and `ai_note`. Profile key `role`: a few words shown next to the assistant (mention list, channel).
+Answers are put into the chat's format (`**bold**` and headings become `*bold*`).
 
 Options: `flurfunk_ai_settings` (`redact`, `log`, `summary`), `flurfunk_ai_channels` (channel →
 instructions), `flurfunk_ai_log` (the last 100 runs: time, agent, asker, thread, channel, model,
-tokens, error, tools, kind). User meta on assistants: `flurfunk_ai` (profile), `flurfunk_ai_usage`
+tokens, error, tools, kind), `flurfunk_ai_meta` (what the newest 2,000 answers were based on). User meta on assistants: `flurfunk_ai` (profile), `flurfunk_ai_usage`
 (tokens this month).
 
 ### Abilities

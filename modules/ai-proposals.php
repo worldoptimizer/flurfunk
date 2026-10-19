@@ -220,12 +220,56 @@ function build_snapshot( array $p ): array {
 		'label' => $p['state'],
 		'tone'  => 'neutral',
 	);
+	// The card's own look (assets/app.js): one sentence for what would happen, a line with where,
+	// a button named after the action. The generic keys above stay for other renderers.
+	$in   = (array) $p['input'];
+	$kind = 'action';
+	$line = $own ? $own['label'] : ( $ability ? $ability->get_label() : (string) $p['ability'] );
+	$sub  = $ability && ! $own ? (string) $ability->get_description() : '';
+	$run  = __( 'Run', 'flurfunk' );
+	if ( 'flurfunk/start-thread' === $p['ability'] ) {
+		$task  = ! empty( $in['task'] );
+		$kind  = $task ? 'task' : 'thread';
+		$what  = trim( (string) ( $in['title'] ?? '' ) ) ?: mb_substr( wp_strip_all_tags( (string) ( $in['text'] ?? '' ) ), 0, 80 );
+		/* translators: %s: title */
+		$line  = sprintf( $task ? __( 'Task: %s', 'flurfunk' ) : __( 'New conversation: %s', 'flurfunk' ), $what );
+		/* translators: %s: channel */
+		$sub   = sprintf( __( 'in #%s', 'flurfunk' ), sanitize_key( (string) ( $in['channel'] ?? '' ) ) );
+		$run   = $task ? __( 'Create task', 'flurfunk' ) : __( 'Start conversation', 'flurfunk' );
+		$extra = trim( (string) ( $in['text'] ?? '' ) );
+	} elseif ( 'flurfunk/reply' === $p['ability'] ) {
+		$kind  = 'reply';
+		$line  = __( 'Reply in a conversation', 'flurfunk' );
+		$sub   = mb_substr( wp_strip_all_tags( (string) ( $in['text'] ?? '' ) ), 0, 140 );
+		$run   = __( 'Send reply', 'flurfunk' );
+		$extra = '';
+	}
+	$result_url = '';
+	foreach ( $fields as $f ) {
+		if ( ! empty( $f['url'] ) ) {
+			$result_url = (string) $f['url'];
+		}
+	}
 	return array(
-		'title'    => $own ? $own['label'] : ( $ability ? $ability->get_label() : (string) $p['ability'] ),
+		'title'    => $line, // What would happen ("Task: …"), also in the line of who ran it.
 		'subtitle' => $own ? $own['description'] : ( $ability ? $ability->get_description() : '' ),
 		'status'   => $status,
 		'fields'   => $fields,
 		'actions'  => 'open' === $p['state'] && $ability ? array( 'run', 'dismiss' ) : array(),
+		'data'     => array(
+			'bare'   => true,
+			'kind'   => $kind,
+			'line'   => $line,
+			'sub'    => $sub,
+			'text'   => isset( $extra ) ? mb_substr( (string) $extra, 0, 400 ) : '',
+			'run'    => $run,
+			'state'  => (string) $p['state'],
+			'by'     => $who,
+			'at'     => $p['at'] ? gmdate( 'c', (int) $p['at'] ) : '',
+			'url'    => $result_url,
+			'agent'  => (int) $p['agent'],
+			'fields' => 'action' === $kind ? $fields : array(),
+		),
 	);
 }
 

@@ -291,14 +291,62 @@ function deliver(): void {
 		update_user_meta( $n['uid'], 'flurfunk_rev', (int) get_user_meta( $n['uid'], 'flurfunk_rev', true ) + 1 );
 		$pr   = prefs( $n['uid'] );
 		$sent = array();
-		if ( wants( $pr['mail'], $n['kind'] ) && mail_one( $n ) ) {
+		// In the recipient's language, not the language of whoever caused it.
+		$lang = get_user_locale( $n['uid'] );
+		if ( wants( $pr['mail'], $n['kind'] ) && in_locale( $lang, static fn () => mail_one( $n ) ) ) {
 			$sent[] = 'mail';
 		}
-		if ( wants( $pr['push'], $n['kind'] ) && ! is_quiet( $n['uid'] ) && \Flurfunk\Push\send( $n['uid'], payload( $n ) ) ) {
+		if ( wants( $pr['push'], $n['kind'] ) && ! is_quiet( $n['uid'] ) && \Flurfunk\Push\send( $n['uid'], in_locale( $lang, static fn () => payload( $n ) ) ) ) {
 			$sent[] = 'push';
 		}
 		if ( $sent && $id ) {
 			$wpdb->update( table( 'notifications' ), array( 'sent' => implode( ',', $sent ) ), array( 'id' => $id ) );
+		}
+	}
+}
+
+/**
+ * Run something in a language: mails and pushes in the recipient's, an assistant's cards in the
+ * conversation's.
+ *
+ * @param string   $locale Locale ('' = as it is).
+ * @param callable $fn     Work.
+ * @return mixed What $fn returns.
+ */
+function in_locale( string $locale, callable $fn ) {
+	static $own = array(); // Locales loaded below, innermost last.
+	$now = $own ? end( $own ) : determine_locale();
+	if ( '' === $locale || $now === $locale ) {
+		return $fn();
+	}
+	if ( ! $own && switch_to_locale( $locale ) ) {
+		try {
+			return $fn();
+		} finally {
+			restore_previous_locale();
+		}
+	}
+	// The site does not have that language installed: Flurfunk brings its own translation, so at
+	// least Flurfunk's texts follow.
+	$load = static function ( string $l ): void {
+		unload_textdomain( 'flurfunk', true );
+		if ( 'en_US' !== $l ) {
+			load_textdomain( 'flurfunk', FLURFUNK_DIR . 'languages/flurfunk-' . $l . '.mo', $l );
+		}
+	};
+	if ( 'en_US' !== $locale && ! is_readable( FLURFUNK_DIR . 'languages/flurfunk-' . $locale . '.l10n.php' ) ) {
+		return $fn();
+	}
+	$load( $locale );
+	$own[] = $locale;
+	try {
+		return $fn();
+	} finally {
+		array_pop( $own );
+		if ( $own ) {
+			$load( end( $own ) );
+		} else {
+			unload_textdomain( 'flurfunk', true ); // WordPress loads the right one again when it is next needed.
 		}
 	}
 }
@@ -506,24 +554,30 @@ function send_digests( bool $force = false ): int {
 		if ( ! $rows ) {
 			continue;
 		}
-		$user  = get_userdata( $uid );
-		$lines = array();
-		foreach ( $rows as $r ) {
-			$w       = words(
-				array(
-					'uid'        => $uid,
-					'kind'       => $r->kind,
-					'thread'     => Store\thread_row( (int) $r->thread_id ),
-					'message_id' => (int) $r->message_id,
-					'actor'      => (int) $r->actor_id,
-				)
-			);
-			$lines[] = '• ' . $w['headline'] . ' – ' . $w['topic'] . "\n  " . \Flurfunk\Admin\url( 'thread:' . $r->thread_id );
-		}
-		/* translators: 1: site/app name, 2: number */
-		$subject = sprintf( _n( '[%1$s] %2$d new notification', '[%1$s] %2$d new notifications', count( $rows ), 'flurfunk' ), \Flurfunk\Settings\name(), count( $rows ) );
-		$body    = implode( "\n\n", $lines ) . "\n\n" . __( 'You can change which mails you get under your name at the bottom of the Flurfunk sidebar.', 'flurfunk' );
-		$mail    = apply_filters( 'flurfunk_mail', compact( 'subject', 'body' ), $user, null, 0 );
+		$user = get_userdata( $uid );
+		list( $subject, $body ) = in_locale(
+			get_user_locale( $uid ),
+			static function () use ( $rows, $uid ): array {
+				$lines = array();
+				foreach ( $rows as $r ) {
+					$w       = words(
+						array(
+							'uid'        => $uid,
+							'kind'       => $r->kind,
+							'thread'     => Store\thread_row( (int) $r->thread_id ),
+							'message_id' => (int) $r->message_id,
+							'actor'      => (int) $r->actor_id,
+						)
+					);
+					$lines[] = '• ' . $w['headline'] . ' – ' . $w['topic'] . "\n  " . \Flurfunk\Admin\url( 'thread:' . $r->thread_id );
+				}
+				/* translators: 1: site/app name, 2: number */
+				$subject = sprintf( _n( '[%1$s] %2$d new notification', '[%1$s] %2$d new notifications', count( $rows ), 'flurfunk' ), \Flurfunk\Settings\name(), count( $rows ) );
+				$body    = implode( "\n\n", $lines ) . "\n\n" . __( 'You can change which mails you get under your name at the bottom of the Flurfunk sidebar.', 'flurfunk' );
+				return array( $subject, $body );
+			}
+		);
+		$mail = apply_filters( 'flurfunk_mail', compact( 'subject', 'body' ), $user, null, 0 );
 		if ( $user && $mail && wp_mail( $user->user_email, $mail['subject'], $mail['body'] ) ) {
 			++$sent;
 		}
