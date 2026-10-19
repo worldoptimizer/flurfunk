@@ -66,6 +66,7 @@ return array(
 		'A post submitted for review becomes a task for the people who may publish it; publishing it ticks the task off.' => 'Ein zur Prüfung eingereichter Artikel wird zur Aufgabe für alle, die ihn veröffentlichen dürfen; mit dem Veröffentlichen ist sie erledigt.',
 		'A short summary from the AI assistant, only for you' => 'Eine kurze Zusammenfassung vom KI-Assistenten, nur für dich',
 		'A thread without a target' => 'Ein Thread ohne Bezug',
+		'AI assistant' => 'KI-Assistent',
 		'AI assistants' => 'KI-Assistenten',
 		'AI on mention: %s' => 'KI auf Erwähnung: %s',
 		'About' => 'Zu',

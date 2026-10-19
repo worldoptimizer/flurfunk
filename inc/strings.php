@@ -103,6 +103,7 @@ function all(): array {
 		'Send' => __( 'Send', 'flurfunk' ),
 		'uploading …' => __( 'uploading …', 'flurfunk' ),
 		'Remove file' => __( 'Remove file', 'flurfunk' ),
+		'AI assistant' => __( 'AI assistant', 'flurfunk' ),
 		'Insert a card' => __( 'Insert a card', 'flurfunk' ),
 		'Attach from the media library' => __( 'Attach from the media library', 'flurfunk' ),
 		'Attach' => __( 'Attach', 'flurfunk' ),

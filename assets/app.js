@@ -1102,8 +1102,11 @@
 			if ( mm ) {
 				const q = mm[ 1 ].toLowerCase();
 				const chan = o.channel || ( el.elements.channel ? el.elements.channel.value : '' );
-				const list = readers( chan ).filter( ( p ) => p.name.toLowerCase().split( /\s+/ ).some( ( w ) => w.startsWith( q ) ) || p.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
-				return menu( list.length ? '' : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-person" data-name="' + esc( p.name ) + '">' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( p.role ) + '</small></span></button>' ) );
+				// AI assistants only where they take part (elsewhere a mention would get no answer), marked as such.
+				const here = ( channelOf( chan ) || {} ).agents || [];
+				const ai = new Set( boot.channels.flatMap( ( c ) => c.agents || [] ) );
+				const list = readers( chan ).filter( ( p ) => ! ai.has( p.id ) || here.includes( p.id ) ).filter( ( p ) => p.name.toLowerCase().split( /\s+/ ).some( ( w ) => w.startsWith( q ) ) || p.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
+				return menu( list.length ? '' : '', list.map( ( p ) => '<button type="button" role="option" data-ff="pick-person" data-name="' + esc( p.name ) + '">' + ava( p.id ) + '<span><b>' + esc( p.name ) + '</b><small>' + esc( here.includes( p.id ) ? t( 'AI assistant' ) : p.bot ? t( 'Assistant' ) : p.role ) + '</small></span></button>' ) );
 			}
 			const sm = b.match( SLASH );
 			if ( sm ) {
