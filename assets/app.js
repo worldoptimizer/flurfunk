@@ -109,6 +109,15 @@
 		}
 		return d.toLocaleDateString( locale(), { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' } ) + ', ' + time;
 	};
+	// For a channel read top to bottom: the time at the message, the day on a line between days.
+	const clock = ( iso ) => ( iso ? new Date( iso ).toLocaleTimeString( locale(), { hour: 'numeric', minute: '2-digit' } ) : '' );
+	const dayLabel = ( iso ) => {
+		const d = new Date( iso );
+		const now = new Date();
+		const days = Math.round( ( new Date( now.toDateString() ) - new Date( d.toDateString() ) ) / 864e5 );
+		const s = days >= 0 && days <= 1 ? new Intl.RelativeTimeFormat( locale(), { numeric: 'auto' } ).format( -days, 'day' ) : d.toLocaleDateString( locale(), { weekday: 'long', day: 'numeric', month: 'long', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' } );
+		return s.charAt( 0 ).toUpperCase() + s.slice( 1 );
+	};
 	const size = ( b ) => ( b < 1048576 ? Math.max( 1, Math.round( b / 1024 ) ) + ' KB' : ( b / 1048576 ).toFixed( 1 ) + ' MB' );
 
 	// One icon set: 24 px grid, 1.75 px stroke, round ends, the colour of the text.
@@ -1452,7 +1461,7 @@
 		}
 		applyLook( root );
 		const params = new URLSearchParams( location.search );
-		const ui = { view: params.get( 'view' ) || 'all', thread: null, list: [], more: false, settings: false, loading: true };
+		const ui = { view: params.get( 'view' ) || 'all', thread: null, list: [], more: false, settings: false, loading: true, seen: null, feedEnd: true, unseenFeed: 0 };
 		const start = ui.view.match( /^thread:(\d+)$/ );
 		if ( start ) {
 			ui.view = 'all';
@@ -1474,7 +1483,7 @@
 			const [ kind, a, b ] = ui.view.split( ':' );
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
-				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a }, channel: a, ai: c && c.agents && c.agents.length ? c : null };
+				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a, order: 'new' }, channel: a, stream: true, ai: c && c.agents && c.agents.length ? c : null };
 			}
 			if ( 'target' === kind ) {
 				const info = boot.recent.concat( boot.targets ).find( ( x ) => x.type === a && x.id === +b );
@@ -1674,7 +1683,7 @@
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
 			+ ava( th.author ) + '<div class="ff-post-body">'
-			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
+			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( viewInfo().stream ? clock( th.created ) : when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<p class="ff-preview">' + preview( th.body ) + '</p>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
@@ -1793,10 +1802,66 @@
 					: ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( t( 'No notifications yet.' ) ) + '</p>';
 				return;
 			}
+			feed.classList.toggle( 'is-stream', !! viewInfo().stream );
+			if ( viewInfo().stream ) {
+				renderStream();
+				return;
+			}
 			feed.innerHTML = ui.list.length
 				? ui.list.map( postHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '' )
 				: ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
 		};
+		// A channel reads top to bottom, as in Slack: the oldest thread first, the newest right above the
+		// writing box. A thread keeps its place when someone replies; older ones load at the top. Scrolled
+		// up, a button leads back down and counts new threads; the place you read stays put.
+		const renderStream = () => {
+			const old = { top: feed.scrollTop, height: feed.scrollHeight, end: feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40 };
+			if ( ! ui.list.length ) {
+				feed.innerHTML = ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
+				return;
+			}
+			const known = ui.seen;
+			const fresh = known && ! ui.prepending ? ui.list.filter( ( th ) => ! known.has( th.id ) ) : [];
+			let html = ui.more ? '<button type="button" class="ff-more ff-more-up" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '';
+			// One group per day: its date sits on the line above it and stays at the top while you scroll through that day.
+			let day = '';
+			ui.list.slice().reverse().forEach( ( th ) => {
+				const d = new Date( th.created ).toDateString();
+				if ( d !== day ) {
+					const label = dayLabel( th.created );
+					html += ( day ? '</section>' : '' ) + '<section class="ff-day-group" aria-label="' + esc( label ) + '"><div class="ff-day"><span>' + esc( label ) + '</span></div>';
+					day = d;
+				}
+				html += postHtml( th );
+			} );
+			feed.innerHTML = html + ( day ? '</section>' : '' ) + '<div class="ff-jump-dock"><button type="button" class="ff-jump" data-ff="jump-feed" tabindex="-1" aria-hidden="true">' + icon.down + '<span>' + esc( t( 'Latest' ) ) + '</span></button></div>';
+			ui.seen = new Set( ui.list.map( ( th ) => th.id ) );
+			const down = ui.feedEnd || old.end;
+			if ( down ) {
+				feed.scrollTop = feed.scrollHeight;
+			} else if ( ui.prepending ) {
+				feed.scrollTop = feed.scrollHeight - ( old.height - old.top );
+			} else {
+				feed.scrollTop = old.top;
+			}
+			if ( ! down ) {
+				ui.unseenFeed = ( ui.unseenFeed || 0 ) + fresh.filter( ( th ) => th.author !== boot.me.id ).length;
+			}
+			fresh.forEach( ( th ) => {
+				const el = feed.querySelector( '.ff-post[data-id="' + th.id + '"]' );
+				if ( el ) {
+					el.classList.add( 'is-new' );
+				}
+			} );
+			ui.feedEnd = false;
+			ui.prepending = false;
+			jumpState( feed, $( '.ff-jump', feed ), 'unseenFeed' );
+		};
+		feed.addEventListener( 'scroll', () => {
+			if ( viewInfo().stream ) {
+				jumpState( feed, $( '.ff-jump', feed ), 'unseenFeed' );
+			}
+		}, { passive: true } );
 		const loadList = async ( append ) => {
 			const v = viewInfo();
 			if ( v.notifications ) {
@@ -1814,11 +1879,23 @@
 			}
 			const args = Object.assign( { limit: 40 }, v.args );
 			if ( append && ui.list.length ) {
-				args.before = ui.list[ ui.list.length - 1 ].activity;
+				if ( v.stream ) {
+					args.before_id = ui.list[ ui.list.length - 1 ].id;
+					ui.prepending = true;
+				} else {
+					args.before = ui.list[ ui.list.length - 1 ].activity;
+				}
 			}
 			const items = await api( 'threads?' + query( args ) );
-			ui.list = append ? ui.list.concat( items ) : items;
-			ui.more = items.length === 40;
+			if ( v.stream && ! append && ! ui.loading && ui.list.length ) {
+				// Refreshing a channel: the newest page takes its part; older threads loaded before stay.
+				const ids = new Set( items.map( ( x ) => x.id ) );
+				const floor = items.length ? items[ items.length - 1 ].id : 0;
+				ui.list = items.concat( ui.list.filter( ( x ) => ! ids.has( x.id ) && x.id < floor ) );
+			} else {
+				ui.list = append ? ui.list.concat( items ) : items;
+				ui.more = items.length === 40;
+			}
 			const was = ui.loading;
 			ui.loading = false;
 			renderFeed();
@@ -1859,6 +1936,7 @@
 					form.elements.due.value = '';
 					form.elements.assignees.value = '';
 					$( '[data-ff="new-assign"]', form ).textContent = t( 'Assign' );
+					ui.feedEnd = true;
 					await refresh();
 					openThread( th.id, th );
 				},
@@ -2000,20 +2078,22 @@
 			return c;
 		};
 		// Scrolled up in a thread (as in Slack): a button back to the newest message, counting what came meanwhile.
-		const jumpState = ( body ) => {
-			const btn = $( '.ff-jump', pane );
+		const jumpState = ( body, button, key ) => {
+			const btn = button || $( '.ff-jump', pane );
+			const k = key || 'unseen';
 			if ( ! btn || ! body ) {
 				return;
 			}
 			const away = body.scrollHeight - body.scrollTop - body.clientHeight > 160;
 			if ( ! away ) {
-				ui.unseen = 0;
+				ui[ k ] = 0;
 			}
+			const n = ui[ k ] || 0;
 			btn.classList.toggle( 'is-shown', away );
-			btn.classList.toggle( 'has-new', !! ui.unseen );
+			btn.classList.toggle( 'has-new', !! n );
 			btn.tabIndex = away ? 0 : -1;
 			btn.setAttribute( 'aria-hidden', String( ! away ) );
-			$( 'span', btn ).textContent = ui.unseen ? ( 1 === ui.unseen ? t( '1 new message' ) : t( '%s new messages', ui.unseen ) ) : t( 'Latest' );
+			$( 'span', btn ).textContent = n ? ( 'unseen' === k ? ( 1 === n ? t( '1 new message' ) : t( '%s new messages', n ) ) : ( 1 === n ? t( '1 new thread' ) : t( '%s new threads', n ) ) ) : t( 'Latest' );
 		};
 		const openThread = async ( id, preset ) => {
 			ui.thread = id;
@@ -2162,6 +2242,9 @@
 			ui.view = view;
 			ui.list = [];
 			ui.loading = true;
+			ui.seen = null;
+			ui.feedEnd = true; // A channel opens at its newest thread.
+			ui.unseenFeed = 0;
 			closeThread();
 			renderNav();
 			renderHead();
@@ -2207,6 +2290,9 @@
 				if ( box ) {
 					box.hidden = ! open;
 				}
+			} else if ( 'jump-feed' === act ) {
+				ui.unseenFeed = 0;
+				feed.scrollTo( { top: feed.scrollHeight, behavior: smooth() } );
 			} else if ( 'jump' === act ) {
 				const body = $( '.ff-pane-body', pane );
 				ui.unseen = 0;

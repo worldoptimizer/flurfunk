@@ -67,6 +67,31 @@ test.describe( 'team', () => {
 		await expect( page.locator( '.ff-pane textarea' ) ).toBeInViewport();
 	} );
 
+	test( 'a channel reads top to bottom, as in Slack: new threads at the bottom, a reply moves nothing', async ( { page } ) => {
+		const stamp = Date.now();
+		const a = await api( page, 'threads', { channel: 'general', body: 'e2e Verlauf A ' + stamp } );
+		const b = await api( page, 'threads', { channel: 'general', body: 'e2e Verlauf B ' + stamp } );
+		await api( page, 'threads/' + a.id + '/messages', { body: 'Antwort an A' } );
+		await page.goto( APP + '&view=channel:general', { waitUntil: 'domcontentloaded' } );
+		const feed = page.locator( '.ff-feed' );
+		await page.locator( `.ff-post[data-id="${ b.id }"]` ).waitFor();
+		const order = await feed.evaluate( ( f ) => [ ...f.querySelectorAll( '.ff-post' ) ].map( ( p ) => +p.dataset.id ) );
+		expect( order.indexOf( a.id ) ).toBeLessThan( order.indexOf( b.id ) );
+		expect( order[ order.length - 1 ] ).toBe( b.id );
+		await expect( page.locator( `.ff-post[data-id="${ b.id }"]` ) ).toBeInViewport();
+		await expect( page.locator( '.ff-feed .ff-day' ).last() ).toBeVisible();
+		// A new thread from the writing box appears at the very bottom.
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		await ta.pressSequentially( 'e2e Verlauf C ' + stamp );
+		await ta.press( 'Enter' );
+		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toContainText( 'e2e Verlauf C ' + stamp );
+		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toBeInViewport();
+		// "All threads" stays a list by latest activity.
+		await page.goto( APP + '&view=all', { waitUntil: 'domcontentloaded' } );
+		await expect( page.locator( '.ff-post' ).first() ).toContainText( 'e2e Verlauf C ' + stamp );
+	} );
+
 	test( 'closing a thread restores the two-column layout', async ( { page } ) => {
 		await page.locator( '.ff-post' ).first().click();
 		await expect( page.locator( '.ff-pane' ) ).toBeVisible();

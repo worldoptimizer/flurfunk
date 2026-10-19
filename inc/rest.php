@@ -303,7 +303,7 @@ function decorate( array $t ): array {
  * @param WP_REST_Request $r Request.
  */
 function list_threads( WP_REST_Request $r ): array {
-	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'after', 'limit', 'order', 'q', 'person' ) ) );
+	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'before_id', 'after', 'limit', 'order', 'q', 'person' ) ) );
 	return array_map( __NAMESPACE__ . '\\decorate', Store\list_threads( get_current_user_id(), array_map( 'sanitize_text_field', $args ) ) );
 }
 

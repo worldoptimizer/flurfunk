@@ -270,7 +270,7 @@ Request bodies are JSON (`Content-Type: application/json`), except file uploads.
 | --- | --- | --- | --- |
 | GET | `bootstrap` | | Everything the app needs to start, see below |
 | GET | `counts` | | Unread numbers, see below |
-| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`, `board`), `channel` (slug), `target` (`type:id`), `person` (user ID: only tasks this person is responsible for), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `limit` (1–200, default 40), `order` (`ref` = oldest first) | Thread summaries |
+| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`, `board`), `channel` (slug), `target` (`type:id`), `person` (user ID: only tasks this person is responsible for), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `before_id` (thread ID, for paging with `order=new`), `limit` (1–200, default 40), `order` (`ref` = oldest first, `new` = newest started first, as a channel shows them) | Thread summaries |
 | POST | `threads` | `channel` (slug, required), `title`, `body`, `target` `{type, id}`, `task` (bool; implied by `due` or `assignees`), `due` (`Y-m-d`), `assignees` (user IDs), `attachments` (`[{provider, ref}]`), `ref_key` | The new thread (full). With a `ref_key` that exists already: that thread, unchanged |
 | GET | `threads/<id>` | `peek=1` to not mark it as read | Full thread; marks it and its notifications as read |
 | POST | `threads/<id>/messages` | `body`, `files` (attachment IDs: uploaded Flurfunk files or media library files, up to 50), `attachments` | The full thread |

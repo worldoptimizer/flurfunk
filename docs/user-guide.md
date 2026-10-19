@@ -27,13 +27,17 @@ The overview has three columns:
 
 1. **Sidebar** with the views, the channels, posts with recent conversations, the bell and your
    name at the bottom.
-2. **Thread list** of the current view, newest activity first, with a box for starting a new
-   thread at the bottom.
+2. **Threads** of the current view, with a box for starting a new thread at the bottom. A
+   channel reads top to bottom, as in Slack: the oldest thread first, the newest right above the
+   box; the day sits on a line between days and stays at the top while you scroll through it; a thread keeps its place when someone replies (its "replies"
+   line shows the news). If you scroll up, a **Latest** button brings you back down. The other
+   views are lists with the latest activity first.
 3. **Thread pane** with the open thread and its replies.
 
 | View | Shows |
 | --- | --- |
 | All threads | Everything you can see, latest activity first |
+| A channel | Its threads in the order they were started, the newest at the bottom; older ones load at the top |
 | Mentions | Threads where someone mentioned you |
 | My tasks | Open tasks you are responsible for, by due date |
 | Open tasks | All tasks not ticked off yet |

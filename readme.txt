@@ -114,6 +114,10 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
+= 0.4.0 (in development) =
+* Changed: a channel reads top to bottom, as in Slack – the oldest thread first, the newest right above the writing box; the day sits on a line between days and stays at the top while you scroll through it. A thread keeps its place when someone replies; older threads load at the top; scrolled up, a button brings you back down and counts new threads. All threads, mentions, tasks and the board stay lists by latest activity.
+* New for developers: `order=new` and `before_id` for the thread list (REST `threads`).
+
 = 0.3.0 =
 * New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
 * New: what an assistant can do is set as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) that say what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".

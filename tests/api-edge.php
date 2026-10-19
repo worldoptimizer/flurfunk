@@ -411,6 +411,17 @@ $as( $team );
 list( $s, $x ) = $req( 'POST', 'threads/' . $st . '/edit', array( 'title' => 'Neuer Titel', 'body' => 'nichts' ) );
 $check( 'the thread title can be edited', 200 === $s && 'Neuer Titel' === $x['title'], $x['title'] ?? $s );
 
+// A channel read top to bottom: newest created first from the API (the app turns it round), paged by ID.
+$as( $team );
+$ord_a = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Reihenfolge A' ) );
+$ord_b = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Reihenfolge B' ) );
+Store\add_message( $ord_a, array( 'body' => 'Antwort an A' ) );
+list( $s, $ord_new ) = $req( 'GET', 'threads', array( 'channel' => 'ff-test', 'order' => 'new', 'limit' => 2 ) );
+list( , $ord_act ) = $req( 'GET', 'threads', array( 'channel' => 'ff-test', 'limit' => 2 ) );
+list( , $ord_old ) = $req( 'GET', 'threads', array( 'channel' => 'ff-test', 'order' => 'new', 'limit' => 1, 'before_id' => $ord_b ) );
+$check( 'order=new: by creation, a reply does not move a thread up', 200 === $s && array( $ord_b, $ord_a ) === array_map( 'intval', array_column( $ord_new, 'id' ) ), array( array_column( $ord_new, 'id' ), array_column( $ord_act, 'id' ) ) );
+$check( '… and before_id pages back to older threads', array( $ord_a ) === array_map( 'intval', array_column( $ord_old, 'id' ) ) );
+
 WP_CLI::log( 'Notifications and mail preferences' );
 $prefs_before = array( Flurfunk\Notify\prefs( $team2 ), Flurfunk\Notify\prefs( $guest ) );
 $as( $team );

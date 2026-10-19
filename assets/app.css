@@ -678,3 +678,18 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 	.ff-root .ff-feed.is-entering > *, .ff-root .ff-pane-body.is-entering, .ff-root .ff-msg.is-new, .ff-root .ff-skel-ava { animation: none; }
 	.ff-root .ff-jump { transition: none; }
 }
+
+/* A channel reads top to bottom: few threads sit right above the writing box; a line with the day between days. */
+.ff-root .ff-feed.is-stream { display: flex; flex-direction: column; }
+.ff-root .ff-feed.is-stream > :first-child { margin-top: auto; }
+.ff-root .ff-feed.is-stream > .ff-post { flex: none; }
+.ff-root .ff-day-group { position: relative; flex: none; }
+.ff-root .ff-day-group::before { content: ""; position: absolute; left: 0; right: 0; top: 23px; height: 1px; background: var(--ff-line); }
+.ff-root .ff-day { position: sticky; top: 8px; z-index: 3; display: flex; justify-content: center; padding: 12px 0 6px; font-size: 12px; font-weight: 700; color: var(--ff-ink); pointer-events: none; }
+.ff-root .ff-day span { padding: 3px 12px; border: 1px solid var(--ff-line); border-radius: 999px; background: var(--ff-paper); box-shadow: 0 1px 3px rgb(0 0 0 / .06); }
+.ff-root .ff-more-up { flex: none; align-self: center; margin: 6px auto 2px; }
+.ff-root .ff-jump-dock { position: sticky; bottom: 12px; z-index: 5; flex: none; height: 0; display: flex; justify-content: center; }
+.ff-root .ff-jump-dock .ff-jump { position: relative; left: auto; top: auto; transform: translateY(calc(-100% + 8px)); }
+.ff-root .ff-jump-dock .ff-jump.is-shown { transform: translateY(-100%); }
+.ff-root .ff-post.is-new { animation: ff-in .25s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .ff-root .ff-post.is-new { animation: none; } }

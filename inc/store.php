@@ -1413,12 +1413,15 @@ function list_threads( int $user_id, array $args = array() ): array {
 	if ( ! empty( $args['after'] ) ) {
 		$where[] = $wpdb->prepare( 't.id > %d', (int) $args['after'] ); // Paging through order=ref lists.
 	}
+	if ( ! empty( $args['before_id'] ) ) {
+		$where[] = $wpdb->prepare( 't.id < %d', (int) $args['before_id'] ); // Paging through order=new lists (a channel read top to bottom).
+	}
 	if ( ! empty( $args['before'] ) && mysql( (string) $args['before'] ) ) {
 		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
 	}
 	$limit = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
 	// One of three fixed sort orders.
-	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' );
+	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( 'new' === ( $args['order'] ?? '' ) ? 't.id DESC' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' ) );
 	$where = implode( ' AND ', $where );
 	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces, $order is one of the fixed orders above.
 	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.* FROM %i t WHERE {$where} ORDER BY {$order} LIMIT %d", table( 'threads' ), $limit ) );
