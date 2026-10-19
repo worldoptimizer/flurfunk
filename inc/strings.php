@@ -117,7 +117,7 @@ function all(): array {
 		'Message' => __( 'Message', 'flurfunk' ),
 		'Attach file' => __( 'Attach file', 'flurfunk' ),
 		'From media library' => __( 'From media library', 'flurfunk' ),
-		'Ctrl+Enter sends' => __( 'Ctrl+Enter sends', 'flurfunk' ),
+		'Shift+Enter for a new line' => __( 'Shift+Enter for a new line', 'flurfunk' ),
 		'Send' => __( 'Send', 'flurfunk' ),
 		'uploading …' => __( 'uploading …', 'flurfunk' ),
 		'Remove file' => __( 'Remove file', 'flurfunk' ),

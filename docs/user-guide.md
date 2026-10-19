@@ -73,11 +73,11 @@ Use the box at the bottom of the thread list:
 2. Optionally pick what the thread is about under **Attached to** (a post, or another type a
    plugin added). Search by typing.
 3. Optionally tick **Task**, set a due date and click **Assign** to choose responsible people.
-4. Click **Start thread** or press Ctrl+Enter (Cmd+Enter on a Mac).
+4. Press Enter or click **Start thread**. Shift+Enter makes a new line.
 
 ### Reply
 
-Click a thread to open it, write in the **Reply** box and press Ctrl+Enter or click **Reply**.
+Click a thread to open it, write in the **Reply** box and press Enter or click **Reply** (Shift+Enter for a new line).
 
 What you type is kept as a draft in this browser until you send it, even if you reload the page
 or open another thread.
@@ -384,7 +384,9 @@ sidebar keeps your site's colour.
 | Keys | Where | Does |
 | --- | --- | --- |
 | Ctrl+K / Cmd+K | Overview | Jump to the search box |
-| Ctrl+Enter / Cmd+Enter | Message and reply boxes | Send, or save an edit |
+| Enter | Message and reply boxes | Send, or save an edit (on phones and tablets: a new line; use the button) |
+| Shift+Enter | Message and reply boxes | New line (inside a code block started with three backticks, Enter makes one too) |
+| Ctrl+Enter / Cmd+Enter | Message and reply boxes | Send, also on a tablet with a keyboard |
 | Escape | Mention or command menu | Close the menu |
 | Escape | Editing a message | Cancel the edit |
 | Escape | Your settings | Close them |

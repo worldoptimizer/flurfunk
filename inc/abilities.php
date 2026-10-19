@@ -111,6 +111,19 @@ function names( string $text ): string {
 }
 
 /**
+ * A post as plain text: without block markup and shortcodes, paragraphs as line breaks, without
+ * invisible characters (they can hide instructions).
+ *
+ * @param \WP_Post $p Post.
+ */
+function plain_text( \WP_Post $p ): string {
+	$html = (string) preg_replace( '/<!--.*?-->/s', '', strip_shortcodes( (string) $p->post_content ) );
+	$html = (string) preg_replace( '#</(p|h[1-6]|li|blockquote|figure|figcaption|tr|div)>|<br\s*/?>#i', "\n", $html );
+	$text = trim( (string) preg_replace( "/\n{3,}/", "\n\n", (string) preg_replace( '/[ \t]+/', ' ', html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES, 'UTF-8' ) ) ) );
+	return (string) preg_replace( '/\p{Cf}+/u', '', $text );
+}
+
+/**
  * Register the abilities.
  */
 function register(): void {
@@ -261,6 +274,140 @@ function register(): void {
 						'about'    => $target,
 						'messages' => $messages,
 					)
+				);
+			},
+			'permission_callback' => __NAMESPACE__ . '\\allowed',
+			'meta'                => array(
+				'annotations' => array(
+					'readonly'    => true,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'public'      => $read,
+			),
+		)
+	);
+	wp_register_ability(
+		'flurfunk/find-posts',
+		array(
+			'label'               => __( 'Find posts', 'flurfunk' ),
+			'description'         => __( 'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author and the first words; read one with flurfunk/get-post.', 'flurfunk' ),
+			'category'            => 'flurfunk',
+			'input_schema'        => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'search' => array(
+						'type'        => 'string',
+						'description' => __( 'Words in the title or text; leave it out for the latest posts.', 'flurfunk' ),
+					),
+					'status' => array(
+						'type'    => 'string',
+						'enum'    => array( 'any', 'publish', 'draft', 'pending', 'future' ),
+						'default' => 'any',
+					),
+					'order'  => array(
+						'type'        => 'string',
+						'enum'        => array( 'date', 'modified' ),
+						'default'     => 'date',
+						'description' => __( 'date: newest by publication date; modified: last edited first.', 'flurfunk' ),
+					),
+					'limit'  => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'maximum' => 20,
+						'default' => 10,
+					),
+				),
+				'additionalProperties' => false,
+			),
+			'output_schema'       => array(
+				'type'  => 'array',
+				'items' => array( 'type' => 'object' ),
+			),
+			'execute_callback'    => static function ( $input = array() ): array {
+				$input  = (array) $input;
+				$uid    = get_current_user_id();
+				$status = (string) ( $input['status'] ?? 'any' );
+				$limit  = max( 1, min( 20, (int) ( $input['limit'] ?? 10 ) ) );
+				$args   = array(
+					'post_type'           => \Flurfunk\Settings\get()['post_types'],
+					'post_status'         => in_array( $status, array( 'publish', 'draft', 'pending', 'future' ), true ) ? array( $status ) : array( 'publish', 'future', 'draft', 'pending', 'private' ),
+					'posts_per_page'      => $limit * 3, // Some may not be visible to this person.
+					'orderby'             => 'modified' === ( $input['order'] ?? '' ) ? 'modified' : 'date',
+					'order'               => 'DESC',
+					'ignore_sticky_posts' => true,
+					'no_found_rows'       => true,
+					's'                   => sanitize_text_field( (string) ( $input['search'] ?? '' ) ),
+				);
+				if ( 'team' !== Access\kind( $uid ) ) {
+					$args['post__in'] = Access\owned_post_ids( $uid ) ?: array( 0 );
+				}
+				$out = array();
+				foreach ( get_posts( $args ) as $p ) {
+					if ( count( $out ) < $limit && \Flurfunk\Providers\visible_post( $p, $uid ) ) {
+						$out[] = array(
+							'id'       => $p->ID,
+							'title'    => html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ),
+							'status'   => $p->post_status,
+							'date'     => (string) $p->post_date,
+							'modified' => (string) $p->post_modified,
+							'author'   => (string) get_the_author_meta( 'display_name', (int) $p->post_author ),
+							'words'    => str_word_count( plain_text( $p ), 0, 'äöüÄÖÜß' ),
+							'start'    => mb_substr( plain_text( $p ), 0, 160 ),
+						);
+					}
+				}
+				return $out;
+			},
+			'permission_callback' => __NAMESPACE__ . '\\allowed',
+			'meta'                => array(
+				'annotations' => array(
+					'readonly'    => true,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'public'      => $read,
+			),
+		)
+	);
+	wp_register_ability(
+		'flurfunk/get-post',
+		array(
+			'label'               => __( 'Read a post', 'flurfunk' ),
+			'description'         => __( 'The text of one post (as plain text, without markup), if the current user may see it – drafts only for those who may edit them.', 'flurfunk' ),
+			'category'            => 'flurfunk',
+			'input_schema'        => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'id' => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+					),
+				),
+				'required'             => array( 'id' ),
+				'additionalProperties' => false,
+			),
+			'output_schema'       => array( 'type' => 'object' ),
+			'execute_callback'    => static function ( $input = array() ) {
+				$uid = get_current_user_id();
+				$p   = get_post( (int) ( (array) $input )['id'] );
+				$ok  = $p && in_array( $p->post_type, \Flurfunk\Settings\get()['post_types'], true ) && \Flurfunk\Providers\visible_post( $p, $uid ) && user_can( $uid, 'read_post', $p->ID )
+					&& ( 'team' === Access\kind( $uid ) || in_array( $p->ID, Access\owned_post_ids( $uid ), true ) );
+				if ( ! $ok ) {
+					return new \WP_Error( 'flurfunk_forbidden', __( 'This post does not exist or you may not see it.', 'flurfunk' ), array( 'status' => 404 ) );
+				}
+				$text = plain_text( $p );
+				$max  = 20000;
+				return array(
+					'id'       => $p->ID,
+					'title'    => html_entity_decode( get_the_title( $p ), ENT_QUOTES, 'UTF-8' ),
+					'status'   => $p->post_status,
+					'date'     => (string) $p->post_date,
+					'modified' => (string) $p->post_modified,
+					'author'   => (string) get_the_author_meta( 'display_name', (int) $p->post_author ),
+					'excerpt'  => html_entity_decode( wp_strip_all_tags( (string) $p->post_excerpt ), ENT_QUOTES, 'UTF-8' ),
+					'url'      => 'publish' === $p->post_status ? (string) get_permalink( $p ) : '',
+					'text'     => mb_strlen( $text ) > $max ? mb_substr( $text, 0, $max ) . ' […]' : $text,
 				);
 			},
 			'permission_callback' => __NAMESPACE__ . '\\allowed',

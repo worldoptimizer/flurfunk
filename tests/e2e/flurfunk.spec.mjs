@@ -5,9 +5,12 @@ const Q = process.env.FF_QUERY ? '&' + process.env.FF_QUERY : '';
 const APP = '/wp-admin/admin.php?page=flurfunk' + Q;
 
 async function login( page, user, pass ) {
-	await page.goto( '/wp-login.php' );
+	await page.goto( '/wp-login.php', { waitUntil: 'load' } );
+	// The login page focuses and selects the name field shortly after loading; let it, then fill.
+	await page.waitForTimeout( 300 );
 	await page.fill( '#user_login', user );
 	await page.fill( '#user_pass', pass );
+	await expect( page.locator( '#user_login' ) ).toHaveValue( user );
 	await page.click( '#wp-submit' );
 	await expect.poll( async () => ( await page.context().cookies() ).some( ( c ) => c.name.startsWith( 'wordpress_logged_in' ) ), { timeout: 90_000 } ).toBe( true );
 }
@@ -107,6 +110,22 @@ test.describe( 'team', () => {
 		await ta.press( 'Tab' );
 		await expect( ta ).toHaveValue( /^\/[a-z0-9_-]+ $/ );
 		await ta.fill( '' );
+	} );
+
+	test( 'Enter sends, Shift+Enter makes a new line, inside ``` Enter too', async ( { page } ) => {
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		const stamp = 'e2e Enter ' + Date.now();
+		await ta.pressSequentially( stamp );
+		await ta.press( 'Shift+Enter' );
+		await ta.pressSequentially( '```' );
+		await ta.press( 'Enter' );
+		await ta.pressSequentially( 'code```' );
+		await expect( ta ).toHaveValue( stamp + '\n```\ncode```' );
+		await ta.press( 'Enter' );
+		await expect( page.locator( '.ff-pane .ff-root-msg' ) ).toContainText( stamp );
+		const th = await api( page, 'threads?view=all&limit=1' );
+		expect( th[ 0 ].body ).toBe( stamp + '\n```\ncode```' );
 	} );
 
 	test( 'slash menu: unknown command, keyboard, card insert and remove', async ( { page } ) => {

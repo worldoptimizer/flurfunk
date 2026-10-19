@@ -739,7 +739,7 @@
 			if ( 'Escape' === e.key ) {
 				e.preventDefault();
 				cancel();
-			} else if ( 'Enter' === e.key && ( e.metaKey || e.ctrlKey ) ) {
+			} else if ( e.target.matches( 'textarea' ) && sendsOnEnter( e, e.target ) ) {
 				e.preventDefault();
 				form.requestSubmit();
 			}
@@ -1118,6 +1118,21 @@
 		lightbox( group, Math.max( 0, group.indexOf( a ) ) );
 	} );
 
+	// As in Slack: Enter sends, Shift+Enter makes a new line; Ctrl/Cmd+Enter sends too. On touch
+	// screens Enter makes a new line (there is the button), and inside an open ``` block as well.
+	const touch = () => window.matchMedia && window.matchMedia( '(pointer: coarse)' ).matches;
+	const sendsOnEnter = ( e, ta ) => {
+		if ( 'Enter' !== e.key || e.isComposing || e.altKey ) {
+			return false;
+		}
+		if ( e.metaKey || e.ctrlKey ) {
+			return true;
+		}
+		if ( e.shiftKey || touch() ) {
+			return false;
+		}
+		return 0 === ( ta.value.slice( 0, ta.selectionStart ).split( '```' ).length - 1 ) % 2;
+	};
 	const composer = ( o ) => {
 		const el = document.createElement( 'form' );
 		el.className = 'ff-compose' + ( o.className ? ' ' + o.className : '' );
@@ -1131,7 +1146,7 @@
 			+ ( boot.me.upload ? '<label class="ff-link ff-upload">' + icon.clip + '<span>' + esc( t( 'Attach file' ) ) + '</span><input type="file" multiple hidden></label>' : '' )
 			+ ( boot.me.upload && window.wp && window.wp.media ? '<button type="button" class="ff-link ff-upload" data-ff="library">' + icon.image + '<span>' + esc( t( 'From media library' ) ) + '</span></button>' : '' )
 			+ ( o.extra || '' ) + '</div>'
-			+ '<span class="ff-hint">' + esc( t( 'Ctrl+Enter sends' ) ) + '</span>'
+			+ ( touch() ? '' : '<span class="ff-hint">' + esc( t( 'Shift+Enter for a new line' ) ) + '</span>' )
 			+ '<button type="submit" class="ff-send">' + esc( o.submitLabel || t( 'Send' ) ) + '</button></div>'
 			+ '<p class="ff-error" role="alert" hidden></p>';
 		const ta = $( 'textarea', el );
@@ -1218,12 +1233,11 @@
 		ta.addEventListener( 'click', updateMenu );
 		el.addEventListener( 'keydown', ( e ) => {
 			const opts = [ ...slot.querySelectorAll( 'button' ) ];
-			if ( e.target === ta && 'Enter' === e.key && ( e.metaKey || e.ctrlKey ) ) {
-				e.preventDefault();
-				el.requestSubmit();
-				return;
-			}
 			if ( ! opts.length ) {
+				if ( e.target === ta && sendsOnEnter( e, ta ) ) {
+					e.preventDefault();
+					el.requestSubmit();
+				}
 				return;
 			}
 			const i = opts.indexOf( e.target );

@@ -999,7 +999,7 @@ $ai_steps = (array) ( Store\full_thread( $ai_t, $team )['thinking_steps'] ?? arr
 $check( '… and what it is doing right now (reading the thread first)', 'read' === ( $ai_steps[ $ai_bot ] ?? '' ), $ai_steps );
 $ai_cv = Store\format_channel( $ai_ch );
 $ai_ci = array_values( array_filter( $ai_cv['agents_info'] ?? array(), static fn ( $i ) => $ai_bot === (int) $i['id'] ) );
-$check( 'the channel explains what each assistant does there and where its reading goes', $ai_ci && in_array( 'answers when you mention it', $ai_ci[0]['does'], true ) && str_contains( $ai_cv['ai_note'] ?? '', 'AI provider' ), $ai_cv['agents_info'] ?? null );
+$check( 'the channel explains what each assistant does there and where its reading goes', $ai_ci && in_array( 'answers when you mention it, and then your follow-ups', $ai_ci[0]['does'], true ) && str_contains( $ai_cv['ai_note'] ?? '', 'AI provider' ), $ai_cv['agents_info'] ?? null );
 $as( $team2 );
 Store\add_message( $ai_t, array( 'body' => 'Ich lese mit.' ) );
 $as( $team );
@@ -1019,6 +1019,45 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	$ai_meta2 = (array) Store\full_thread( $ai_t, $team )['ai_meta'];
 	$check( '… with the conversations it opened and the other tools it used, by name', array( 'List conversations' ) === $ai_meta2[ $ai_r ]['tools'] && 'KI-Frage' === $ai_meta2[ $ai_r ]['threads'][0]['title'], $ai_meta2[ $ai_r ] ?? null );
 }
+// Follow-ups: right after its answer to you, you need not mention it again. (Usage, log and the
+// recorded contexts are put back afterwards, the checks below count them.)
+$fu_keep = array( get_user_meta( $ai_bot, 'flurfunk_ai_usage', true ), get_option( 'flurfunk_ai_log', array() ), $ai_seen );
+$fresh_rate();
+$as( $team );
+$fu_last = static fn ( int $tid ) => (int) $ai_lastm( $tid )['author'];
+$fu_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Erste Frage" ) );
+Flurfunk\Modules\Ai\run( $fu_t, 0, $ai_bot );
+$fu_m = Store\add_message( $fu_t, array( 'body' => 'Und wie ist es am Montag?' ) );
+$check( 'a follow-up right after its answer, without @, goes to the assistant', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m, $ai_bot ) ) );
+$fu_n = count( $ai_seen );
+Flurfunk\Modules\Ai\run( $fu_t, $fu_m, $ai_bot );
+$fu_ctx = $ai_seen[ $fu_n ] ?? array();
+$check( '… which is told it was not mentioned and may pass', str_contains( $fu_ctx['prompt'] ?? '', 'without mentioning you' ) && $team === ( $fu_ctx['asker'] ?? 0 ) && $ai_bot === $fu_last( $fu_t ), substr( $fu_ctx['prompt'] ?? '', -300 ) );
+$as( $team2 );
+$fu_m2 = Store\add_message( $fu_t, array( 'body' => 'Ich übernehme das.' ) );
+$as( $team );
+$fu_m3 = Store\add_message( $fu_t, array( 'body' => 'Danke dir.' ) );
+$check( '… but not when someone else writes after it, nor after that person\'s message', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m2, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m3, $ai_bot ) ) );
+$fu_t2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Zweite Frage" ) );
+Flurfunk\Modules\Ai\run( $fu_t2, 0, $ai_bot );
+$fu_m4 = Store\add_message( $fu_t2, array( 'body' => "<@$team2> schau mal" ) );
+$check( '… nor when the message mentions someone else', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t2, $fu_m4, $ai_bot ) ) );
+$fu_t3 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Dritte Frage" ) );
+Flurfunk\Modules\Ai\run( $fu_t3, 0, $ai_bot );
+$fu_m5 = Store\add_message( $fu_t3, array( 'body' => 'Danke!' ) );
+add_filter( 'flurfunk_ai_pre_answer', $fu_dash = static fn () => array( 'text' => '–', 'tokens' => 5 ), 20 );
+$fu_r = Flurfunk\Modules\Ai\run( $fu_t3, $fu_m5, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
+$check( '… and a follow-up that needs no answer gets none', null === $fu_r && $team === $fu_last( $fu_t3 ) && array() === Store\full_thread( $fu_t3, $team )['thinking'] );
+add_filter( 'flurfunk_ai_follow_ups', '__return_false' );
+$fu_t4 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Vierte Frage" ) );
+Flurfunk\Modules\Ai\run( $fu_t4, 0, $ai_bot );
+$fu_m6 = Store\add_message( $fu_t4, array( 'body' => 'Und noch was?' ) );
+remove_filter( 'flurfunk_ai_follow_ups', '__return_false' );
+$check( '… unless the site switches follow-ups off', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t4, $fu_m6, $ai_bot ) ) );
+update_user_meta( $ai_bot, 'flurfunk_ai_usage', $fu_keep[0] );
+update_option( 'flurfunk_ai_log', $fu_keep[1], false );
+$ai_seen = $fu_keep[2];
 $ai_ctx = $ai_seen[0] ?? array();
 add_filter( 'flurfunk_ai_guidelines', $ai_gl = static fn () => 'Wir gendern mit Doppelpunkt.' );
 $ai_glc = Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), $ai_m, $ai_bot );
@@ -1039,6 +1078,21 @@ $check( '… but not for someone who may not read that draft', '' === Flurfunk\M
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
 $check( '… and not when the profile does not allow it', ! str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ai_pt ), 0, $ai_bot )['prompt'], 'Kolibris' ) );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'instructions' => "Sei knapp.", 'budget' => 0 ) );
+if ( function_exists( 'wp_get_ability' ) ) {
+	// Finding and reading posts (with "reads posts"): the latest or by words, drafts only for those who may edit them.
+	$as( $team );
+	$fp_all  = wp_get_ability( 'flurfunk/find-posts' )->execute( array() );
+	$fp_hit  = wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'KI-Entwurf' ) );
+	$gp_team = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $ai_post ) );
+	$check( 'find-posts: the latest posts, the team\'s own draft among them; search finds it', is_array( $fp_all ) && in_array( $ai_post, array_column( $fp_all, 'id' ), true ) && $ai_post === ( $fp_hit[0]['id'] ?? 0 ) && 'draft' === $fp_hit[0]['status'], $fp_hit );
+	$check( 'get-post: the text as plain text, without markup or invisible characters', is_array( $gp_team ) && str_contains( $gp_team['text'], 'Kolibris fliegen rückwärts.' ) && ! str_contains( $gp_team['text'], 'wp:paragraph' ) && str_contains( $gp_team['text'], 'Unsichtbargedreht' ), $gp_team );
+	$as( $guest );
+	$fp_g = wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'KI-Entwurf' ) );
+	$gp_g = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $ai_post ) );
+	$check( '… a guest finds and reads only their own posts', is_array( $fp_g ) && ! in_array( $ai_post, array_column( $fp_g, 'id' ), true ) && is_wp_error( $gp_g ) && in_array( $guest_post, array_column( (array) wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'limit' => 20, 'search' => get_the_title( $guest_post ) ) ), 'id' ), true ) );
+	$as( $team );
+	$check( 'reading posts brings the tools to find and read them', array( 'flurfunk/find-posts', 'flurfunk/get-post' ) === array_values( array_intersect( array( 'flurfunk/find-posts', 'flurfunk/get-post' ), array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) ) ) ) && str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ai_pt ), 0, $ai_bot )['system'], 'flurfunk/find-posts' ) );
+}
 wp_delete_post( $ai_post, true );
 $ai_red = Flurfunk\Modules\Ai\redact( "Mail an leser.in@example.org oder 0171 1234567, Büro +49 (30) 123 456-78. Am 19.10.2026 um 14:30, 2.500 Euro, ISBN 978-3-16-148410-0, Postfach 0815." );
 $check( 'email addresses and phone numbers are replaced; dates, amounts, ISBNs and short numbers stay', ! str_contains( $ai_red, '@' ) && ! str_contains( $ai_red, '1234567' ) && ! str_contains( $ai_red, '456-78' ) && str_contains( $ai_red, '19.10.2026' ) && str_contains( $ai_red, '2.500' ) && str_contains( $ai_red, '978-3-16-148410-0' ) && str_contains( $ai_red, '0815' ), $ai_red );
