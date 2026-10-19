@@ -293,7 +293,7 @@
 		const canRefresh = stored && boot && boot.providers.some( ( x ) => x.id === a.provider );
 		// Custom renderers may place action buttons themselves (h.button with an action).
 		const acts = stored && ! /data-ff="card-act"/.test( inner ) ? cardActions( a.provider, s ) : '';
-		return '<div class="ff-card"' + ( stored ? ' data-cid="' + ( +a.id ) + '"' : '' ) + '><span class="ff-card-kind">' + esc( p.label ) + ( p.command ? ' <small>/' + esc( p.command ) + '</small>' : '' )
+		return '<div class="ff-card"' + ( stored ? ' data-cid="' + ( +a.id ) + '"' : '' ) + '><span class="ff-card-kind">' + esc( p.label ) + ( p.command && ! p.hidden ? ' <small>/' + esc( p.command ) + '</small>' : '' )
 			+ ( canRefresh ? ' <button type="button" class="ff-card-refresh" data-ff="card-refresh" data-cid="' + a.id + '">' + esc( t( 'Update' ) ) + '</button>' : '' ) + '</span>' + inner + acts
 			+ ( remove !== undefined ? '<button type="button" class="ff-x ff-card-x" data-ff="card-x" data-i="' + remove + '" aria-label="' + esc( t( 'Remove card' ) ) + '">×</button>' : '' ) + '</div>';
 	};

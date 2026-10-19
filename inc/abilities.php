@@ -130,6 +130,7 @@ function register(): void {
 				'properties'           => array(
 					'channel' => array(
 						'type'        => 'string',
+						'title'       => __( 'Channel', 'flurfunk' ),
 						'description' => __( 'Channel short name, e.g. general.', 'flurfunk' ),
 					),
 					'view'    => array(
@@ -254,6 +255,7 @@ function register(): void {
 					'text' => array(
 						'type'      => 'string',
 						'minLength' => 1,
+						'title'     => __( 'Text', 'flurfunk' ),
 					),
 				),
 				'required'             => array( 'id', 'text' ),
@@ -285,12 +287,22 @@ function register(): void {
 			'input_schema'        => array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'channel' => array( 'type' => 'string' ),
-					'title'   => array( 'type' => 'string' ),
-					'text'    => array( 'type' => 'string' ),
+					'channel' => array(
+						'type'  => 'string',
+						'title' => __( 'Channel', 'flurfunk' ),
+					),
+					'title'   => array(
+						'type'  => 'string',
+						'title' => __( 'Title', 'flurfunk' ),
+					),
+					'text'    => array(
+						'type'  => 'string',
+						'title' => __( 'Text', 'flurfunk' ),
+					),
 					'task'    => array(
 						'type'    => 'boolean',
 						'default' => false,
+						'title'   => __( 'As a task', 'flurfunk' ),
 					),
 				),
 				'required'             => array( 'channel', 'text' ),

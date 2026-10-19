@@ -938,6 +938,7 @@ $ai_mod   = get_option( 'flurfunk_modules', null );
 $ai_notes = get_option( 'flurfunk_ai_channels', null );
 $ai_opts  = get_option( 'flurfunk_ai_settings', null );
 $ai_logo  = get_option( 'flurfunk_ai_log', null );
+$ai_props = get_option( 'flurfunk_ai_proposals', null );
 delete_option( 'flurfunk_ai_log' );
 Flurfunk\Modules\set( array( 'flurfunk/ai' => true ) );
 $ai_bot = Flurfunk\Access\create_bot( 'KI-Test', 'ff-test-ai-' . strtolower( wp_generate_password( 5, false, false ) ) );
@@ -1112,6 +1113,35 @@ $check( 'with the module switched off meanwhile, a queued run does nothing', nul
 Flurfunk\Modules\set( array( 'flurfunk/ai' => true ) );
 wp_unschedule_hook( 'flurfunk_ai_run' );
 wp_delete_user( $ai_bot2 );
+if ( function_exists( 'wp_get_ability' ) ) {
+	// Proposals: the assistant never runs an ability that changes something; a person does, with a button.
+	$ai_pp = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'proposals' => array( 'flurfunk/start-thread', 'flurfunk/get-thread' ) ) );
+	$check( 'proposals: only abilities that change something can be chosen', array( 'flurfunk/start-thread' ) === $ai_pp['proposals'], $ai_pp['proposals'] );
+	$ai_pid = Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'title' => 'Vorgeschlagene Aufgabe', 'text' => 'Bitte erledigen', 'task' => true ), $ai_bot, $ai_e );
+	$ai_pm  = Flurfunk\Modules\Ai\reply( $ai_e, $ai_bot, 'Ich schlage eine Aufgabe vor.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ai_pid ) ) ) );
+	$ai_pc  = null;
+	foreach ( Store\full_thread( $ai_e, $team )['messages'] as $m ) {
+		if ( (int) $m['id'] === (int) $ai_pm ) {
+			$ai_pc = $m['attachments'][0] ?? null;
+		}
+	}
+	$check( 'a proposal is a card under the answer, waiting, with Run and Dismiss', $ai_pc && 'flurfunk/ai-proposal' === $ai_pc['provider'] && array( 'run', 'dismiss' ) === $ai_pc['snapshot']['actions'] && 'warning' === $ai_pc['snapshot']['status']['tone'], $ai_pc );
+	$check( '… nothing happened yet', ! array_filter( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Vorgeschlagene Aufgabe' === $t['title'] ) );
+	$as( $team2 );
+	list( $s, $x ) = $req( 'POST', 'cards/' . (int) $ai_pc['id'] . '/action/run', array( 'key' => 'k1' ) );
+	$ai_new = array_values( array_filter( Store\list_threads( $team2, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Vorgeschlagene Aufgabe' === $t['title'] ) );
+	$check( 'Run: the ability runs as the person who clicked', 200 === $s && $ai_new && $team2 === (int) $ai_new[0]['author'] && 'open' === $ai_new[0]['status'], array( $s, $ai_new[0] ?? null ) );
+	$ai_ps = Flurfunk\Modules\Ai\proposal_snapshot( array( 'id' => $ai_pid ) );
+	$check( '… the card says who ran it, links the result and offers no more buttons', 'positive' === $ai_ps['status']['tone'] && array() === $ai_ps['actions'] && ! empty( end( $ai_ps['fields'] )['url'] ), $ai_ps );
+	list( $s ) = $req( 'POST', 'cards/' . (int) $ai_pc['id'] . '/action/run', array( 'key' => 'k2' ) );
+	$check( '… and cannot be run twice', 409 === $s || 1 === count( array_filter( Store\list_threads( $team2, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Vorgeschlagene Aufgabe' === $t['title'] ) ), $s );
+	$as( $team );
+	$ai_pid2 = Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'text' => 'Lieber nicht' ), $ai_bot, $ai_e );
+	Flurfunk\Modules\Ai\reply( $ai_e, $ai_bot, 'Noch ein Vorschlag.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ai_pid2 ) ) ) );
+	$ai_l2 = $ai_lastm( $ai_e );
+	list( $s ) = $req( 'POST', 'cards/' . (int) $ai_l2['attachments'][0]['id'] . '/action/dismiss', array( 'key' => 'k3' ) );
+	$check( 'Dismiss: nothing runs, the card says who dismissed it', 200 === $s && 'dismissed' === Flurfunk\Modules\Ai\proposal( $ai_pid2 )['state'] && ! array_filter( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 50 ) ), static fn ( $t ) => 'Lieber nicht' === $t['body'] ), $s );
+}
 remove_filter( 'flurfunk_ai_pre_answer', $ai_fake, 10 );
 require_once ABSPATH . 'wp-admin/includes/template.php';
 ob_start();
@@ -1124,6 +1154,7 @@ delete_transient( 'flurfunk_ai_busy_' . $ai_t );
 null === $ai_notes ? delete_option( 'flurfunk_ai_channels' ) : update_option( 'flurfunk_ai_channels', $ai_notes );
 null === $ai_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $ai_opts );
 null === $ai_logo ? delete_option( 'flurfunk_ai_log' ) : update_option( 'flurfunk_ai_log', $ai_logo );
+null === $ai_props ? delete_option( 'flurfunk_ai_proposals' ) : update_option( 'flurfunk_ai_proposals', $ai_props );
 null === $ai_mod ? delete_option( 'flurfunk_modules' ) : update_option( 'flurfunk_modules', $ai_mod );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 if ( (int) get_option( 'flurfunk_bot_default' ) === $ai_bot ) {
