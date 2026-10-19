@@ -114,6 +114,11 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
+= 0.3.1 (in development) =
+* New: AI assistants can find and read posts – "proofread the latest article" or "the article about …" works. Two new abilities, flurfunk/find-posts and flurfunk/get-post, with the rights of the person asking (drafts only for those who may edit them, guests only their own posts).
+* New: right after an assistant's answer you can simply write on – a follow-up without a new mention goes to it; if it needs no answer ("thanks"), the assistant stays quiet. Developers can switch this off with flurfunk_ai_follow_ups.
+* Changed: as in Slack, Enter sends and Shift+Enter makes a new line (Ctrl/Cmd+Enter still sends; on touch screens Enter makes a new line).
+
 = 0.3.0 =
 * New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
 * New: what an assistant can do is set as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) that say what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".
