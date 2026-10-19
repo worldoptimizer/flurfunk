@@ -117,6 +117,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 = 0.5.0 (in development) =
 * New: limits for AI assistants. An assistant never can more than the person asking and never administers the site (users, plugins, themes, settings, unfiltered HTML are off while it works). "May at most act as" sets a role as a ceiling on top – also for what it reads, e.g. no other people's drafts within the limit Author. Proposals it may not make within the limit are not offered; a card runs within the limit too. The assistant says when its limit may hide something.
 * New: AI assistants can write drafts (pack "Drafts", off by default): "make an article of this thread, with the photo" gives a draft – the person asking is its author, images from the conversation go along (into the media library) – and a card under the answer. Follow-ups change the draft until someone else works on it. It never publishes. Abilities flurfunk/create-draft and flurfunk/update-draft.
+* Changed: as in Slack, an assistant that is only thanked reacts with 👍 instead of writing; mentioned only in passing, it reacts with 👀. After a mention it never stays silent; a follow-up not meant for it still gets nothing.
 * Changed: flurfunk/start-thread and flurfunk/reply check the channel or conversation in their permission check, not only when they run.
 
 = 0.4.0 =

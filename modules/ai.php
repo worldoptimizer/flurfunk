@@ -846,9 +846,16 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		}
 		$before = usage( $agent )['tokens'];
 		add_usage( $agent, $answer['tokens'] );
-		$text = trim( $answer['text'] );
-		if ( preg_match( '/^[-–—]$/u', $text ) && empty( $answer['ideas'] ) && empty( $answer['drafts'] ) ) {
-			return null; // A follow-up that was not meant for it.
+		$text  = trim( $answer['text'] );
+		$plain = empty( $answer['ideas'] ) && empty( $answer['drafts'] );
+		// Mentioned (or in private, where every message is for it), it never stays silent.
+		$mentioned = str_contains( $question ? (string) $question->body : (string) $thread->body, '<@' . $agent . '>' ) || ! empty( $thread->private_to );
+		if ( preg_match( '/^[-–—]$/u', $text ) && $plain ) {
+			// Not meant for it: nothing – or, mentioned in passing, "seen" as a reaction.
+			return $mentioned ? react( $thread_id, $message_id, $agent, '👀' ) : null;
+		}
+		if ( $plain && '' !== \Flurfunk\Reactions\key( $text ) ) {
+			return react( $thread_id, $message_id, $agent, $text ); // Thanks, OK: a reaction, as in Slack.
 		}
 		// Crossing 80 % of the budget: one short note under this answer, once.
 		if ( '' !== $text && $p['budget'] && $before < 0.8 * $p['budget'] && usage( $agent )['tokens'] >= 0.8 * $p['budget'] ) {
@@ -902,6 +909,27 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		set_busy( $thread_id, $agent, false );
 	}
+}
+
+/**
+ * React instead of replying (a thanks, being mentioned in passing): the assistant's emoji on that
+ * message, as in Slack. It never takes a reaction back, so a second run changes nothing.
+ *
+ * @param int    $thread_id  Thread.
+ * @param int    $message_id Message (0 = the thread itself).
+ * @param int    $agent      Assistant.
+ * @param string $emoji      Emoji.
+ * @return null Nothing was posted.
+ */
+function react( int $thread_id, int $message_id, int $agent, string $emoji ) {
+	$key = \Flurfunk\Reactions\key( $emoji );
+	foreach ( \Flurfunk\Reactions\for_threads( array( $thread_id ) )[ $thread_id ][ $message_id ] ?? array() as $r ) {
+		if ( \Flurfunk\Reactions\key( (string) $r['emoji'] ) === $key && in_array( $agent, (array) $r['people'], true ) ) {
+			return null;
+		}
+	}
+	\Flurfunk\Reactions\toggle( $thread_id, $message_id, $emoji, $agent );
+	return null;
 }
 
 /**
@@ -1281,8 +1309,8 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 	);
 	$prompt = $posts . "<thread>\n" . $head . ( '' !== $body ? "\n\n" . $body : '' ) . "\n</thread>\n\n"
 		. ( '' !== $task ? $task : ( $message_id && empty( $thread->private_to ) && ! str_contains( $said, '<@' . $agent . '>' )
-			? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it is meant for you, answer it now. If it is not, or needs no answer (thanks, OK, a remark to someone else), reply with only a single dash: -', $asker_name )
-			: sprintf( '%s mentioned you in the last message of this thread. Answer now.', $asker_name ) ) );
+			? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it asks you something or asks for a change, answer it now. If it only thanks you or agrees (thanks, OK, great), reply with only 👍 – it is shown as your reaction on that message. If it is not meant for you (a remark to someone else), reply with only a single dash: -', $asker_name )
+			: sprintf( '%s mentioned you in the last message of this thread. Answer now. Only if that message asks you nothing – it just thanks you, or mentions you in passing while talking to someone else – reply with a single emoji instead and nothing else: 👍 for thanks or agreement, 👀 for being mentioned in passing. It is shown as your reaction on that message.', $asker_name ) ) );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
 		'prompt' => options()['redact'] ? redact( $prompt ) : $prompt,

@@ -1102,6 +1102,23 @@ add_filter( 'flurfunk_ai_pre_answer', $fu_dash = static fn () => array( 'text' =
 $fu_r = Flurfunk\Modules\Ai\run( $fu_t3, $fu_m5, $ai_bot );
 remove_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
 $check( '… and a follow-up that needs no answer gets none', null === $fu_r && $team === $fu_last( $fu_t3 ) && array() === Store\full_thread( $fu_t3, $team )['thinking'] );
+// Reacting instead of replying, as in Slack: thanks gets 👍, being mentioned in passing 👀 – never silence after a mention.
+$rx_has = static fn ( int $t, int $m, string $e ) => (bool) array_filter( Flurfunk\Reactions\for_threads( array( $t ) )[ $t ][ $m ] ?? array(), static fn ( $r ) => Flurfunk\Reactions\key( $r['emoji'] ) === Flurfunk\Reactions\key( $e ) && in_array( $ai_bot, $r['people'], true ) );
+$rx_ctx = Flurfunk\Modules\Ai\context( Store\thread_row( $fu_t3 ), $fu_m5, $ai_bot );
+$check( 'a follow-up is told: thanks get 👍 as a reaction, a remark to someone else a dash', str_contains( $rx_ctx['prompt'], 'reply with only 👍' ) && str_contains( $rx_ctx['prompt'], 'single dash' ) );
+add_filter( 'flurfunk_ai_pre_answer', $rx_up = static fn () => array( 'text' => '👍', 'tokens' => 5 ), 20 );
+$rx_r1 = Flurfunk\Modules\Ai\run( $fu_t3, $fu_m5, $ai_bot );
+$rx_r2 = Flurfunk\Modules\Ai\run( $fu_t3, $fu_m5, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $rx_up, 20 );
+$check( '… a 👍 answer becomes the assistant\'s reaction on that message, no reply – and a second run does not take it back', null === $rx_r1 && null === $rx_r2 && $team === $fu_last( $fu_t3 ) && $rx_has( $fu_t3, $fu_m5, '👍' ) );
+$rx_m = Store\add_message( $fu_t3, array( 'body' => "<@$team2> frag doch mal <@$ai_bot>" ) );
+$check( 'mentioned in passing, it is told it may react with 👀', str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $fu_t3 ), $rx_m, $ai_bot )['prompt'], '👀 for being mentioned in passing' ) );
+add_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
+$rx_r3 = Flurfunk\Modules\Ai\run( $fu_t3, $rx_m, $ai_bot );
+$rx_m2 = Store\add_message( $fu_t3, array( 'body' => 'Das war für Jakob.' ) );
+$rx_r4 = Flurfunk\Modules\Ai\run( $fu_t3, $rx_m2, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
+$check( '… and after a mention it never stays silent: a dash becomes 👀; without a mention a dash stays nothing', null === $rx_r3 && $rx_has( $fu_t3, $rx_m, '👀' ) && null === $rx_r4 && ! ( Flurfunk\Reactions\for_threads( array( $fu_t3 ) )[ $fu_t3 ][ $rx_m2 ] ?? array() ) && $team === $fu_last( $fu_t3 ) );
 add_filter( 'flurfunk_ai_follow_ups', '__return_false' );
 $fu_t4 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Vierte Frage" ) );
 Flurfunk\Modules\Ai\run( $fu_t4, 0, $ai_bot );

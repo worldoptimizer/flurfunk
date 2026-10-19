@@ -156,7 +156,9 @@ their role.
   summary only you see (of just the new messages if you have read the rest). Nothing is posted.
 
 - **Follow-ups:** right after its answer you can simply write on, without mentioning it again. If
-  you only say thanks, it stays quiet. When someone else writes in between, mention it again.
+  you only say thanks, it puts a 👍 on your message instead of writing back. Mentioned only in
+  passing ("@Rita, ask @Lektorat later"), it puts a 👀 on the message – after a mention it never
+  stays silent. When someone else writes in between, mention it again.
 - **Private conversations:** under **Assistants** in the sidebar each assistant you may ask has its
   own space. Write in the box at the bottom to start a conversation; it answers every message there
   without a mention. Only you see these conversations – not your team, not the site's
