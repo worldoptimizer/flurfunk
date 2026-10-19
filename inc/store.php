@@ -931,9 +931,10 @@ function refresh_card( int $attachment_id ) {
  * @param int    $attachment_id Card row.
  * @param string $action        Action ID.
  * @param string $key           Idempotency key from the client ('' = none).
+ * @param array  $input         What the person chose on the card (e.g. rows).
  * @return int|\WP_Error Thread ID.
  */
-function card_action( int $attachment_id, string $action, string $key = '' ) {
+function card_action( int $attachment_id, string $action, string $key = '', array $input = array() ) {
 	global $wpdb;
 	$user   = get_current_user_id();
 	$action = sanitize_key( $action );
@@ -967,7 +968,7 @@ function card_action( int $attachment_id, string $action, string $key = '' ) {
 		}
 		$snapshot = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT snapshot FROM %i WHERE id = %d', table( 'attachments' ), $attachment_id ) );
 		$card     = json_decode( $snapshot, true ) ?: array();
-		$snap     = \Flurfunk\Providers\run_action( (string) $row->provider, $action, (array) json_decode( $row->ref, true ), $card, $user );
+		$snap     = \Flurfunk\Providers\run_action( (string) $row->provider, $action, (array) json_decode( $row->ref, true ), $card, $user, $input );
 		if ( is_wp_error( $snap ) ) {
 			return $snap;
 		}

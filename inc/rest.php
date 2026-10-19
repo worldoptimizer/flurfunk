@@ -189,7 +189,9 @@ function routes(): void {
 			'callback'            => static function ( WP_REST_Request $r ) {
 				$key = ( (array) $r->get_json_params() )['key'] ?? $r->get_header( 'x_flurfunk_key' ) ?? '';
 				$key = is_string( $key ) ? $key : '';
-				$tid = Store\card_action( (int) $r['id'], (string) $r['action'], preg_replace( '/[^A-Za-z0-9_-]/', '', $key ) );
+				// What the person chose on the card (e.g. which rows), for the provider to check.
+				$in  = ( (array) $r->get_json_params() )['input'] ?? array();
+				$tid = Store\card_action( (int) $r['id'], (string) $r['action'], preg_replace( '/[^A-Za-z0-9_-]/', '', $key ), is_array( $in ) ? $in : array() );
 				return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
 			},
 			'permission_callback' => $auth,

@@ -1551,6 +1551,92 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/create-dra
 	}
 	$as( $team );
 }
+// Changes to existing posts: one card with before and after, rows to choose, undo.
+WP_CLI::log( 'AI changes to posts' );
+$ch_raw = "<!-- wp:paragraph -->\n<p>Die Bürgermeisterin sagt, das das neue Schwimbad öffnet. <a href=\"https://example.org/das-das\">das das</a></p>\n<!-- /wp:paragraph -->";
+$ch_new = Flurfunk\Changes\replace( $ch_raw, array( array( 'find' => 'Schwimbad', 'with' => 'Schwimmbad <b>' ), array( 'find' => 'das das', 'with' => 'dass das' ) ) );
+$check( 'corrections change text only – never markup, block comments or links – and the new text is escaped', is_string( $ch_new ) && str_contains( $ch_new, 'Schwimmbad &lt;b&gt;' ) && str_contains( $ch_new, 'sagt, dass das neue' ) && str_contains( $ch_new, 'example.org/das-das' ) && str_contains( $ch_new, '<!-- wp:paragraph -->' ), $ch_new );
+$check( '… a text that is not there is refused with a hint', is_wp_error( Flurfunk\Changes\replace( $ch_raw, array( array( 'find' => 'Hallenbad', 'with' => 'x' ) ) ) ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Changes\NAME ) ) {
+	$as( $team );
+	$ch_p1 = wp_insert_post( array( 'post_title' => 'ff-test Schwimmbad', 'post_status' => 'publish', 'post_content' => $ch_raw ) );
+	$ch_p2 = wp_insert_post( array( 'post_title' => 'ff-test Zweiter Artikel', 'post_status' => 'publish', 'post_content' => "<!-- wp:paragraph -->\n<p>Ein Text.</p>\n<!-- /wp:paragraph -->" ) );
+	$ch_p3 = wp_insert_post( array( 'post_title' => 'ff-test Mit Einbettung', 'post_status' => 'publish', 'post_content' => "<!-- wp:html -->\n<iframe src=\"https://example.org/karte\"></iframe>\n<!-- /wp:html -->\n\n<!-- wp:paragraph -->\n<p>Ein Tippfeler.</p>\n<!-- /wp:paragraph -->" ) );
+	$ch_in = array(
+		'posts' => array(
+			array( 'id' => $ch_p1, 'replace' => array( array( 'find' => 'das das neue', 'with' => 'dass das neue' ), array( 'find' => 'Schwimbad', 'with' => 'Schwimmbad' ) ), 'add_categories' => array( 'ff-test Klima' ) ),
+			array( 'id' => $ch_p2, 'title' => 'ff-test Kürzer' ),
+			array( 'id' => $ch_p3, 'replace' => array( array( 'find' => 'Tippfeler', 'with' => 'Tippfehler' ) ) ),
+		),
+	);
+	$lim_set( '' );
+	$as( $lim_au );
+	$ch_no = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_au, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Changes\NAME, $ch_in ) );
+	$as( $lim_ed );
+	$ch_ok  = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Changes\NAME, $ch_in ) );
+	$ch_bad = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Changes\NAME, array( 'posts' => array( array( 'id' => $ch_p1, 'replace' => array( array( 'find' => 'Hallenbad', 'with' => 'x' ) ) ) ) ) ) );
+	$check( 'proposing changes: only for people who may edit every post; a text not in the post comes back to the AI', is_wp_error( $ch_no ) && true === $ch_ok && is_wp_error( $ch_bad ) && 'flurfunk_change_text' === $ch_bad->get_error_code(), array( $ch_no, $ch_ok, $ch_bad ) );
+	$as( $team );
+	$ch_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Bitte die Artikel korrigieren' ) );
+	$ch_pid = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Changes\NAME, $ch_in, $ai_bot, $ch_t );
+	$ch_mid = Flurfunk\Modules\Ai\reply( $ch_t, $ai_bot, 'Hier meine Korrekturen.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ch_pid ) ) ) );
+	$ch_card = static function () use ( $ch_t, $ch_mid, $lim_ed ) {
+		foreach ( Store\full_thread( $ch_t, $lim_ed )['messages'] as $m ) {
+			if ( (int) $m['id'] === (int) $ch_mid ) {
+				return $m['attachments'][0] ?? null;
+			}
+		}
+		return null;
+	};
+	$ch_c  = $ch_card();
+	$ch_d  = $ch_c['snapshot']['data'] ?? array();
+	$ch_r1 = $ch_d['rows'][0] ?? array();
+	$check( 'one card for all posts: a row per post with before and after, Apply and Dismiss', 'changes' === ( $ch_d['kind'] ?? '' ) && 3 === count( $ch_d['rows'] ?? array() ) && array( 'run', 'dismiss' ) === $ch_c['snapshot']['actions'] && 'Schwimbad' === ( $ch_r1['changes'][1]['find'] ?? '' ) && 'Schwimmbad' === ( $ch_r1['changes'][1]['with'] ?? '' ) && str_contains( (string) ( $ch_r1['changes'][2]['after'] ?? '' ), 'ff-test Klima' ), $ch_d );
+	sleep( 1 );
+	wp_update_post( array( 'ID' => $ch_p2, 'post_content' => "<!-- wp:paragraph -->\n<p>Ein Text, von Hand geändert.</p>\n<!-- /wp:paragraph -->" ) );
+	$as( $lim_ed );
+	$req( 'POST', 'cards/' . (int) $ch_c['id'] . '/refresh' );
+	$ch_r2 = $ch_card()['snapshot']['data']['rows'][1] ?? array();
+	$check( '… a post changed since shows it (and would be skipped)', '' !== ( $ch_r2['note'] ?? '' ), $ch_r2 );
+	list( $ch_s ) = $req( 'POST', 'cards/' . (int) $ch_c['id'] . '/action/run', array( 'key' => 'ch1', 'input' => array( 'rows' => array( $ch_p1, $ch_p2, $ch_p3 ) ) ) );
+	$ch_o = Flurfunk\Modules\Ai\proposal( $ch_pid )['outcome'] ?? array();
+	$ch_st = array_column( $ch_o, 'status', 'id' );
+	$ch_c1 = get_post( $ch_p1 );
+	$check( 'Apply: the post is corrected (text and category), with the clicker\'s rights', 200 === $ch_s && 'changed' === ( $ch_st[ $ch_p1 ] ?? '' ) && str_contains( $ch_c1->post_content, 'dass das neue Schwimmbad' ) && str_contains( $ch_c1->post_content, 'example.org/das-das' ) && in_array( 'ff-test Klima', wp_get_post_terms( $ch_p1, 'category', array( 'fields' => 'names' ) ), true ), array( $ch_s, $ch_o ) );
+	$check( '… the post someone changed meanwhile is skipped, and so is the one whose embed saving would lose', 'skipped' === ( $ch_st[ $ch_p2 ] ?? '' ) && 'ff-test Zweiter Artikel' === get_the_title( $ch_p2 ) && 'skipped' === ( $ch_st[ $ch_p3 ] ?? '' ) && str_contains( get_post( $ch_p3 )->post_content, '<iframe' ) && str_contains( get_post( $ch_p3 )->post_content, 'Tippfeler' ), $ch_o );
+	$ch_c = $ch_card();
+	$check( '… the card says what happened to each and offers Undo', 'done' === ( $ch_c['snapshot']['data']['state'] ?? '' ) && array( 'undo' ) === $ch_c['snapshot']['actions'] && 'changed' === ( $ch_c['snapshot']['data']['rows'][0]['status'] ?? '' ), $ch_c['snapshot'] );
+	list( $ch_s2 ) = $req( 'POST', 'cards/' . (int) $ch_c['id'] . '/action/undo', array( 'key' => 'ch2' ) );
+	$ch_u = get_post( $ch_p1 );
+	$check( 'Undo: back to the text and categories from before', 200 === $ch_s2 && str_contains( $ch_u->post_content, 'das das neue Schwimbad' ) && ! in_array( 'ff-test Klima', wp_get_post_terms( $ch_p1, 'category', array( 'fields' => 'names' ) ), true ) && 'undone' === Flurfunk\Modules\Ai\proposal( $ch_pid )['state'] && array() === $ch_card()['snapshot']['actions'], array( $ch_s2, $ch_u->post_content ) );
+	// Only the ticked rows; undo leaves a post alone that someone changed after applying.
+	$as( $team );
+	$ch_pid2 = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Changes\NAME, array( 'posts' => array( array( 'id' => $ch_p1, 'title' => 'ff-test Neu 1' ), array( 'id' => $ch_p2, 'title' => 'ff-test Neu 2' ) ) ), $ai_bot, $ch_t );
+	$ch_mid2 = Flurfunk\Modules\Ai\reply( $ch_t, $ai_bot, 'Noch zwei Titel.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ch_pid2 ) ) ) );
+	$ch_cid2 = 0;
+	foreach ( Store\full_thread( $ch_t, $lim_ed )['messages'] as $m ) {
+		if ( (int) $m['id'] === (int) $ch_mid2 ) {
+			$ch_cid2 = (int) ( $m['attachments'][0]['id'] ?? 0 );
+		}
+	}
+	$as( $lim_ed );
+	list( $ch_s3 ) = $req( 'POST', 'cards/' . $ch_cid2 . '/action/run', array( 'key' => 'ch3', 'input' => array( 'rows' => array( (string) $ch_p2 ) ) ) );
+	$check( 'only the rows left ticked are applied', 200 === $ch_s3 && 'ff-test Neu 2' === get_the_title( $ch_p2 ) && 'ff-test Neu 1' !== get_the_title( $ch_p1 ), array( $ch_s3, get_the_title( $ch_p1 ), get_the_title( $ch_p2 ) ) );
+	sleep( 1 );
+	wp_update_post( array( 'ID' => $ch_p2, 'post_title' => 'ff-test Von Hand' ) );
+	$req( 'POST', 'cards/' . $ch_cid2 . '/action/undo', array( 'key' => 'ch4' ) );
+	$check( '… and undo leaves a post alone that someone changed after applying', 'ff-test Von Hand' === get_the_title( $ch_p2 ) && 'skipped' === ( Flurfunk\Modules\Ai\proposal( $ch_pid2 )['undone'][0]['status'] ?? '' ) );
+	list( $ch_s5 ) = $req( 'POST', 'cards/' . $ch_cid2 . '/action/run', array( 'key' => 'ch5', 'input' => array( 'rows' => array() ) ) );
+	$check( '… a card that was applied cannot be applied again', 200 !== $ch_s5 || 'ff-test Von Hand' === get_the_title( $ch_p2 ) );
+	$as( $team );
+	foreach ( array( $ch_p1, $ch_p2, $ch_p3 ) as $ch_id ) {
+		wp_delete_post( $ch_id, true );
+	}
+	$ch_term = get_term_by( 'name', 'ff-test Klima', 'category' );
+	$ch_term && wp_delete_term( $ch_term->term_id, 'category' );
+	$dr_k2 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'edits' ) ) );
+	$check( 'the pack "Changes to posts" makes it a proposal, and the AI is told how to quote corrections', in_array( Flurfunk\Changes\NAME, $dr_k2['proposals'], true ) && str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ch_t ), 0, $ai_bot )['system'], 'flurfunk/update-posts' ) );
+}
 wp_delete_attachment( $dr_img, true );
 wp_delete_attachment( $dr_hid, true );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );

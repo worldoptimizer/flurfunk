@@ -68,7 +68,11 @@ function may_propose( string $ability, array $input ) {
 		return new \WP_Error( 'flurfunk_ai_gone', 'No such ability.' );
 	}
 	$ok = $a->check_permissions( $input );
-	return true === $ok ? true : ( is_wp_error( $ok ) ? $ok : new \WP_Error( 'flurfunk_forbidden', 'Not allowed.' ) );
+	if ( true !== $ok ) {
+		return is_wp_error( $ok ) ? $ok : new \WP_Error( 'flurfunk_forbidden', 'Not allowed.' );
+	}
+	// Changes to posts: every post exists, every text to correct is found – else the AI hears why.
+	return \Flurfunk\Changes\NAME === $ability ? \Flurfunk\Changes\validate( $input ) : true;
 }
 
 /**
@@ -81,6 +85,20 @@ function may_propose( string $ability, array $input ) {
  * @return string Proposal ID.
  */
 function add_proposal( string $ability, array $input, int $agent, int $thread ): string {
+	$preview = array();
+	if ( \Flurfunk\Changes\NAME === $ability ) {
+		// Remember each post's state now: if someone changes it before the click, it is skipped.
+		// And what the card shows as before and after, as it was when proposed.
+		foreach ( (array) ( $input['posts'] ?? array() ) as $i => $e ) {
+			$post = get_post( (int) ( ( (array) $e )['id'] ?? 0 ) );
+			if ( $post ) {
+				$input['posts'][ $i ]                    = (array) $e;
+				$input['posts'][ $i ]['unchanged_since'] = (string) $post->post_modified_gmt;
+				$plan                                    = \Flurfunk\Changes\plan( (array) $e );
+				$preview[ $post->ID ]                    = is_wp_error( $plan ) ? array() : $plan;
+			}
+		}
+	}
 	$all        = (array) get_option( PROPOSALS, array() );
 	$id         = wp_generate_password( 12, false, false );
 	$all[ $id ] = array(
@@ -90,6 +108,7 @@ function add_proposal( string $ability, array $input, int $agent, int $thread ):
 		'thread'  => $thread,
 		'state'   => 'open',
 		'locale'  => language( $agent ),
+		'preview' => $preview,
 		'by'      => 0,
 		'at'      => 0,
 		'result'  => '',
@@ -142,6 +161,14 @@ function register_proposals(): void {
 					'confirm'  => __( 'Run this now, with your rights?', 'flurfunk' ),
 					'callback' => __NAMESPACE__ . '\\run_proposal',
 				),
+				'undo'    => array(
+					'label'    => __( 'Undo', 'flurfunk' ),
+					/* translators: %s: person */
+					'done'     => __( '%s undid the changes', 'flurfunk' ),
+					'style'    => 'secondary',
+					'confirm'  => __( 'Undo these changes, with your rights?', 'flurfunk' ),
+					'callback' => __NAMESPACE__ . '\\undo_proposal',
+				),
 				'dismiss' => array(
 					'label'    => __( 'Dismiss', 'flurfunk' ),
 					/* translators: %s: person */
@@ -190,6 +217,9 @@ function proposal_snapshot( array $ref, int $user_id = 0 ): ?array {
  * @param array $p Proposal.
  */
 function build_snapshot( array $p ): array {
+	if ( \Flurfunk\Changes\NAME === $p['ability'] ) {
+		return changes_snapshot( $p );
+	}
 	$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( (string) $p['ability'] ) : null;
 	$fields  = array();
 	$schema  = $ability ? (array) ( $ability->get_input_schema()['properties'] ?? array() ) : array();
@@ -293,6 +323,92 @@ function build_snapshot( array $p ): array {
 }
 
 /**
+ * The card of changes to posts: one row per post with before and after; once run, what happened
+ * to each (changed or skipped, and why); "Undo" while it can be undone.
+ *
+ * @param array $p Proposal.
+ */
+function changes_snapshot( array $p ): array {
+	$entries = \Flurfunk\Changes\entries( (array) $p['input'] );
+	$name    = static fn ( int $u ): string => $u ? \Flurfunk\Store\person( $u )['name'] : '';
+	$rows    = array();
+	$fields  = array();
+	foreach ( $entries as $e ) {
+		$id   = (int) $e['id'];
+		$post = get_post( $id );
+		// Before and after as proposed; while open, checked again against the post as it is now.
+		$plan = 'open' === $p['state'] || ! isset( $p['preview'][ $id ] ) ? \Flurfunk\Changes\plan( $e ) : (array) $p['preview'][ $id ];
+		$row  = array(
+			'id'      => $id,
+			'title'   => $post ? html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ) : '#' . $id,
+			'url'     => $post ? (string) get_edit_post_link( $id, 'raw' ) : '',
+			'changes' => is_wp_error( $plan ) ? (array) ( $p['preview'][ $id ] ?? array() ) : $plan,
+			'note'    => is_wp_error( $plan ) ? $plan->get_error_message() : '',
+		);
+		if ( 'open' !== $p['state'] && 'dismissed' !== $p['state'] ) {
+			$row['status'] = 'left'; // Not ticked when it was applied (the outcome below says otherwise).
+		}
+		// Changed by someone since it was proposed: it would be skipped.
+		if ( 'open' === $p['state'] && $post && ! empty( $e['unchanged_since'] ) && (string) $e['unchanged_since'] !== (string) $post->post_modified_gmt ) {
+			$row['note'] = __( 'Someone changed this post in the meantime.', 'flurfunk' );
+		}
+		foreach ( $row['changes'] as $c ) {
+			$fields[ $c['label'] ] = true;
+		}
+		// Short enough for a card (its data has a size limit): at most 8 changes, texts shortened.
+		$cut            = static fn ( $v ) => mb_strlen( (string) $v ) > 160 ? mb_substr( (string) $v, 0, 159 ) . '…' : (string) $v;
+		$row['more']    = max( 0, count( $row['changes'] ) - 8 );
+		$row['changes'] = array_map( static fn ( $c ) => array_map( $cut, $c ), array_slice( $row['changes'], 0, 8 ) );
+		$rows[ $id ]    = $row;
+	}
+	// After running (or undoing): what happened to each post.
+	foreach ( array( 'outcome', 'undone' ) as $key ) {
+		foreach ( (array) ( $p[ $key ] ?? array() ) as $r ) {
+			$id = (int) ( $r['id'] ?? 0 );
+			if ( isset( $rows[ $id ] ) ) {
+				$rows[ $id ]['status'] = (string) ( $r['status'] ?? '' );
+				$rows[ $id ]['note']   = (string) ( $r['message'] ?? '' );
+			}
+		}
+	}
+	$n      = count( $entries );
+	/* translators: %d: number of posts */
+	$line   = sprintf( _n( 'Change %d post', 'Change %d posts', $n, 'flurfunk' ), $n );
+	$by     = $name( (int) $p['by'] );
+	$undoer = $name( (int) ( $p['undo_by'] ?? 0 ) );
+	$status = array(
+		/* translators: %s: person */
+		'done'      => array( 'label' => sprintf( __( 'Applied by %s', 'flurfunk' ), $by ), 'tone' => 'positive' ),
+		/* translators: %s: person */
+		'undone'    => array( 'label' => sprintf( __( 'Undone by %s', 'flurfunk' ), $undoer ), 'tone' => 'neutral' ),
+		/* translators: %s: person */
+		'dismissed' => array( 'label' => sprintf( __( 'Dismissed by %s', 'flurfunk' ), $by ), 'tone' => 'neutral' ),
+	)[ $p['state'] ] ?? array( 'label' => __( 'Waiting for a person', 'flurfunk' ), 'tone' => 'warning' );
+	return array(
+		'title'    => $line,
+		'subtitle' => implode( ', ', array_keys( $fields ) ),
+		'status'   => $status,
+		'fields'   => array_map( static fn ( $r ) => array( 'label' => $r['title'], 'value' => implode( ', ', array_map( static fn ( $c ) => $c['label'], $r['changes'] ) ) ), array_values( $rows ) ),
+		'actions'  => 'open' === $p['state'] ? array( 'run', 'dismiss' ) : ( 'done' === $p['state'] && undoable( $p ) ? array( 'undo' ) : array() ),
+		'data'     => array(
+			'bare'    => true,
+			'kind'    => 'changes',
+			'line'    => $line,
+			'sub'     => implode( ', ', array_keys( $fields ) ),
+			'run'     => __( 'Apply', 'flurfunk' ),
+			'state'   => (string) $p['state'],
+			'by'      => $by,
+			'at'      => $p['at'] ? gmdate( 'c', (int) $p['at'] ) : '',
+			'undo_by' => $undoer,
+			'undo_at' => ! empty( $p['undo_at'] ) ? gmdate( 'c', (int) $p['undo_at'] ) : '',
+			'undo'    => 'done' === $p['state'] && undoable( $p ),
+			'rows'    => array_values( $rows ),
+			'agent'   => (int) $p['agent'],
+		),
+	);
+}
+
+/**
  * "Run": the ability runs as the person who clicked, with its own permission check, within the
  * limit of the assistant that proposed it.
  *
@@ -301,7 +417,7 @@ function build_snapshot( array $p ): array {
  * @param int   $user_id Who clicked.
  * @return array|\WP_Error|null
  */
-function run_proposal( array $ref, array $card, int $user_id ) {
+function run_proposal( array $ref, array $card, int $user_id, array $choice = array() ) {
 	$id = (string) ( $ref['id'] ?? '' );
 	$p  = proposal( $id );
 	if ( ! $p || 'open' !== $p['state'] ) {
@@ -311,11 +427,21 @@ function run_proposal( array $ref, array $card, int $user_id ) {
 	if ( ! $ability ) {
 		return new \WP_Error( 'flurfunk_ai_gone', __( 'This action is no longer available on the site.', 'flurfunk' ) );
 	}
+	$input   = (array) $p['input'];
+	$changes = \Flurfunk\Changes\NAME === $p['ability'];
+	if ( $changes && isset( $choice['rows'] ) ) {
+		// Only the rows the person left ticked.
+		$rows           = array_map( 'intval', (array) $choice['rows'] );
+		$input['posts'] = array_values( array_filter( (array) ( $input['posts'] ?? array() ), static fn ( $e ) => in_array( (int) ( ( (array) $e )['id'] ?? 0 ), $rows, true ) ) );
+		if ( ! $input['posts'] ) {
+			return new \WP_Error( 'flurfunk_change_empty', __( 'Tick at least one post.', 'flurfunk' ), array( 'status' => 400 ) );
+		}
+	}
 	$me = get_current_user_id();
 	wp_set_current_user( $user_id );
 	try {
 		// With the clicker's rights, within the limit of the assistant that proposed it.
-		$result = with_limit( (int) $p['agent'], $user_id, static fn () => $ability->execute( (array) $p['input'] ) );
+		$result = with_limit( (int) $p['agent'], $user_id, static fn () => $ability->execute( $input ) );
 	} finally {
 		wp_set_current_user( $me );
 	}
@@ -325,11 +451,55 @@ function run_proposal( array $ref, array $card, int $user_id ) {
 	update_proposal(
 		$id,
 		array(
-			'state'  => 'done',
-			'by'     => $user_id,
-			'at'     => time(),
-			'result' => mb_substr( is_scalar( $result ) ? (string) $result : (string) wp_json_encode( $result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ), 0, 300 ),
+			'state'   => 'done',
+			'by'      => $user_id,
+			'at'      => time(),
+			'result'  => $changes ? '' : mb_substr( is_scalar( $result ) ? (string) $result : (string) wp_json_encode( $result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ), 0, 300 ),
+			'outcome' => $changes ? (array) ( $result['posts'] ?? array() ) : null,
 		)
 	);
 	return null;
+}
+
+/**
+ * "Undo" of changes to posts: back to the state before, post by post, with the clicker's rights
+ * within the assistant's limit – unless someone changed a post again since.
+ *
+ * @param array $ref     { id }.
+ * @param array $card    Card.
+ * @param int   $user_id Who clicked.
+ * @return \WP_Error|null
+ */
+function undo_proposal( array $ref, array $card, int $user_id ) {
+	$id = (string) ( $ref['id'] ?? '' );
+	$p  = proposal( $id );
+	if ( ! $p || 'done' !== $p['state'] || \Flurfunk\Changes\NAME !== $p['ability'] || ! undoable( $p ) ) {
+		return new \WP_Error( 'flurfunk_action_gone', __( 'This is no longer possible. The card shows the current state.', 'flurfunk' ), array( 'status' => 409 ) );
+	}
+	$me = get_current_user_id();
+	wp_set_current_user( $user_id );
+	try {
+		$result = with_limit( (int) $p['agent'], $user_id, static fn () => \Flurfunk\Changes\undo( (array) $p['outcome'] ) );
+	} finally {
+		wp_set_current_user( $me );
+	}
+	update_proposal(
+		$id,
+		array(
+			'state'   => 'undone',
+			'undone'  => (array) $result['posts'],
+			'undo_by' => $user_id,
+			'undo_at' => time(),
+		)
+	);
+	return null;
+}
+
+/**
+ * Can the changes of a run proposal still be undone (at least one post changed)?
+ *
+ * @param array $p Proposal.
+ */
+function undoable( array $p ): bool {
+	return (bool) array_filter( (array) ( $p['outcome'] ?? array() ), static fn ( $r ) => 'changed' === ( $r['status'] ?? '' ) );
 }

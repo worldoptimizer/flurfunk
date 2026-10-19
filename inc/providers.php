@@ -63,9 +63,12 @@ defined( 'ABSPATH' ) || exit;
  *           'style'      => 'primary',                  // primary | secondary | danger
  *           'confirm'    => 'Really approve?',          // optional, asked inline
  *           'capability' => 'flurfunk_team',            // default
- *           'callback'   => fn ( array $ref, array $card, int $user_id ) => array|WP_Error,
+ *           'callback'   => fn ( array $ref, array $card, int $user_id, array $input ) => array|WP_Error,
  *       ),
  *   ),
+ *
+ * $input is what the person chose on the card: inputs with data-card-input in a custom renderer
+ * (checkboxes of one name become a list of the checked values). Untrusted – check it.
  *
  * A plugin that needs a special look registers a renderer in JavaScript:
  *   window.Flurfunk.registerCard( 'myplugin/report', ( snapshot, h ) => html ), built with the helpers in h.
@@ -436,9 +439,10 @@ function clean_snapshot( array $s, string $provider = '' ): array {
  * @param array  $ref      The card's reference.
  * @param array  $card     The card's stored snapshot.
  * @param int    $user_id  User.
+ * @param array  $input    What the person chose on the card (e.g. rows), passed to the callback.
  * @return array|\WP_Error The new snapshot (cleaned).
  */
-function run_action( string $provider, string $action, array $ref, array $card, int $user_id ) {
+function run_action( string $provider, string $action, array $ref, array $card, int $user_id, array $input = array() ) {
 	$p = registry()[ $provider ] ?? null;
 	$a = $p['actions'][ $action ] ?? null;
 	if ( ! $p || ! $a ) {
@@ -451,7 +455,7 @@ function run_action( string $provider, string $action, array $ref, array $card, 
 		return new \WP_Error( 'flurfunk_action_gone', __( 'This is no longer possible. The card shows the current state.', 'flurfunk' ), array( 'status' => 409 ) );
 	}
 	try {
-		$result = call_user_func( $a['callback'], $ref, $card, $user_id );
+		$result = call_user_func( $a['callback'], $ref, $card, $user_id, $input );
 	} catch ( \Throwable $e ) {
 		return new \WP_Error( 'flurfunk_action_failed', __( 'That did not work.', 'flurfunk' ), array( 'status' => 500 ) );
 	}

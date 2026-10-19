@@ -784,7 +784,7 @@ them with the provider; each snapshot lists the ones that make sense right now.
 | `style` | `secondary` | `primary`, `secondary` or `danger` |
 | `confirm` | | Question asked inside the card before it runs. Use it for anything hard to undo |
 | `capability` | `flurfunk_team` | Needed to see and run the button, on top of the provider's `capability` and `can`. Any [capability](#permissions), e.g. `moderate_comments` or one you declared |
-| `callback` | required | `( array $ref, array $card, int $user_id ): array\|WP_Error`. Runs as the person who clicked |
+| `callback` | required | `( array $ref, array $card, int $user_id, array $input ): array\|WP_Error`. Runs as the person who clicked. `$input` is what they chose on the card: in a custom renderer, form fields with `data-card-input` (checkboxes of one name become a list of the checked values) – untrusted, check it |
 
 Action IDs are keys like `ship` (lowercase letters, digits, `_`, `-`); up to six per provider.
 
@@ -1028,6 +1028,7 @@ current user with Flurfunk's own checks, so an agent only reaches what its accou
 | `flurfunk/find-posts` | yes | Posts the user may see (drafts only if they may edit them): `search`, `status`, `order`, `limit`. |
 | `flurfunk/get-post` | yes | One post's text as plain text: `id`. |
 | `flurfunk/create-draft` | no | A draft (never published), the user is its author: `title`, `text` (paragraphs, `- ` lists, `## ` headings, `*bold*`; no HTML), `excerpt`, `type`, `featured_image`, `images` (IDs; Flurfunk files from conversations the user can see move into the media library). Needs the post type's `create_posts`, for images `upload_files`. |
+| `flurfunk/update-posts` | no | Changes existing posts, up to 20 at once: `posts: [ { id, title, excerpt, replace: [ { find, with } ], add_categories, remove_categories, add_tags, remove_tags, featured_image, unchanged_since } ]`. Replacements only touch text, never markup; `with` is escaped. A post modified since `unchanged_since`, or one whose markup kses would change for this person, is skipped. Returns `posts: [ { id, status: changed\|skipped, message, undo } ]`; `Flurfunk\Changes\undo()` takes those back. |
 | `flurfunk/update-draft` | no | Changes a draft made with `create-draft` while nobody else has saved it since (`_flurfunk_draft_saved` = its modification time): `id`, `title`, `text`, `excerpt`, `featured_image`, `images`. Needs `edit_post`. |
 
 The action `flurfunk_draft_saved` (`int $post_id`, `array $input`) fires after either; drafts an AI

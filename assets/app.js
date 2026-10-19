@@ -399,6 +399,9 @@
 			action: spark,
 		};
 		const ico = icons[ d.kind ] || icons.action;
+		if ( 'changes' === d.kind ) {
+			return changesCard( d, h );
+		}
 		if ( 'done' === d.state ) {
 			return '<div class="ff-prop is-done"><span class="ff-prop-ico">' + '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12l5 5 9-10"/></svg>' + '</span><div class="ff-prop-main"><p class="ff-prop-line">' + h.esc( d.line ) + '</p><p class="ff-prop-sub">'
 				+ h.esc( t( 'Done by %s', d.by || '' ) ) + ( d.at ? ', ' + h.esc( h.when( d.at ) ) : '' ) + ( d.url ? ' · <a href="' + h.esc( d.url ) + '" target="_top">' + h.esc( t( 'open' ) ) + '</a>' : '' ) + '</p></div></div>';
@@ -413,6 +416,40 @@
 			+ '<div class="ff-prop-bar"><span>' + h.esc( t( 'Runs with your rights' ) ) + '</span>'
 			+ h.button( t( 'Dismiss' ), { action: 'dismiss' } )
 			+ h.button( d.run || t( 'Run' ), { style: 'primary', action: 'run', confirm: 'action' === d.kind ? t( 'Run this now, with your rights?' ) : '' } ) + '</div></div>';
+	};
+	// Changes to posts: one row per post with before and after, rows to untick; afterwards what
+	// happened to each, and Undo.
+	const changesCard = ( d, h ) => {
+		const open = 'open' === d.state;
+		const change = ( c ) => '<li><span class="ff-chg-k">' + h.esc( c.label ) + '</span> <span class="ff-chg-v">'
+			+ ( 'text' === c.field
+				? h.esc( c.before ) + '<del>' + h.esc( c.find ) + '</del><ins>' + h.esc( c.with ) + '</ins>' + h.esc( c.after )
+				: '<del>' + h.esc( c.before || '–' ) + '</del> <span aria-hidden="true">→</span> <ins>' + h.esc( c.after || '–' ) + '</ins>' )
+			+ '</span></li>';
+		const words = { changed: t( 'Changed' ), skipped: t( 'Skipped' ), undone: t( 'Undone' ), left: t( 'Not applied' ) };
+		const rows = ( d.rows || [] ).map( ( r ) => {
+			const blocked = open && !! r.note;
+			return '<li class="ff-chg-row' + ( r.status ? ' is-' + h.esc( r.status ) : '' ) + ( blocked ? ' is-blocked' : '' ) + '">'
+				+ ( open ? '<input type="checkbox" data-card-input name="rows" value="' + ( +r.id ) + '"' + ( blocked ? ' disabled' : ' checked' ) + ' aria-label="' + h.esc( t( 'Apply to %s', r.title ) ) + '">' : '' )
+				+ '<div class="ff-chg-main"><p class="ff-chg-t">' + ( r.url ? '<a href="' + h.esc( r.url ) + '" target="_top">' + h.esc( r.title ) + '</a>' : h.esc( r.title ) )
+				+ ( r.status ? ' <span class="ff-chg-st">' + h.esc( words[ r.status ] || r.status ) + '</span>' : '' ) + '</p>'
+				+ ( r.changes && r.changes.length && 'skipped' !== r.status && 'left' !== r.status ? '<ul class="ff-chg-list">' + r.changes.map( change ).join( '' ) + ( r.more ? '<li class="ff-chg-more">' + h.esc( t( '… and %s more', String( r.more ) ) ) + '</li>' : '' ) + '</ul>' : '' )
+				+ ( r.note ? '<p class="ff-chg-note">' + h.esc( r.note ) + '</p>' : '' ) + '</div></li>';
+		} ).join( '' );
+		const when = ( at ) => ( at ? ', ' + h.esc( h.when( at ) ) : '' );
+		const head = '<div class="ff-prop-top"><span class="ff-prop-ico">' + spark + '</span><div class="ff-prop-main">'
+			+ ( open ? '<p class="ff-prop-k">' + h.esc( t( 'Suggestion · waiting for you' ) ) + '</p>' : '' )
+			+ '<p class="ff-prop-line">' + h.esc( d.line ) + '</p>'
+			+ ( 'done' === d.state ? '<p class="ff-prop-sub">' + h.esc( t( 'Applied by %s', d.by || '' ) ) + when( d.at ) + '</p>' : '' )
+			+ ( 'undone' === d.state ? '<p class="ff-prop-sub">' + h.esc( t( 'Undone by %s', d.undo_by || '' ) ) + when( d.undo_at ) + '</p>' : '' )
+			+ ( 'dismissed' === d.state ? '<p class="ff-prop-sub">' + h.esc( t( 'Dismissed by %s', d.by || '' ) ) + when( d.at ) + '</p>' : '' )
+			+ ( open && d.sub ? '<p class="ff-prop-sub">' + h.esc( d.sub ) + '</p>' : '' )
+			+ '</div></div>';
+		const list = 'dismissed' === d.state ? '' : '<ul class="ff-chg">' + rows + '</ul>';
+		const bar = open
+			? '<div class="ff-prop-bar"><span>' + h.esc( t( 'Runs with your rights · can be undone' ) ) + '</span>' + h.button( t( 'Dismiss' ), { action: 'dismiss' } ) + h.button( d.run || t( 'Apply' ), { style: 'primary', action: 'run' } ) + '</div>'
+			: d.undo ? '<div class="ff-prop-bar"><span>' + h.esc( t( 'Back to how it was before, unless someone changed a post since' ) ) + '</span>' + h.button( t( 'Undo' ), { action: 'undo', confirm: t( 'Undo these changes, with your rights?' ) } ) + '</div>' : '';
+		return '<div class="ff-prop is-changes' + ( open ? '' : ' is-' + h.esc( d.state ) ) + '">' + head + list + bar + '</div>';
 	};
 	/*
 	 * Card building blocks. Providers send data only; these turn it into markup. The same
@@ -995,7 +1032,16 @@
 		// The same key for retries of this click, so the action runs at most once.
 		el.dataset.key = el.dataset.key || ( window.crypto && crypto.randomUUID ? crypto.randomUUID() : String( Date.now() ) + Math.random().toString( 36 ).slice( 2 ) );
 		try {
-			onUpdate( await api( 'cards/' + box.dataset.cid + '/action/' + encodeURIComponent( el.dataset.act ), { method: 'POST', body: { key: el.dataset.key } } ) );
+			// What the person chose on the card: checkboxes of one name become a list of the checked values.
+			const input = {};
+			box.querySelectorAll( '[data-card-input]' ).forEach( ( f ) => {
+				if ( 'checkbox' === f.type ) {
+					input[ f.name ] = ( input[ f.name ] || [] ).concat( f.checked ? [ f.value ] : [] );
+				} else {
+					input[ f.name ] = f.value;
+				}
+			} );
+			onUpdate( await api( 'cards/' + box.dataset.cid + '/action/' + encodeURIComponent( el.dataset.act ), { method: 'POST', body: { key: el.dataset.key, input } } ) );
 		} catch ( x ) {
 			buttons.forEach( ( b ) => {
 				b.disabled = false;

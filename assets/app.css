@@ -597,6 +597,29 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-prop-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; padding: 10px 14px; border-top: 1px solid var(--ff-line); background: var(--ff-soft); }
 .ff-root .ff-prop-bar > span { margin-right: auto; font-size: 12px; color: var(--ff-muted); }
 .ff-root .ff-prop + .ff-card-confirm, .ff-root .ff-card.is-bare .ff-card-confirm { padding: 10px 14px; }
+/* Changes to posts: rows with before and after */
+.ff-root .ff-prop.is-changes { display: block; padding: 0; }
+.ff-root .ff-prop.is-changes.is-dismissed .ff-prop-ico { background: none; }
+.ff-root .ff-chg { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ff-line); }
+.ff-root .ff-chg-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--ff-line); }
+.ff-root .ff-chg-row:last-child { border-bottom: 0; }
+.ff-root .ff-chg-row > input { margin-top: 3px; flex: none; accent-color: var(--ff-accent); }
+.ff-root .ff-chg-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.ff-root .ff-chg-main p { margin: 0; }
+.ff-root .ff-chg-t { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.ff-root .ff-chg-t a { color: var(--ff-ink); }
+.ff-root .ff-chg-st { font-weight: 600; font-size: 11px; border-radius: 999px; padding: 1px 7px; background: var(--ff-soft2); color: var(--ff-muted); }
+.ff-root .ff-chg-row.is-changed .ff-chg-st { background: color-mix(in srgb, var(--ff-ok) 14%, var(--ff-paper)); color: var(--ff-ok); }
+.ff-root .ff-chg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.ff-root .ff-chg-k { color: var(--ff-muted); font-size: 12px; }
+.ff-root .ff-chg-v { overflow-wrap: anywhere; }
+.ff-root .ff-chg del { background: color-mix(in srgb, var(--ff-tone-critical) 14%, var(--ff-paper)); color: var(--ff-ink); border-radius: 3px; padding: 0 2px; }
+.ff-root .ff-chg ins { background: color-mix(in srgb, var(--ff-ok) 16%, var(--ff-paper)); color: var(--ff-ink); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.ff-root .ff-chg-row.is-undone del, .ff-root .ff-chg-row.is-undone ins { background: none; }
+.ff-root .ff-chg-row.is-left .ff-chg-t { font-weight: 400; color: var(--ff-muted); }
+.ff-root .ff-chg-note { font-size: 12.5px; color: var(--ff-tone-warning); }
+.ff-root .ff-chg-row.is-blocked .ff-chg-t, .ff-root .ff-chg-row.is-blocked .ff-chg-list { opacity: .6; }
+.ff-root .ff-chg-more { color: var(--ff-muted); }
 
 /* Icons and icon buttons, like Slack: one 18 px icon in a 32 px button, a dark tooltip on hover. */
 .ff-i { width: 18px; height: 18px; flex: none; display: block; }

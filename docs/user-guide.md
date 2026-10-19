@@ -169,6 +169,10 @@ their role.
   this thread, with the photo as featured image". It writes a draft with you as its author and
   puts a card with it under its answer; write on ("shorter title, please") and it changes the
   draft, until someone else has worked on it. It never publishes.
+- **Corrections:** "@Lektorat, check the three latest articles and suggest the corrections" gives one
+  card with before and after for each post (if your administrators allow it). Untick what you do
+  not want and click **Apply** – it runs with your rights; **Undo** brings the posts back, as long as
+  nobody changed them since. A post someone changed in the meantime is skipped.
 - **Rights:** an assistant works with your rights, never more, and never administers the site.
   Your administrators can limit it further (e.g. to what an author may); then it tells you when
   something may be outside its limit instead of claiming it does not exist.
