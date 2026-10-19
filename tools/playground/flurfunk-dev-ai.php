@@ -34,3 +34,42 @@ add_filter(
 	10,
 	3
 );
+
+/*
+ * Local Playground only: no login screen. Opening the dashboard or the app on localhost without being
+ * logged in logs in the administrator; ?as=redaktion or ?as=gast switches to another account. After
+ * logging out it stays out (cookie). Lives in this dev mu-plugin, which only start-ai.sh mounts –
+ * never on a real site.
+ */
+add_action(
+	'wp_logout',
+	static function () {
+		setcookie( 'ff_dev_noauto', '1', 0, '/' );
+	}
+);
+add_action(
+	'init',
+	static function () {
+		$host   = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+		$remote = (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		if ( ! in_array( $host, array( 'localhost', '127.0.0.1' ), true ) || ! in_array( $remote, array( '127.0.0.1', '::1', '' ), true ) || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+			return;
+		}
+		$as   = sanitize_user( (string) ( $_GET['as'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		// Without ?as= only in the dashboard and the full-screen app, and not after logging out
+		// (tests and the login screen stay as they are).
+		$uri  = (string) ( $_SERVER['REQUEST_URI'] ?? '' ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$auto = ( is_admin() || str_contains( $uri, '/flurfunk' ) ) && ! str_contains( $uri, 'admin-ajax.php' ) && empty( $_COOKIE['ff_dev_noauto'] );
+		$user = '' !== $as ? get_user_by( 'login', $as ) : ( is_user_logged_in() || ! $auto ? null : get_user_by( 'id', 1 ) );
+		if ( ! $user || get_current_user_id() === $user->ID ) {
+			return;
+		}
+		wp_set_current_user( $user->ID );
+		wp_set_auth_cookie( $user->ID, true );
+		if ( ! wp_doing_ajax() && ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) && 'GET' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			wp_safe_redirect( remove_query_arg( 'as', ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			exit;
+		}
+	},
+	1
+);

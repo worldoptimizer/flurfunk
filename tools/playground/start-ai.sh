@@ -31,7 +31,7 @@ if [ -n "$KEY" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
 	printf 'Anthropic API key (not shown): '
 	stty -echo; read -r ANTHROPIC_API_KEY; stty echo; echo
 fi
-echo "Flurfunk: http://localhost:$PORT/wp-admin/admin.php?page=flurfunk – log in as admin / password (Playground default), or as redaktion (password set by the blueprint, see blueprint-ai.json)"
+echo "Flurfunk: http://localhost:$PORT/wp-admin/admin.php?page=flurfunk – logs you in as the administrator by itself; add ?as=redaktion or ?as=gast to switch (local only, see flurfunk-dev-ai.php)"
 EXTRA=""
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
 	EXTRA="--define ANTHROPIC_API_KEY $ANTHROPIC_API_KEY"
