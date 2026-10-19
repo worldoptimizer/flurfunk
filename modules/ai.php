@@ -29,6 +29,9 @@ const PROFILE  = 'flurfunk_ai';
 const USAGE    = 'flurfunk_ai_usage';
 const CHANNELS = 'flurfunk_ai_channels';
 const HOOK     = 'flurfunk_ai_run';
+const OPTIONS  = 'flurfunk_ai_settings';
+const LOG      = 'flurfunk_ai_log';
+const LOG_MAX  = 100;
 const BUSY     = 'flurfunk_ai_busy_';
 // How much of a thread goes to the AI: the newest messages, and at most this many characters.
 const MAX_MESSAGES = 60;
@@ -150,6 +153,50 @@ function add_usage( int $user_id, int $tokens, bool $warned = false ): void {
 			'warned'   => $u['warned'] || $warned,
 		)
 	);
+}
+
+/**
+ * Site-wide AI settings: redact email addresses and phone numbers before sending (default on),
+ * keep a log of runs without content (default on).
+ *
+ * @return array{redact:bool, log:bool}
+ */
+function options(): array {
+	$o = get_option( OPTIONS, array() );
+	$o = is_array( $o ) ? $o : array();
+	return array(
+		'redact' => ! array_key_exists( 'redact', $o ) || ! empty( $o['redact'] ),
+		'log'    => ! array_key_exists( 'log', $o ) || ! empty( $o['log'] ),
+	);
+}
+
+/**
+ * Replace email addresses and phone numbers before a text leaves the site.
+ *
+ * @param string $text Text.
+ */
+function redact( string $text ): string {
+	$text = (string) preg_replace( '/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', '[' . __( 'email', 'flurfunk' ) . ']', $text );
+	// Phone numbers: start with +, 00 or 0, at least eight digits, with the usual separators.
+	return (string) preg_replace_callback(
+		'/(?<![\w.,\/])(?:\+|00|0)\d[\d \/().\-]{5,}\d(?![\w])/u',
+		static fn ( $m ) => preg_match_all( '/\d/', $m[0] ) >= 8 ? '[' . __( 'phone', 'flurfunk' ) . ']' : $m[0],
+		$text
+	);
+}
+
+/**
+ * Note a run in the log (no content: who, where, model, tokens, result).
+ *
+ * @param array $entry agent, asker, thread, channel, model, tokens, ok, error.
+ */
+function log_run( array $entry ): void {
+	if ( ! options()['log'] ) {
+		return;
+	}
+	$log   = (array) get_option( LOG, array() );
+	$log[] = array( 'time' => time() ) + $entry;
+	update_option( LOG, array_slice( $log, -LOG_MAX ), false );
 }
 
 /**
@@ -363,6 +410,18 @@ function run( int $thread_id, int $message_id, int $agent ) {
 			return flurfunk_reply( $thread_id, __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ), array( 'author' => $agent ) );
 		}
 		$answer = flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) );
+		$ch     = Store\channel( (int) $thread->channel_id );
+		log_run(
+			array(
+				'agent'   => $agent,
+				'asker'   => answering( $agent ),
+				'thread'  => $thread_id,
+				'channel' => $ch ? (string) $ch->slug : '',
+				'model'   => is_wp_error( $answer ) ? '' : (string) ( $answer['model'] ?? '' ),
+				'tokens'  => is_wp_error( $answer ) ? 0 : (int) $answer['tokens'],
+				'error'   => is_wp_error( $answer ) ? $answer->get_error_message() : '',
+			)
+		);
 		if ( is_wp_error( $answer ) ) {
 			do_action( 'flurfunk_ai_error', $answer, $thread_id, $agent );
 			/* translators: %s: error message */
@@ -421,6 +480,7 @@ function answer( object $thread, int $message_id, int $agent ) {
 		'text'   => (string) $result->toText(),
 		'tokens' => (int) $result->getTokenUsage()->getTotalTokens(),
 		'asker'  => (int) $context['asker'],
+		'model'  => (string) $result->getModelMetadata()->getId(),
 	);
 }
 
@@ -538,7 +598,7 @@ function context( object $thread, int $message_id, int $agent ) {
 		. sprintf( '%s mentioned you in the last message of this thread. Answer now.', $asker_name );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
-		'prompt' => $prompt,
+		'prompt' => options()['redact'] ? redact( $prompt ) : $prompt,
 		'asker'  => $asker,
 	);
 }
@@ -632,6 +692,11 @@ function render_section(): void {
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<input type="hidden" name="action" value="flurfunk_ai">
 		<?php wp_nonce_field( 'flurfunk_ai' ); ?>
+		<?php $o = options(); ?>
+		<p style="max-width:46rem">
+			<label><input type="checkbox" name="ai_options[redact]" value="1" <?php checked( $o['redact'] ); ?>> <?php esc_html_e( 'Replace email addresses and phone numbers before anything is sent to the AI provider', 'flurfunk' ); ?></label><br>
+			<label><input type="checkbox" name="ai_options[log]" value="1" <?php checked( $o['log'] ); ?>> <?php esc_html_e( 'Keep a log of the last 100 answers (who asked, where, model, tokens – no content)', 'flurfunk' ); ?></label>
+		</p>
 		<?php
 		foreach ( $bots as $bot ) :
 			$p    = profile( $bot->ID );
@@ -668,7 +733,42 @@ function render_section(): void {
 		</details>
 		<?php submit_button( __( 'Save AI assistants', 'flurfunk' ) ); ?>
 	</form>
+	<?php render_log(); ?>
 	</div>
+	<?php
+}
+
+/**
+ * The log, newest first (under the form).
+ */
+function render_log(): void {
+	$log = array_reverse( (array) get_option( LOG, array() ) );
+	if ( ! $log || ! options()['log'] ) {
+		return;
+	}
+	$name = static fn ( int $id ): string => Store\person( $id )['name'];
+	?>
+	<details style="max-width:46rem;margin-top:1em">
+		<summary><?php
+			/* translators: %s: number of entries */
+			printf( esc_html__( 'Log (%s)', 'flurfunk' ), esc_html( number_format_i18n( count( $log ) ) ) );
+		?></summary>
+		<table class="widefat striped" style="margin-top:.5em">
+			<thead><tr><th><?php esc_html_e( 'When', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Assistant', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Asked by', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Channel', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Model', 'flurfunk' ); ?></th><th><?php esc_html_e( 'Tokens', 'flurfunk' ); ?></th></tr></thead>
+			<tbody>
+			<?php foreach ( array_slice( $log, 0, LOG_MAX ) as $e ) : ?>
+				<tr>
+					<td><?php echo esc_html( wp_date( get_option( 'date_format' ) . ' H:i', (int) $e['time'] ) ); ?></td>
+					<td><?php echo esc_html( $name( (int) $e['agent'] ) ); ?></td>
+					<td><?php echo esc_html( $e['asker'] ? $name( (int) $e['asker'] ) : '–' ); ?></td>
+					<td>#<?php echo esc_html( (string) $e['channel'] ); ?></td>
+					<td><?php echo '' !== (string) $e['error'] ? '<span style="color:#b32d2e">' . esc_html( (string) $e['error'] ) . '</span>' : esc_html( (string) $e['model'] ); ?></td>
+					<td><?php echo esc_html( number_format_i18n( (int) $e['tokens'] ) ); ?></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+	</details>
 	<?php
 }
 
@@ -695,6 +795,18 @@ function save(): void {
 		}
 	}
 	update_option( CHANNELS, $keep, false );
+	$o = isset( $_POST['ai_options'] ) && is_array( $_POST['ai_options'] ) ? wp_unslash( $_POST['ai_options'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only checked for presence.
+	update_option(
+		OPTIONS,
+		array(
+			'redact' => ! empty( $o['redact'] ),
+			'log'    => ! empty( $o['log'] ),
+		),
+		false
+	);
+	if ( empty( $o['log'] ) ) {
+		delete_option( LOG );
+	}
 	Store\bump();
 	wp_safe_redirect( add_query_arg( 'flurfunk-saved', '1', admin_url( 'options-general.php?page=' . \Flurfunk\Settings\PAGE ) ) . '#flurfunk-ai' );
 	exit;
