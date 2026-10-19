@@ -913,3 +913,48 @@ test.describe( 'guest', () => {
 		expect( opts.join( ' ' ) ).not.toMatch( /nichts|nothing/ );
 	} );
 } );
+
+// AI assistants: only against a site with an AI provider and an assistant with an AI profile in
+// #general (tools/playground/start-ai.sh sets that up). FF_AI=1 switches these tests on.
+test.describe( 'AI assistants', () => {
+	test.skip( ! process.env.FF_AI, 'FF_AI not set (needs a site with an AI provider)' );
+	test.beforeEach( async ( { page } ) => {
+		await login( page, process.env.FF_TEAM2 || process.env.FF_TEAM, process.env.FF_TEAM2_PASS || process.env.FF_TEAM_PASS );
+		await page.goto( APP + '&view=channel:general', { waitUntil: 'domcontentloaded' } );
+		await page.waitForSelector( '.ff-app .ff-me-tile' );
+	} );
+
+	test( 'a mention gets "… is thinking" and then an answer in the thread', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		const general = boot.channels.find( ( c ) => 'general' === c.id );
+		test.skip( ! general || ! ( general.agents || [] ).length, 'no AI assistant in #general' );
+		await expect( page.locator( '.ff-head-text p' ) ).toContainText( /KI|AI/ );
+		const agent = boot.people.find( ( p ) => p.id === general.agents[ 0 ] );
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e KI ' + Date.now() } );
+		await page.goto( APP + '&view=thread:' + th.id, { waitUntil: 'domcontentloaded' } );
+		const ta = page.locator( '.ff-pane textarea' );
+		await ta.fill( '@' + agent.name + ' Antworte nur mit dem Wort: Funkprobe' );
+		await page.locator( '.ff-pane .ff-send' ).last().click();
+		await expect( page.locator( '.ff-pane .ff-thinking' ) ).toBeVisible( { timeout: 15_000 } );
+		await expect( page.locator( '.ff-pane .ff-msg', { hasText: agent.name } ).last() ).toContainText( /Funkprobe/i, { timeout: 90_000 } );
+		await expect( page.locator( '.ff-pane .ff-thinking' ) ).toHaveCount( 0 );
+	} );
+
+	test( '"Summarize" shows a private summary and posts nothing', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', title: 'e2e Zusammenfassung', body: 'Wir planen das Sommerfest.' } );
+		for ( const b of [ 'Termin: 12. Juli.', 'Ort: Hof der Redaktion.', 'Getränke bringt Rita.', 'Offen: Musik.' ] ) {
+			await api( page, 'threads/' + th.id + '/messages', { body: b } );
+		}
+		await page.goto( APP + '&view=thread:' + th.id, { waitUntil: 'domcontentloaded' } );
+		await page.locator( '.ff-pane textarea' ).waitFor();
+		const btn = page.locator( '.ff-pane [data-ff=summary]' );
+		test.skip( ! await btn.count(), 'summaries are not offered here' );
+		await btn.click();
+		await expect( page.locator( '.ff-ai-summary header' ) ).toBeVisible( { timeout: 90_000 } );
+		await expect( page.locator( '.ff-ai-summary .ff-text' ) ).toContainText( /Juli|Musik|Sommerfest/ );
+		const after = await api( page, 'threads/' + th.id );
+		expect( after.messages.filter( ( m ) => 'message' === m.type ).length ).toBe( 4 );
+		await page.locator( '.ff-ai-summary [data-ff=summary-close]' ).click();
+		await expect( page.locator( '.ff-ai-summary' ) ).toHaveCount( 0 );
+	} );
+} );
