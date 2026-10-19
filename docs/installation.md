@@ -256,10 +256,21 @@ an assistant an AI profile in the section **AI assistants** below it: tick the c
 in, write a few lines of instructions, and set a monthly token budget (WordPress itself has no
 spending limit). People then write `@Name` in a thread; the assistant answers in that thread.
 
-What it reads goes to the AI provider: only the thread it was mentioned in, never other
-conversations. Mention that in your privacy policy (*Settings → Privacy* suggests a text) and check
-whether you need a data processing agreement with the provider. Guests can only ask an assistant if
-its profile allows it.
+What it reads goes to the AI provider: the thread it was mentioned in and, if its profile allows it,
+the text of the post the thread is about (only if the person asking may read that post). With tools
+(read-only abilities, chosen per assistant) it can look things up – with the rights of the person
+asking and, in Flurfunk, only in its own channels. Mention that in your privacy policy (*Settings →
+Privacy* suggests a text) and check whether you need a data processing agreement with the provider.
+Guests can only ask an assistant if its profile allows it; who may ask at all is the capability
+**Ask AI assistants** (`flurfunk_use_ai`, under *Permissions*).
+
+Switches for the whole site, at the top of the section: replace email addresses and phone numbers
+before anything is sent (on by default), keep a log of the last 100 answers without content (who,
+where, model, tokens, tools), and offer **Summarize** in threads – a private summary for the person
+who asks, never posted.
+
+An answer only notifies the person who asked; long messages are folded with **Show more**, so
+threads stay calm.
 
 ### Limits
 

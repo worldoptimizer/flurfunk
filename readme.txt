@@ -87,7 +87,7 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 
 = AI assistants (optional, off by default) =
 
-Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. Nothing is sent otherwise. The providers WordPress offers:
+Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, or asks for a summary of it, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. If the site allows it, the text of the post the conversation is about and what the assistant looks up with its tools (only what the person asking may see) are sent too. Email addresses and phone numbers are replaced before sending unless the site switches that off. Nothing is sent otherwise. The providers WordPress offers:
 
 * Anthropic: [Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy](https://www.anthropic.com/legal/privacy)
 * Google (Gemini API): [Terms](https://ai.google.dev/gemini-api/terms), [Privacy](https://policies.google.com/privacy)
@@ -110,7 +110,9 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 == Changelog ==
 
 = 0.3.0 (in development) =
-* New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget.
+* New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about and look things up with read-only abilities, always with the rights of the person asking. "Summarize" gives a private summary of a thread. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
+* New: abilities for the WordPress Abilities API and MCP: list channels, list and read conversations (public), reply and start conversations (not public by default).
+* Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.
 * New for developers: the flurfunk_thread_view and flurfunk_channel_view filters and the flurfunk_settings_sections action.
 * Changed: assistants show no WordPress role next to their name.
 

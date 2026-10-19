@@ -941,7 +941,7 @@ They only build on WordPress itself.
 | --- | --- | --- |
 | `flurfunk/comments` | on | `/comment` (German `/kommentar`) inserts a comment: the commenter's public name, the post, an excerpt as quote, the state as status pill, and the actions **Approve**, **Spam** and **Trash** (with confirmation), depending on the state. For the team (`flurfunk_team`) with `moderate_comments`; each action checks `edit_comment` for that comment. The card never contains the email or IP address, the user agent or the commenter's website. |
 | `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. Setting **Channel** (default `comments`): switching the module on creates #comments ("Comments"), which requires `moderate_comments` and is closed to guests (an existing #comments is used as it is). The filter `flurfunk_comments_channel` overrides the setting. |
-| `flurfunk/ai` | off | Needs WordPress 7.0 or newer (the AI client) and an AI provider under *Settings → Connectors*. Assistants get an AI profile under *Settings → Flurfunk → AI assistants*: on/off, instructions, the channels they take part in, whether guests may ask, preferred model IDs and a monthly token budget; channels can carry instructions of their own. When a person mentions such an assistant in a thread (or in a new thread's text) in one of its channels, a run is queued: the thread shows "… is thinking", the assistant reads that one thread (up to the newest 60 messages, 40,000 characters; cards and files as short notes, mentions as names) and answers in it. Assistants do not trigger each other; a mention is answered once. Runs happen right after the response under PHP-FPM, otherwise through WP-Cron (`flurfunk_ai_run`). Over budget it says so once a month and stays silent. The AI only reads and answers; it changes nothing on the site. See [AI assistants](#ai-assistants) for the hooks. Since 0.3.0. |
+| `flurfunk/ai` | off | Needs WordPress 7.0 or newer (the AI client) and an AI provider under *Settings → Connectors*. Assistants get an AI profile under *Settings → Flurfunk → AI assistants*: on/off, instructions, the channels they take part in, whether guests may ask, whether they may read the text of the post a thread is about, read-only tools (abilities), preferred model IDs and a monthly token budget; channels can carry instructions of their own; site-wide switches replace email addresses and phone numbers before sending (on), keep a log of runs without content (on) and offer private summaries (on). When a person with `flurfunk_use_ai` mentions such an assistant in one of its channels (also by editing a message), a run is queued: the thread shows "… is thinking", the assistant reads that one thread (newest 60 messages, 40,000 characters) and answers in it; only the person who asked is notified. "Summarize" in the thread header gives a private summary that is never posted. Tools run with the rights of the person asking and, in Flurfunk, only in the assistant's channels. Assistants do not trigger each other; a mention is answered once; over budget it says so once a month. See [AI assistants](#ai-assistants). Since 0.3.0. |
 | `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it, assigned to everyone who may publish and edit it (not the author, no assistants), with the post as a card. Settings: **Channel** (default `general`) and **Assign everyone who may publish** (default on; off: nobody is assigned). The filters `flurfunk_review_channel` and `flurfunk_review_assignees` override them per post. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
 
 ### AI assistants
@@ -959,7 +959,34 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_system` (filter) | `string $system`, `object $thread`, `int $agent` | Change the system instruction. |
 | `flurfunk_ai_max_tokens` (filter) | `int $max` (4000), `int $agent` | Maximum length of an answer. |
 | `flurfunk_ai_run_now` (filter) | `bool $now` (true) | false: leave runs to WP-Cron only. |
-| `flurfunk_ai_error` (action) | `WP_Error $error`, `int $thread_id`, `int $agent` | A run failed (the assistant also says so in the thread). |
+| `flurfunk_ai_error` (action) | `WP_Error $error`, `int $thread_id`, `int $agent` | A run failed (the assistant also says so in the thread, in plain words). |
+| `flurfunk_ai_summaries_per_hour` (filter) | `int $max` (20) | Private summaries per person and hour. |
+| `flurfunk_ability_channel` (filter) | `bool $ok`, `string $channel` | Narrow the channels Flurfunk's reading abilities return; the AI module uses it while an assistant looks things up. |
+
+REST: `POST flurfunk/v1/threads/<id>/summary` returns `{ text, agent }` for the person asking
+(400 `flurfunk_ai_none` if no assistant takes part in the channel, 403 if summaries are off, 429
+over the hourly limit or the budget).
+
+Options: `flurfunk_ai_settings` (`redact`, `log`, `summary`), `flurfunk_ai_channels` (channel →
+instructions), `flurfunk_ai_log` (the last 100 runs: time, agent, asker, thread, channel, model,
+tokens, error, tools, kind). User meta on assistants: `flurfunk_ai` (profile), `flurfunk_ai_usage`
+(tokens this month).
+
+### Abilities
+
+With WordPress 6.9 or newer Flurfunk registers abilities in the category `flurfunk`. They run as the
+current user with Flurfunk's own checks, so an agent only reaches what its account may.
+
+| Ability | Public | Does |
+| --- | --- | --- |
+| `flurfunk/list-channels` | yes | Channels the user can read (short name, name, topic). |
+| `flurfunk/list-threads` | yes | Conversations, newest activity first; `channel`, `view` (`all`, `mine`, `tasks`, `mentions`), `search`, `limit` (≤ 50). |
+| `flurfunk/get-thread` | yes | One conversation with its newest 100 messages; mentions as names. |
+| `flurfunk/reply` | no | Replies as the user: `id`, `text`. |
+| `flurfunk/start-thread` | no | Starts a conversation: `channel`, `title`, `text`, `task`. |
+
+"Public" is the ability's `meta.public` (REST, MCP adapter); the filters
+`flurfunk_abilities_public` and `flurfunk_abilities_public_write` change it.
 
 To try it locally without a paid key: `tools/playground/start-ai.sh` starts a Playground on port 9600
 with the OpenAI and Anthropic providers; requests of the OpenAI provider go to an OpenAI-compatible
