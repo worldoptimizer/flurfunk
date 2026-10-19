@@ -913,6 +913,13 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	$check( 'get-thread: the conversation with readable mentions', ! is_wp_error( $ab_g ) && 'Ability-Test' === $ab_g['title'] && str_contains( $ab_g['text'], '@' . Store\person( $team2 )['name'] ), $ab_g );
 	$ab_r = wp_get_ability( 'flurfunk/reply' )->execute( array( 'id' => $ab_t, 'text' => 'Antwort über eine Ability' ) );
 	$check( 'reply: as the current user', ! is_wp_error( $ab_r ) && $team === (int) end( Store\full_thread( $ab_t, $team )['messages'] )['author'], $ab_r );
+	add_filter( 'flurfunk_ability_channel', $ab_scope = static fn ( $ok, $slug ) => $ok && 'no-such' === $slug, 10, 2 );
+	$ab_sl = wp_get_ability( 'flurfunk/list-threads' )->execute( array( 'channel' => 'ff-test' ) );
+	$ab_sg = wp_get_ability( 'flurfunk/get-thread' )->execute( array( 'id' => $ab_t ) );
+	$ab_sc = wp_get_ability( 'flurfunk/list-channels' )->execute();
+	remove_filter( 'flurfunk_ability_channel', $ab_scope, 10 );
+	$check( 'a channel scope (as for an AI assistant) hides other channels in all reading abilities', array() === $ab_sl && is_wp_error( $ab_sg ) && array() === $ab_sc, array( $ab_sl, $ab_sc ) );
+	$check( 'list-channels: the channels the person can read', in_array( 'ff-test', array_column( wp_get_ability( 'flurfunk/list-channels' )->execute(), 'channel' ), true ) );
 	$check( 'reading abilities are public, writing ones are not (by default)', true === wp_get_ability( 'flurfunk/get-thread' )->get_meta()['public'] && false === wp_get_ability( 'flurfunk/reply' )->get_meta()['public'] );
 	$as( $guest );
 	$ab_x = wp_get_ability( 'flurfunk/get-thread' )->execute( array( 'id' => $ab_t ) );
@@ -936,6 +943,11 @@ Flurfunk\Modules\set( array( 'flurfunk/ai' => true ) );
 $ai_bot = Flurfunk\Access\create_bot( 'KI-Test', 'ff-test-ai-' . strtolower( wp_generate_password( 5, false, false ) ) );
 $ai_p   = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test', 'no-such-channel' ), 'models' => 'gpt-x, <b>claude</b> ; drop table', 'instructions' => "Sei knapp.\n<script>x</script>", 'budget' => '-5' ) );
 $check( 'a profile keeps only real channels, clean model IDs and plain text', array( 'ff-test' ) === $ai_p['channels'] && ! str_contains( $ai_p['models'], '<' ) && ! str_contains( $ai_p['models'], ' ' . 'table' ) && ! str_contains( $ai_p['instructions'], '<script' ) && 0 === $ai_p['budget'] && $ai_p['on'], $ai_p );
+if ( function_exists( 'wp_get_ability' ) ) {
+	$ai_tp = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'tools' => array( 'flurfunk/reply', 'flurfunk/get-thread', 'no/such-ability' ) ) );
+	$check( 'tools: only read-only abilities can be given to an assistant', array( 'flurfunk/get-thread' ) === $ai_tp['tools'], $ai_tp['tools'] );
+	Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'instructions' => "Sei knapp.\n<script>x</script>" ) );
+}
 $check( 'only assistants can have an AI profile switched on', ! Flurfunk\Modules\Ai\profile( $team )['on'] || ! Flurfunk\Access\is_bot( $team ) );
 update_option( 'flurfunk_ai_channels', array( 'ff-test' => 'Kanalregel: immer mit Quelle.' ) );
 add_filter( 'flurfunk_ai_run_now', '__return_false' );

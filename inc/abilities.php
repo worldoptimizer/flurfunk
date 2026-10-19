@@ -41,6 +41,16 @@ function allowed(): bool {
 }
 
 /**
+ * May this channel be used here? Other code can narrow it (the AI module does while an assistant
+ * looks things up: only channels the assistant takes part in).
+ *
+ * @param string $slug Channel.
+ */
+function channel_ok( string $slug ): bool {
+	return (bool) apply_filters( 'flurfunk_ability_channel', true, $slug );
+}
+
+/**
  * A thread in short: for lists.
  *
  * @param array $t Thread as the interface gets it.
@@ -75,10 +85,45 @@ function register(): void {
 	$read  = (bool) apply_filters( 'flurfunk_abilities_public', true );
 	$write = (bool) apply_filters( 'flurfunk_abilities_public_write', false );
 	wp_register_ability(
+		'flurfunk/list-channels',
+		array(
+			'label'               => __( 'List channels', 'flurfunk' ),
+			'description'         => __( 'The Flurfunk channels the current user can read: short name, name and topic.', 'flurfunk' ),
+			'category'            => 'flurfunk',
+			'output_schema'       => array(
+				'type'  => 'array',
+				'items' => array( 'type' => 'object' ),
+			),
+			'execute_callback'    => static function (): array {
+				$uid = get_current_user_id();
+				$out = array();
+				foreach ( Store\channels() as $c ) {
+					if ( empty( $c->archived ) && 'none' !== Access\level( $c, $uid ) && channel_ok( (string) $c->slug ) ) {
+						$out[] = array(
+							'channel' => (string) $c->slug,
+							'name'    => (string) $c->name,
+							'topic'   => (string) $c->topic,
+						);
+					}
+				}
+				return $out;
+			},
+			'permission_callback' => __NAMESPACE__ . '\\allowed',
+			'meta'                => array(
+				'annotations' => array(
+					'readonly'    => true,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'public'      => $read,
+			),
+		)
+	);
+	wp_register_ability(
 		'flurfunk/list-threads',
 		array(
 			'label'               => __( 'List conversations', 'flurfunk' ),
-			'description'         => __( 'Conversations in Flurfunk the current user can read, newest activity first. Filter by channel, by view (all, mine = my tasks, tasks = open tasks, mentions) or by search words.', 'flurfunk' ),
+			'description'         => __( 'Conversations in Flurfunk the current user can read, newest activity first. Filter by channel (leave it out to search all channels), by view (all, mine = my tasks, tasks = open tasks, mentions) or by search words.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -116,7 +161,7 @@ function register(): void {
 						'limit'   => max( 1, min( 50, (int) ( $input['limit'] ?? 20 ) ) ),
 					)
 				);
-				return array_map( __NAMESPACE__ . '\\brief', $rows );
+				return array_values( array_map( __NAMESPACE__ . '\\brief', array_filter( $rows, static fn ( $t ) => channel_ok( (string) $t['channel'] ) ) ) );
 			},
 			'permission_callback' => __NAMESPACE__ . '\\allowed',
 			'meta'                => array(
@@ -151,6 +196,9 @@ function register(): void {
 				$full = Store\full_thread( (int) ( (array) $input )['id'], get_current_user_id() );
 				if ( is_wp_error( $full ) ) {
 					return $full;
+				}
+				if ( ! channel_ok( (string) $full['channel'] ) ) {
+					return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
 				}
 				$messages = array();
 				foreach ( array_slice( $full['messages'], -100 ) as $m ) {
