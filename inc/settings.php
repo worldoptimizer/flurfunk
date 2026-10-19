@@ -377,6 +377,7 @@ function render(): void {
 		</form>
 		<?php \Flurfunk\Caps\render_section(); ?>
 		<?php \Flurfunk\Modules\render_section(); ?>
+		<?php do_action( 'flurfunk_settings_sections' ); // Sections of modules (e.g. AI assistants). ?>
 		<?php \Flurfunk\Data\render_section(); ?>
 	</div>
 	<?php

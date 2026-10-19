@@ -186,7 +186,13 @@ function ensure_channel( string $slug, array $args = array(), bool $update = fal
  * @param object $c Channel row.
  */
 function format_channel( object $c ): array {
-	return array(
+	/**
+	 * A channel as the interface gets it.
+	 *
+	 * @param array  $view Channel.
+	 * @param object $c    Channel row.
+	 */
+	return (array) apply_filters( 'flurfunk_channel_view', array(
 		'id'         => $c->slug,
 		'name'       => $c->name,
 		'topic'      => $c->topic,
@@ -195,7 +201,7 @@ function format_channel( object $c ): array {
 			'guests' => $c->access_guests,
 		),
 		'capability' => (string) ( $c->capability ?? '' ),
-	);
+	), $c );
 }
 
 /* -------------------------------------------------------------------------
@@ -222,7 +228,8 @@ function person( int $id ): array {
 		);
 	}
 	$roles = wp_roles()->role_names;
-	$role  = $u->roles ? translate_user_role( $roles[ $u->roles[0] ] ?? $u->roles[0] ) : '';
+	// Assistants carry the "Assistant" mark instead of their (technical) role.
+	$role = $u->roles && ! Access\is_bot( $id ) ? translate_user_role( $roles[ $u->roles[0] ] ?? $u->roles[0] ) : '';
 	return $cache[ $id ] = array(
 		'id'     => $id,
 		'name'   => html_entity_decode( $u->display_name, ENT_QUOTES, 'UTF-8' ),
@@ -1297,7 +1304,7 @@ function full_thread( int $id, int $user_id ) {
 	$messages = format_messages( $t, $atts, $ments, $limit );
 	global $wpdb;
 	$total = count( $messages ) < $limit ? count( $messages ) : (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE thread_id = %d', table( 'messages' ), $id ) );
-	return format_thread( $t, $atts, $ments ) + array(
+	$view = format_thread( $t, $atts, $ments ) + array(
 		'messages' => $messages,
 		'older'    => max( 0, $total - count( $messages ) ),
 		'read'     => read_state( array( $id ), $user_id )[ $id ] ?? 0,
@@ -1305,6 +1312,14 @@ function full_thread( int $id, int $user_id ) {
 		'remind'   => iso( reminder( $id, $user_id ) ),
 		'audience' => audience( $t ),
 	);
+	/**
+	 * A thread as the interface and the REST API get it (e.g. to add who is working on it).
+	 *
+	 * @param array  $view    Thread.
+	 * @param object $t       Thread row.
+	 * @param int    $user_id Who looks.
+	 */
+	return (array) apply_filters( 'flurfunk_thread_view', $view, $t, $user_id );
 }
 
 /**

@@ -246,6 +246,21 @@ environment type is `local`).
 How to post with it is described in the
 [developer guide](developers.md#posting-as-an-assistant-from-scripts-and-ci).
 
+### AI assistants
+
+With WordPress 7.0 or newer an assistant can answer with AI. Set up the provider (Anthropic, Google
+or OpenAI) and its key under *Settings → Connectors* – on a live site preferably as a constant in
+`wp-config.php` (e.g. `define( 'ANTHROPIC_API_KEY', '…' );`), because the screen stores keys in the
+database. Then switch on the module **AI assistants** under *Settings → Flurfunk → Modules* and give
+an assistant an AI profile in the section **AI assistants** below it: tick the channels it takes part
+in, write a few lines of instructions, and set a monthly token budget (WordPress itself has no
+spending limit). People then write `@Name` in a thread; the assistant answers in that thread.
+
+What it reads goes to the AI provider: only the thread it was mentioned in, never other
+conversations. Mention that in your privacy policy (*Settings → Privacy* suggests a text) and check
+whether you need a data processing agreement with the provider. Guests can only ask an assistant if
+its profile allows it.
+
 ### Limits
 
 New threads and messages are limited to 30 per minute and person (administrators are exempt).

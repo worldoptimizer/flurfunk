@@ -941,7 +941,30 @@ They only build on WordPress itself.
 | --- | --- | --- |
 | `flurfunk/comments` | on | `/comment` (German `/kommentar`) inserts a comment: the commenter's public name, the post, an excerpt as quote, the state as status pill, and the actions **Approve**, **Spam** and **Trash** (with confirmation), depending on the state. For the team (`flurfunk_team`) with `moderate_comments`; each action checks `edit_comment` for that comment. The card never contains the email or IP address, the user agent or the commenter's website. |
 | `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. Setting **Channel** (default `comments`): switching the module on creates #comments ("Comments"), which requires `moderate_comments` and is closed to guests (an existing #comments is used as it is). The filter `flurfunk_comments_channel` overrides the setting. |
+| `flurfunk/ai` | off | Needs WordPress 7.0 or newer (the AI client) and an AI provider under *Settings → Connectors*. Assistants get an AI profile under *Settings → Flurfunk → AI assistants*: on/off, instructions, the channels they take part in, whether guests may ask, preferred model IDs and a monthly token budget; channels can carry instructions of their own. When a person mentions such an assistant in a thread (or in a new thread's text) in one of its channels, a run is queued: the thread shows "… is thinking", the assistant reads that one thread (up to the newest 60 messages, 40,000 characters; cards and files as short notes, mentions as names) and answers in it. Assistants do not trigger each other; a mention is answered once. Runs happen right after the response under PHP-FPM, otherwise through WP-Cron (`flurfunk_ai_run`). Over budget it says so once a month and stays silent. The AI only reads and answers; it changes nothing on the site. See [AI assistants](#ai-assistants) for the hooks. Since 0.3.0. |
 | `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it, assigned to everyone who may publish and edit it (not the author, no assistants), with the post as a card. Settings: **Channel** (default `general`) and **Assign everyone who may publish** (default on; off: nobody is assigned). The filters `flurfunk_review_channel` and `flurfunk_review_assignees` override them per post. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
+
+### AI assistants
+
+What the AI gets is built in `Flurfunk\Modules\Ai\context()`: a system instruction (who it is, the
+rules, the channel and its topic, the date, the site's and the channel's instructions) and the thread
+as a transcript inside `<thread>…</thread>`, with the note that the conversation is data, not
+instructions. The call goes through `wp_ai_client_prompt()` with `using_system_instruction()`,
+`using_max_tokens()` and, if set, `using_model_preference()`. A site can block calls with WordPress's
+`wp_ai_client_prevent_prompt` filter; runs happen as the assistant's account.
+
+| Hook | Arguments | Use |
+| --- | --- | --- |
+| `flurfunk_ai_pre_answer` (filter) | `null`, `array $context` (`system`, `prompt`, `asker`), `int $agent` | Return `['text' => …, 'tokens' => …]` or a `WP_Error` to answer without the provider (tests, another backend). |
+| `flurfunk_ai_system` (filter) | `string $system`, `object $thread`, `int $agent` | Change the system instruction. |
+| `flurfunk_ai_max_tokens` (filter) | `int $max` (4000), `int $agent` | Maximum length of an answer. |
+| `flurfunk_ai_run_now` (filter) | `bool $now` (true) | false: leave runs to WP-Cron only. |
+| `flurfunk_ai_error` (action) | `WP_Error $error`, `int $thread_id`, `int $agent` | A run failed (the assistant also says so in the thread). |
+
+To try it locally without a paid key: `tools/playground/start-ai.sh` starts a Playground on port 9600
+with the OpenAI and Anthropic providers; requests of the OpenAI provider go to an OpenAI-compatible
+proxy on this machine (`FLURFUNK_DEV_AI_PROXY` in `tools/playground/blueprint-ai.json`).
+`ANTHROPIC_API_KEY=… tools/playground/start-ai.sh` uses a real Anthropic key instead.
 
 ## Targets
 
@@ -1088,6 +1111,8 @@ locked in the database.
 | `flurfunk_can_resolve` | 0.1.0 | `bool $can`, `object $thread`, `int $user_id` | bool | May the person change the task state, due date or assignees? |
 | `flurfunk_can_attach` | 0.1.0 | `bool $can`, `WP_Post $attachment`, `int $user_id` | bool | May the person refer to this media library file in a message? Default: own files, files they may edit, and for assistants any file not attached to a private post. |
 | `flurfunk_max_files` | 0.1.0 | `int $max` | int | Files per message. Default 50. |
+| `flurfunk_thread_view` | 0.3.0 | `array $view`, `object $thread`, `int $user_id` | array | A thread as the interface and `GET threads/<id>` return it (e.g. `thinking`: assistants working on it). |
+| `flurfunk_channel_view` | 0.3.0 | `array $view`, `object $channel` | array | A channel as the interface gets it (e.g. `agents`: AI assistants that answer there). |
 | `flurfunk_board_done_days` | 0.1.0 | `int $days` | int | How long done tasks stay on the board. Default 14. |
 | `flurfunk_can_edit` | 0.1.0 | `bool $can`, `int $author_id`, `int $user_id` | bool | May the person edit or delete this message or thread? Default: author or `flurfunk_moderate`. |
 | `flurfunk_target_info` | 0.1.0 | `array $info`, `string $type`, `int $id` | array | `type`, `title`, `url`, `status`, `label` of a target for the interface. |
@@ -1137,6 +1162,7 @@ yourself.
 | `flurfunk_modules_loaded` | 0.2.0 | | After the modules that are on have loaded (still `init`, priority 0). |
 | `flurfunk_module_on` | 0.2.0 | `string $id` | After a module was switched on (settings or `wp flurfunk module on`), only if it was off. |
 | `flurfunk_module_off` | 0.2.0 | `string $id` | After a module was switched off, only if it was on. E.g. to clear its cron events. |
+| `flurfunk_settings_sections` | 0.3.0 | | On *Settings → Flurfunk*, after the modules section: modules print their own sections (forms of their own) here. |
 
 Editing a thread's own title or text (`threads/<id>/edit`) fires no action.
 

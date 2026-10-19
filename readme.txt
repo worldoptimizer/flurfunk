@@ -70,7 +70,7 @@ By default they stay, so a reinstall picks up where you left off. Untick "Keep c
 
 == External services ==
 
-Flurfunk talks to outside services only for these two features.
+Flurfunk talks to outside services only for these features.
 
 = Web Push =
 
@@ -84,6 +84,14 @@ When a person turns on push notifications in their browser, the browser register
 = Profile pictures (Gravatar) =
 
 Flurfunk shows profile pictures through WordPress's own avatar function. Unless a plugin provides local avatars, WordPress loads them from Gravatar, which receives a hash of the person's email address. Sites with avatars turned off (Settings → Discussion) and people who chose initials in their Flurfunk settings load nothing from there. [Gravatar Terms](https://wordpress.com/tos/), [Privacy](https://automattic.com/privacy/)
+
+= AI assistants (optional, off by default) =
+
+Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. Nothing is sent otherwise. The providers WordPress offers:
+
+* Anthropic: [Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy](https://www.anthropic.com/legal/privacy)
+* Google (Gemini API): [Terms](https://ai.google.dev/gemini-api/terms), [Privacy](https://policies.google.com/privacy)
+* OpenAI: [Terms](https://openai.com/policies/row-terms-of-use/), [Privacy](https://openai.com/policies/row-privacy-policy/)
 
 == Screenshots ==
 
@@ -100,6 +108,11 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 11. Each person's own settings: appearance, mail, push and quiet hours.
 
 == Changelog ==
+
+= 0.3.0 (in development) =
+* New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget.
+* New for developers: the flurfunk_thread_view and flurfunk_channel_view filters and the flurfunk_settings_sections action.
+* Changed: assistants show no WordPress role next to their name.
 
 = 0.2.1 =
 * New for developers: module settings of the type `users` (pick people, optionally only those with a capability).

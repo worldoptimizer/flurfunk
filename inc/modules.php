@@ -424,6 +424,17 @@ add_action(
 			)
 		);
 		register(
+			'flurfunk/ai',
+			array(
+				'label'       => __( 'AI assistants', 'flurfunk' ),
+				'description' => __( 'Assistants with an AI profile answer in the thread when someone mentions them, with the AI provider from Settings → Connectors (WordPress 7.0 or newer). Profiles, channels and budgets are set below.', 'flurfunk' ),
+				'group'       => __( 'Core', 'flurfunk' ),
+				'default'     => false,
+				'requires'    => static fn () => function_exists( 'wp_ai_client_prompt' ),
+				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/ai.php',
+			)
+		);
+		register(
 			'flurfunk/review',
 			array(
 				'label'       => __( 'Review requests', 'flurfunk' ),

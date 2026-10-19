@@ -1,0 +1,11 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"preferredVersions": { "php": "8.3", "wp": "latest" },
+	"steps": [
+		{ "step": "setSiteOptions", "options": { "permalink_structure": "/%postname%/", "blogname": "Flurfunk KI" } },
+		{ "step": "defineWpConfigConsts", "consts": { "FLURFUNK_DEV_AI_PROXY": "http://localhost:8317/v1" } },
+		{ "step": "installPlugin", "pluginData": { "resource": "wordpress.org/plugins", "slug": "ai-provider-for-openai" } },
+		{ "step": "installPlugin", "pluginData": { "resource": "wordpress.org/plugins", "slug": "ai-provider-for-anthropic" } },
+		{ "step": "activatePlugin", "pluginPath": "flurfunk/flurfunk.php" }
+	]
+}

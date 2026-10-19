@@ -1335,7 +1335,9 @@
 			const [ kind, a, b ] = ui.view.split( ':' );
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
-				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a }, channel: a };
+				// AI assistants that answer here when mentioned: say so in the header.
+				const agents = c && c.agents && c.agents.length ? t( 'AI on mention: %s' ).replace( '%s', c.agents.map( ( id ) => person( id ).name ).join( ', ' ) ) : '';
+				return { title: '#' + chName( a ), sub: [ c ? c.topic : '', agents ].filter( Boolean ).join( ' · ' ), args: { channel: a }, channel: a };
 			}
 			if ( 'target' === kind ) {
 				const info = boot.recent.concat( boot.targets ).find( ( x ) => x.type === a && x.id === +b );
@@ -1736,6 +1738,24 @@
 			return '<select class="ff-remind' + ( set ? ' is-set' : '' ) + '" data-ff="remind" aria-label="' + esc( t( 'Remind me about this thread' ) ) + '">'
 				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '">' + esc( l ) + '</option>' ).join( '' ) + '</select>';
 		};
+		// AI assistants working on the thread: a line under the messages, and a quicker look until they are done.
+		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<p class="ff-thinking" role="status">' + esc( t( '%s is thinking' ).replace( '%s', th.thinking.map( ( id ) => person( id ).name ).join( ', ' ) ) ) + '</p>' : '' );
+		let thinkingTimer = 0;
+		// After a reply: the line under the messages may appear (the reply mentioned an assistant).
+		const paintThinking = ( th ) => {
+			const old = $( '.ff-thinking', pane );
+			if ( old ) {
+				old.remove();
+			}
+			$( '.ff-msgs', pane ).insertAdjacentHTML( 'afterend', thinkingHtml( th ) );
+			watchThinking( th );
+		};
+		const watchThinking = ( th ) => {
+			clearTimeout( thinkingTimer );
+			if ( th.thinking && th.thinking.length ) {
+				thinkingTimer = setTimeout( () => pollPane().catch( () => {} ), 3000 );
+			}
+		};
 		const renderPane = ( th ) => {
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
@@ -1750,7 +1770,8 @@
 				+ files( th.files ) + cards( th.attachments ) + targetChip( th )
 				+ taskControls( th )
 				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
-				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div><div class="ff-reply-slot"></div></div>';
+				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div>' + thinkingHtml( th ) + '<div class="ff-reply-slot"></div></div>';
+			watchThinking( th );
 			const c = composer( {
 				key: 'thread:' + th.id,
 				channel: th.channel,
@@ -1760,6 +1781,7 @@
 					const fresh = await api( 'threads/' + th.id + '/messages', { method: 'POST', body: payload } );
 					ui.current = fresh;
 					$( '.ff-msgs', pane ).innerHTML = messagesHtml( fresh );
+					paintThinking( fresh );
 					const body = $( '.ff-pane-body', pane );
 					body.scrollTop = body.scrollHeight;
 					refresh();
@@ -1870,7 +1892,7 @@
 		};
 		// What can change while a thread is open: new, edited or deleted messages, the status, the
 		// thread text, refreshed cards.
-		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) ) ).join( '|' );
+		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ), ( th.thinking || [] ).join( ',' ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) ) ).join( '|' );
 		const pollPane = async () => {
 			const active = document.activeElement;
 			const busy = pane.contains( active ) && ( ( 'TEXTAREA' === active.tagName && active.value ) || active.closest( '.ff-edit, .ff-pop' ) ) || $( '.ff-edit', pane );
@@ -1878,6 +1900,7 @@
 				return;
 			}
 			const th = await api( 'threads/' + ui.thread );
+			watchThinking( th );
 			if ( ui.current && signature( th ) !== signature( ui.current ) ) {
 				const body = $( '.ff-pane-body', pane );
 				const atEnd = body && body.scrollHeight - body.scrollTop - body.clientHeight < 40;
