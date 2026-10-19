@@ -6,6 +6,11 @@
 set -e
 cd "$(dirname "$0")/../.."
 PORT="${PORT:-9600}"
+if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+	echo "Port $PORT is already in use – the AI Playground is probably running: http://localhost:$PORT/wp-admin/admin.php?page=flurfunk"
+	echo "Start another one with PORT=9601 $0, or stop the running one first."
+	exit 0
+fi
 export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
 EXTRA=""
 if [ -n "$ANTHROPIC_API_KEY" ]; then

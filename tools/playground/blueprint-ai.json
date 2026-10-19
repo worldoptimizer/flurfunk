@@ -6,6 +6,7 @@
 		{ "step": "defineWpConfigConsts", "consts": { "FLURFUNK_DEV_AI_PROXY": "http://localhost:8317/v1" } },
 		{ "step": "installPlugin", "pluginData": { "resource": "wordpress.org/plugins", "slug": "ai-provider-for-openai" } },
 		{ "step": "installPlugin", "pluginData": { "resource": "wordpress.org/plugins", "slug": "ai-provider-for-anthropic" } },
-		{ "step": "activatePlugin", "pluginPath": "flurfunk/flurfunk.php" }
+		{ "step": "activatePlugin", "pluginPath": "flurfunk/flurfunk.php" },
+		{ "step": "runPHP", "code": "<?php require '/wordpress/wp-load.php'; $m = (array) get_option( 'flurfunk_modules', array() ); $m['flurfunk/ai'] = true; update_option( 'flurfunk_modules', $m ); $ed = wp_insert_user( array( 'user_login' => 'redaktion', 'user_pass' => wp_generate_password(), 'user_email' => 'redaktion@example.test', 'display_name' => 'Rita Redaktion', 'role' => 'editor' ) ); $bot = Flurfunk\\Access\\create_bot( 'Lektorat', 'lektorat' ); update_user_meta( $bot, 'flurfunk_ai', array( 'on' => true, 'channels' => array( 'general' ), 'models' => 'gpt-5.6-luna', 'instructions' => 'Du hilfst der Redaktion beim Gegenlesen. Weise auf unklare Sätze und fehlende Belege hin.', 'guests' => false, 'budget' => 0 ) ); update_user_meta( 1, 'locale', 'de_DE' ); wp_update_user( array( 'ID' => 1, 'display_name' => 'Max Admin' ) );" }
 	]
 }
