@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,8 +114,8 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
-= 0.5.0 (in development) =
-* New: limits for AI assistants. An assistant never can more than the person asking and never administers the site (users, plugins, themes, settings, unfiltered HTML are off while it works). "May at most act as" sets a role as a ceiling on top – also for what it reads, e.g. no other people's drafts within the limit Author. Proposals it may not make within the limit are not offered; a card runs within the limit too. The assistant says when its limit may hide something.
+= 0.5.0 =
+* New: limits for AI assistants. An assistant can never do more than the person asking, and it never administers the site (users, plugins, themes, settings, unfiltered HTML are off while it works). "May at most act as" sets a role as a ceiling on top – also for what it reads, e.g. no other people's drafts within the limit Author. Proposals it may not make within the limit are not offered; a card runs within the limit too. The assistant says when its limit may hide something.
 * New: AI assistants can write drafts (pack "Drafts", off by default): "make an article of this thread, with the photo" gives a draft – the person asking is its author, images from the conversation go along (into the media library) – and a card under the answer. Follow-ups change the draft until someone else works on it. It never publishes. Abilities flurfunk/create-draft and flurfunk/update-draft.
 * New: changes to existing posts as one card (pack "Changes to posts", off by default): corrections in the text, titles, excerpts, categories, tags and featured images, for several posts at once – before and after per post, untick what you do not want, apply with your rights, undo afterwards. A post someone changed in the meantime is skipped, as is one whose markup saving would lose (e.g. an embed). Ability flurfunk/update-posts.
 * New for developers: card actions receive what the person chose on the card (inputs with data-card-input) as a fourth argument.
@@ -166,6 +166,9 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * First version.
 
 == Upgrade Notice ==
+
+= 0.5.0 =
+AI assistants get limits (never more than the person asking, never administering the site) and, if you switch it on per assistant, can write drafts and propose changes to posts as one card you can undo. As in Slack, a thanks gets a thumbs-up reaction instead of a reply.
 
 = 0.4.0 =
 Channels and all threads now read top to bottom as in Slack, the newest right above the writing box, with the date at the top while you scroll. New: emoji reactions and private conversations with an AI assistant. Flurfunk updates its tables by itself.
