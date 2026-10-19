@@ -48,6 +48,7 @@ add_action( 'flurfunk_settings_sections', __NAMESPACE__ . '\\render_section' );
 add_action( 'admin_post_flurfunk_ai', __NAMESPACE__ . '\\save' );
 add_action( 'admin_init', __NAMESPACE__ . '\\privacy_text' );
 add_filter( 'flurfunk_notify_recipients', __NAMESPACE__ . '\\quiet_answer', 10, 3 );
+add_action( 'rest_api_init', __NAMESPACE__ . '\\routes' );
 
 /* -------------------------------------------------------------------------
  * Profiles
@@ -443,13 +444,14 @@ function run( int $thread_id, int $message_id, int $agent ) {
 /**
  * Ask the AI. Runs as the agent (flurfunk_as()).
  *
- * @param object $thread     Thread row.
- * @param int    $message_id The message that mentioned the agent.
- * @param int    $agent      Assistant.
+ * @param object     $thread     Thread row.
+ * @param int        $message_id The message that mentioned the agent.
+ * @param int        $agent      Assistant.
+ * @param array|null $context    Prepared context (e.g. for a summary); null: the mention's.
  * @return array{text:string, tokens:int}|\WP_Error
  */
-function answer( object $thread, int $message_id, int $agent ) {
-	$context = context( $thread, $message_id, $agent );
+function answer( object $thread, int $message_id, int $agent, ?array $context = null ) {
+	$context = $context ?? context( $thread, $message_id, $agent );
 	if ( is_wp_error( $context ) ) {
 		return $context;
 	}
@@ -520,9 +522,11 @@ function quiet_answer( array $to, $thread, int $message_id ): array {
  * @param object $thread     Thread row.
  * @param int    $message_id The message that mentioned the agent (0 = the thread's text).
  * @param int    $agent      Assistant.
+ * @param string $task       What to do instead of answering the mention ('' = answer it).
+ * @param int    $asker_override Who asks, if not the author of the message.
  * @return array{system:string, prompt:string, asker:int}|\WP_Error
  */
-function context( object $thread, int $message_id, int $agent ) {
+function context( object $thread, int $message_id, int $agent, string $task = '', int $asker_override = 0 ) {
 	$full = Store\full_thread( (int) $thread->id, $agent );
 	if ( is_wp_error( $full ) ) {
 		return $full;
@@ -555,6 +559,7 @@ function context( object $thread, int $message_id, int $agent ) {
 		array_shift( $lines );
 		$body = '[…]' . "\n\n" . implode( "\n\n", $lines );
 	}
+	$asker      = $asker_override ?: $asker;
 	$asker_name = Store\person( $asker )['name'];
 	$posts      = '';
 	if ( profile( $agent )['posts'] ) {
@@ -594,8 +599,7 @@ function context( object $thread, int $message_id, int $agent ) {
 		)
 	);
 	$prompt = $posts . "<thread>\n" . $head . ( '' !== $body ? "\n\n" . $body : '' ) . "\n</thread>\n\n"
-		/* translators: %s: name */
-		. sprintf( '%s mentioned you in the last message of this thread. Answer now.', $asker_name );
+		. ( '' !== $task ? $task : sprintf( '%s mentioned you in the last message of this thread. Answer now.', $asker_name ) );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
 		'prompt' => options()['redact'] ? redact( $prompt ) : $prompt,
@@ -654,6 +658,100 @@ function line( int $author, string $created, string $text, array $cards = array(
 	}
 	$when = $created ? wp_date( 'j.n. H:i', (int) strtotime( $created ) ) : '';
 	return $person['name'] . ( $person['bot'] ? ' [' . __( 'Assistant', 'flurfunk' ) . ']' : '' ) . ( $when ? ' (' . $when . ')' : '' ) . ":\n" . trim( $text . ( $extra ? "\n" . implode( "\n", $extra ) : '' ) );
+}
+
+/* -------------------------------------------------------------------------
+ * Private summary of a thread (like Slack AI): only for the person who asks, never posted.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * REST: POST threads/<id>/summary.
+ */
+function routes(): void {
+	register_rest_route(
+		\Flurfunk\Rest\NS,
+		'/threads/(?P<id>\d+)/summary',
+		array(
+			'methods'             => 'POST',
+			'callback'            => static fn ( \WP_REST_Request $r ) => rest_ensure_response( summarize( (int) $r['id'], get_current_user_id() ) ),
+			'permission_callback' => static fn (): bool => is_user_logged_in() && Access\can_use(),
+			'args'                => array(
+				'id' => array(
+					'type'     => 'integer',
+					'required' => true,
+				),
+			),
+		)
+	);
+}
+
+/**
+ * The assistant that summarizes in a channel for this person: the first one that takes part there
+ * and may answer them.
+ *
+ * @param object $channel Channel row.
+ * @param int    $user_id Who asks.
+ */
+function summary_agent( object $channel, int $user_id ): int {
+	foreach ( agents() as $agent ) {
+		if ( may_answer( $agent, $user_id, $channel ) ) {
+			return $agent;
+		}
+	}
+	return 0;
+}
+
+/**
+ * Summarize a thread for one person.
+ *
+ * @param int $thread_id Thread.
+ * @param int $user_id   Who asks.
+ * @return array{text:string, agent:int}|\WP_Error
+ */
+function summarize( int $thread_id, int $user_id ) {
+	$thread  = Store\thread_row( $thread_id );
+	$channel = $thread ? Store\channel( (int) $thread->channel_id ) : null;
+	if ( ! $thread || ! $channel || ! Access\can_see( $thread, $user_id ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'This conversation does not exist.', 'flurfunk' ), array( 'status' => 404 ) );
+	}
+	$agent = summary_agent( $channel, $user_id );
+	if ( ! $agent ) {
+		return new \WP_Error( 'flurfunk_ai_none', __( 'No AI assistant takes part in this channel.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$key  = 'flurfunk_ai_sum_' . $user_id . '_' . gmdate( 'YmdH' );
+	$used = (int) get_transient( $key );
+	if ( $used >= (int) apply_filters( 'flurfunk_ai_summaries_per_hour', 20 ) ) {
+		return new \WP_Error( 'flurfunk_rate', __( 'That was a lot at once. Please wait a minute.', 'flurfunk' ), array( 'status' => 429 ) );
+	}
+	set_transient( $key, $used + 1, HOUR_IN_SECONDS );
+	$p = profile( $agent );
+	if ( $p['budget'] && usage( $agent )['tokens'] >= $p['budget'] ) {
+		return new \WP_Error( 'flurfunk_ai_budget', __( 'The AI budget for this month is used up.', 'flurfunk' ), array( 'status' => 429 ) );
+	}
+	$name    = Store\person( $user_id )['name'];
+	$task    = sprintf( '%s asks you for a private summary of this thread, to catch up. Give what it is about, what was decided, what is still open and who does what next – at most six short points, only from what is in the thread. Mention names where it matters.', $name );
+	$context = flurfunk_as( $agent, static fn () => context( $thread, 0, $agent, $task, $user_id ) );
+	$answer  = is_wp_error( $context ) ? $context : flurfunk_as( $agent, static fn () => answer( $thread, 0, $agent, $context ) );
+	log_run(
+		array(
+			'agent'   => $agent,
+			'asker'   => $user_id,
+			'thread'  => $thread_id,
+			'channel' => (string) $channel->slug,
+			'model'   => is_wp_error( $answer ) ? '' : (string) ( $answer['model'] ?? '' ),
+			'tokens'  => is_wp_error( $answer ) ? 0 : (int) $answer['tokens'],
+			'error'   => is_wp_error( $answer ) ? $answer->get_error_message() : '',
+			'kind'    => 'summary',
+		)
+	);
+	if ( is_wp_error( $answer ) ) {
+		return $answer;
+	}
+	add_usage( $agent, (int) $answer['tokens'] );
+	return array(
+		'text'  => trim( (string) $answer['text'] ),
+		'agent' => $agent,
+	);
 }
 
 /* -------------------------------------------------------------------------

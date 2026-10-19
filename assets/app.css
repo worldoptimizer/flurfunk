@@ -543,3 +543,9 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 /* Long messages start folded ("Show more"), like in Slack */
 .ff-root .ff-text.is-long:not(.is-open) { max-height: 13.5em; overflow: hidden; -webkit-mask-image: linear-gradient( to bottom, #000 70%, transparent ); mask-image: linear-gradient( to bottom, #000 70%, transparent ); }
 .ff-root .ff-more-text { display: block; margin: .15rem 0 .25rem; font-size: .8125rem; }
+
+/* Private AI summary at the top of a thread */
+.ff-root .ff-summary { margin: 0 0 1rem; padding: .75rem .9rem; border: 1px solid var(--ff-line); border-radius: 10px; background: var(--ff-soft); }
+.ff-root .ff-summary header { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .35rem; }
+.ff-root .ff-summary header span { color: var(--ff-muted); font-size: .8125rem; flex: 1; }
+.ff-root .ff-summary .ff-thinking { margin: 0; }

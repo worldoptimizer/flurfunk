@@ -1744,6 +1744,32 @@
 			return '<select class="ff-remind' + ( set ? ' is-set' : '' ) + '" data-ff="remind" aria-label="' + esc( t( 'Remind me about this thread' ) ) + '">'
 				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '">' + esc( l ) + '</option>' ).join( '' ) + '</select>';
 		};
+		// "Summarize": a private summary from an AI assistant of the channel, only for me (like Slack AI).
+		const summaryButton = ( th ) => {
+			const ch = channelOf( th.channel );
+			const replies = ( th.messages || [] ).filter( ( m ) => 'message' === m.type ).length;
+			return ch && ch.agents && ch.agents.length && replies >= 4 ? '<button type="button" class="ff-link" data-ff="summary" title="' + esc( t( 'A short summary from the AI assistant, only for you' ) ) + '">' + esc( t( 'Summarize' ) ) + '</button>' : '';
+		};
+		const showSummary = async ( th ) => {
+			const body = $( '.ff-pane-body', pane );
+			let box = $( '.ff-summary', pane );
+			if ( ! box ) {
+				box = document.createElement( 'section' );
+				box.className = 'ff-summary';
+				box.setAttribute( 'aria-live', 'polite' );
+				body.prepend( box );
+			}
+			box.innerHTML = '<p class="ff-thinking">' + esc( t( 'Summarizing' ) ) + '</p>';
+			body.scrollTop = 0;
+			try {
+				const r = await api( 'threads/' + th.id + '/summary', { method: 'POST', body: {} } );
+				box.innerHTML = '<header><strong>' + esc( t( 'Summary' ) ) + '</strong> <span>' + esc( t( 'only for you · by %s', person( r.agent ).name ) ) + '</span><button type="button" class="ff-x" data-ff="summary-close" aria-label="' + esc( t( 'Close summary' ) ) + '">×</button></header><div class="ff-text">' + rich( r.text ) + '</div>';
+				// Kept while the thread is open, also when new messages redraw it.
+				ui.summaries = Object.assign( ui.summaries || {}, { [ th.id ]: box.innerHTML } );
+			} catch ( err ) {
+				box.innerHTML = '<p class="ff-error" role="alert">' + esc( err.message ) + '</p><button type="button" class="ff-link" data-ff="summary-close">' + esc( t( 'Close' ) ) + '</button>';
+			}
+		};
 		// AI assistants working on the thread: a line under the messages, and a quicker look until they are done.
 		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<p class="ff-thinking" role="status">' + esc( t( '%s is thinking' ).replace( '%s', th.thinking.map( ( id ) => person( id ).name ).join( ', ' ) ) ) + '</p>' : '' );
 		let thinkingTimer = 0;
@@ -1768,7 +1794,7 @@
 			const follow = th.follow || 0;
 			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
 				+ '<span class="ff-follow"><button type="button" class="ff-link" data-ff="follow" data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '" title="' + esc( t( 'Get notified about every reply' ) ) + '">' + esc( 1 === follow ? t( 'Following' ) : t( 'Follow' ) ) + '</button>'
-				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button>' + remindSelect( th ) + '</span>'
+				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button>' + remindSelect( th ) + summaryButton( th ) + '</span>'
 				+ '<button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
@@ -1778,6 +1804,9 @@
 				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div>' + thinkingHtml( th ) + '<div class="ff-reply-slot"></div></div>';
 			watchThinking( th );
+			if ( ui.summaries && ui.summaries[ th.id ] ) {
+				$( '.ff-pane-body', pane ).insertAdjacentHTML( 'afterbegin', '<section class="ff-summary" aria-live="polite">' + ui.summaries[ th.id ] + '</section>' );
+			}
 			const c = composer( {
 				key: 'thread:' + th.id,
 				channel: th.channel,
@@ -1958,6 +1987,15 @@
 				closeThread();
 			} else if ( 'more' === act ) {
 				loadList( true );
+			} else if ( 'summary' === act ) {
+				if ( ui.current ) {
+					showSummary( ui.current );
+				}
+			} else if ( 'summary-close' === act ) {
+				el.closest( '.ff-summary' ).remove();
+				if ( ui.summaries && ui.current ) {
+					delete ui.summaries[ ui.current.id ];
+				}
 			} else if ( 'expand' === act ) {
 				const open = 'true' !== el.getAttribute( 'aria-expanded' );
 				el.previousElementSibling.classList.toggle( 'is-open', open );
