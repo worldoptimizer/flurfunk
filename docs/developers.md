@@ -1025,6 +1025,13 @@ current user with Flurfunk's own checks, so an agent only reaches what its accou
 | `flurfunk/get-thread` | yes | One conversation with its newest 100 messages; mentions as names. |
 | `flurfunk/reply` | no | Replies as the user: `id`, `text`. |
 | `flurfunk/start-thread` | no | Starts a conversation: `channel`, `title`, `text`, `task`. |
+| `flurfunk/find-posts` | yes | Posts the user may see (drafts only if they may edit them): `search`, `status`, `order`, `limit`. |
+| `flurfunk/get-post` | yes | One post's text as plain text: `id`. |
+| `flurfunk/create-draft` | no | A draft (never published), the user is its author: `title`, `text` (paragraphs, `- ` lists, `## ` headings, `*bold*`; no HTML), `excerpt`, `type`, `featured_image`, `images` (IDs; Flurfunk files from conversations the user can see move into the media library). Needs the post type's `create_posts`, for images `upload_files`. |
+| `flurfunk/update-draft` | no | Changes a draft made with `create-draft` while nobody else has saved it since (`_flurfunk_draft_saved` = its modification time): `id`, `title`, `text`, `excerpt`, `featured_image`, `images`. Needs `edit_post`. |
+
+The action `flurfunk_draft_saved` (`int $post_id`, `array $input`) fires after either; drafts an AI
+assistant wrote carry `_flurfunk_assistant` and `_flurfunk_thread`.
 
 "Public" is the ability's `meta.public` (REST, MCP adapter); the filters
 `flurfunk_abilities_public` and `flurfunk_abilities_public_write` change it.

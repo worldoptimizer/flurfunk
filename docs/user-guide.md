@@ -163,6 +163,10 @@ their role.
   administrators. Each conversation is separate: a new one starts fresh, the assistant does not
   remember the others.
 
+- **Drafts:** if your administrators allow it, ask for one – "@Lektorat, make a short article of
+  this thread, with the photo as featured image". It writes a draft with you as its author and
+  puts a card with it under its answer; write on ("shorter title, please") and it changes the
+  draft, until someone else has worked on it. It never publishes.
 - **Rights:** an assistant works with your rights, never more, and never administers the site.
   Your administrators can limit it further (e.g. to what an author may); then it tells you when
   something may be outside its limit instead of claiming it does not exist.

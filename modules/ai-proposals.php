@@ -24,7 +24,8 @@ const PROPOSAL_CARD = 'flurfunk/ai-proposal';
 add_action( 'init', __NAMESPACE__ . '\\register_proposals', 20 );
 
 /**
- * Abilities an assistant may propose: registered ones that are not marked read-only.
+ * Abilities an assistant may propose: registered ones that are not marked read-only (the draft
+ * abilities come with the pack "Drafts" and run directly instead).
  *
  * @return array<string, \WP_Ability>
  */
@@ -34,7 +35,7 @@ function writable_abilities(): array {
 	}
 	$out = array();
 	foreach ( wp_get_abilities() as $a ) {
-		if ( empty( $a->get_meta()['annotations']['readonly'] ) ) {
+		if ( empty( $a->get_meta()['annotations']['readonly'] ) && ! in_array( $a->get_name(), DRAFT_TOOLS, true ) ) {
 			$out[ $a->get_name() ] = $a;
 		}
 	}

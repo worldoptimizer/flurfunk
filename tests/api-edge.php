@@ -1470,6 +1470,73 @@ ob_start();
 Flurfunk\Modules\Ai\render_section();
 $lim_html = (string) ob_get_clean();
 $check( 'the settings show "May at most act as" with the roles, without Administrator, and the limit in the summary line', str_contains( $lim_html, 'name="ai[' . $ai_bot . '][limit]"' ) && (bool) preg_match( '/<option value="author"\s+selected/', $lim_html ) && ! str_contains( $lim_html, '<option value="administrator"' ) && str_contains( $lim_html, 'At most as: ' ) );
+// Drafts: an assistant writes drafts (never published), with images from the conversation.
+WP_CLI::log( 'AI drafts' );
+$dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";
+$dr_html = Flurfunk\Drafts\blocks( $dr_text );
+$dr_kinds = array_values( array_filter( array_map( static fn ( $b ) => $b['blockName'], parse_blocks( $dr_html ) ) ) );
+$check( 'text becomes blocks: heading, paragraphs with line breaks, lists, bold and links; HTML is escaped', array( 'core/heading', 'core/paragraph', 'core/list', 'core/paragraph' ) === $dr_kinds && str_contains( $dr_html, '<strong>fetter</strong>' ) && str_contains( $dr_html, 'Absatz.<br>Zweite' ) && str_contains( $dr_html, '&lt;script&gt;' ) && ! str_contains( $dr_html, '<script>' ) && str_contains( $dr_html, 'href="https://example.org"' ), array( $dr_kinds, $dr_html ) );
+$dr_png = base64_decode( 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' );
+$as( $lim_ed );
+$dr_img = Flurfunk\Files\store( 'ff-test-bild.png', $dr_png );
+$dr_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Hier das Foto vom Gipfel', 'files' => array( $dr_img ) ) );
+$as( $team );
+$dr_hid = Flurfunk\Files\store( 'ff-test-geheim.png', $dr_png );
+Store\create_thread( array( 'channel' => 'ff-test-lim', 'body' => 'Nur für Redakteure', 'files' => array( $dr_hid ) ) );
+$check( 'the AI sees files in the thread with their ID, marked as images', str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $dr_t ), 0, $ai_bot )['prompt'], '#' . $dr_img . ': ff-test-bild.png' ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/create-draft' ) ) {
+	$dr_run = static function ( int $user, string $limit, string $ability, array $input ) use ( $as, $lim_set, $ai_bot ) {
+		$as( $user );
+		$lim_set( $limit );
+		return Flurfunk\Modules\Ai\with_limit( $ai_bot, $user, static fn () => wp_get_ability( $ability )->execute( $input ) );
+	};
+	$dr_a = $dr_run( $lim_ed, '', 'flurfunk/create-draft', array( 'title' => 'ff-test Gipfel-Entwurf', 'text' => "Der Gipfel endete mit einer Einigung.\n\n- Punkt eins", 'featured_image' => $dr_img, 'images' => array( $dr_img ) ) );
+	$dr_p = is_array( $dr_a ) ? get_post( (int) $dr_a['id'] ) : null;
+	$check( 'create-draft: a draft with the person asking as author, the image from the conversation as featured image and in the text', $dr_p && 'draft' === $dr_p->post_status && $lim_ed === (int) $dr_p->post_author && $dr_img === (int) get_post_thumbnail_id( $dr_p ) && str_contains( $dr_p->post_content, '"id":' . $dr_img ) && str_contains( $dr_p->post_content, 'Der Gipfel endete' ), $dr_a );
+	$check( '… the image moves into the media library and keeps its address', ! Flurfunk\Files\is_hidden( $dr_img ) && $dr_p && (int) get_post( $dr_img )->post_parent === $dr_p->ID );
+	$dr_c1 = $dr_run( $lim_co, '', 'flurfunk/create-draft', array( 'title' => 'ff-test Mitarbeiterbild', 'text' => 'Text', 'featured_image' => $dr_img ) );
+	$dr_c2 = $dr_run( $lim_co, '', 'flurfunk/create-draft', array( 'title' => 'ff-test Mitarbeitertext', 'text' => 'Text' ) );
+	$check( 'a contributor gets the draft but no images (WordPress: contributors may not add media)', is_wp_error( $dr_c1 ) && is_array( $dr_c2 ) && 'draft' === get_post_status( (int) $dr_c2['id'] ), array( $dr_c1, $dr_c2 ) );
+	$dr_e1 = $dr_run( $lim_ed, 'contributor', 'flurfunk/create-draft', array( 'title' => 'ff-test Grenzbild', 'text' => 'Text', 'images' => array( $dr_img ) ) );
+	$check( '… the same for an editor whose assistant is limited to Contributor', is_wp_error( $dr_e1 ) );
+	$dr_h = $dr_run( $lim_au, '', 'flurfunk/create-draft', array( 'title' => 'ff-test Fremdbild', 'text' => 'Text', 'images' => array( $dr_hid ) ) );
+	$check( 'an image from a conversation the person cannot see cannot be used', is_wp_error( $dr_h ) && Flurfunk\Files\is_hidden( $dr_hid ), $dr_h );
+	$dr_u1 = $dr_run( $lim_ed, '', 'flurfunk/update-draft', array( 'id' => $dr_p->ID, 'title' => 'ff-test Gipfel-Entwurf, kürzer' ) );
+	$check( 'update-draft: the draft it wrote can be changed further', is_array( $dr_u1 ) && 'ff-test Gipfel-Entwurf, kürzer' === get_the_title( $dr_p->ID ) && str_contains( get_post( $dr_p->ID )->post_content, 'Der Gipfel endete' ), $dr_u1 );
+	$as( $team );
+	sleep( 1 ); // A new modification time.
+	wp_update_post( array( 'ID' => $dr_p->ID, 'post_content' => get_post( $dr_p->ID )->post_content . "\n\n<!-- wp:paragraph -->\n<p>Von Hand ergänzt.</p>\n<!-- /wp:paragraph -->" ) );
+	$dr_u2 = $dr_run( $lim_ed, '', 'flurfunk/update-draft', array( 'id' => $dr_p->ID, 'title' => 'Überschrieben?' ) );
+	$dr_u3 = $dr_run( $lim_ed, '', 'flurfunk/update-draft', array( 'id' => $lim_draft, 'title' => 'Fremd?' ) );
+	$check( '… but not once someone else worked on it, nor a draft not written here', is_wp_error( $dr_u2 ) && 'flurfunk_draft_touched' === $dr_u2->get_error_code() && is_wp_error( $dr_u3 ) && 'ff-test Gipfel-Entwurf, kürzer' === get_the_title( $dr_p->ID ), array( $dr_u2, $dr_u3 ) );
+	$dr_b = $dr_run( $lim_ed, '', 'flurfunk/create-draft', array( 'title' => 'ff-test Veröffentlicht', 'text' => 'Text' ) );
+	wp_publish_post( (int) $dr_b['id'] );
+	$dr_u4 = $dr_run( $lim_ed, '', 'flurfunk/update-draft', array( 'id' => (int) $dr_b['id'], 'title' => 'Nachträglich?' ) );
+	$check( '… nor once it is published', is_wp_error( $dr_u4 ) && 'flurfunk_draft_published' === $dr_u4->get_error_code(), $dr_u4 );
+	$dr_k = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'drafts' ) ) );
+	$dr_names = array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) );
+	$check( 'the pack "Drafts" gives the two draft tools (they run directly, they are no proposals)', $dr_k['drafts'] && ! array_diff( array( 'flurfunk/create-draft', 'flurfunk/update-draft' ), $dr_names ) && ! array_intersect( array( 'flurfunk/create-draft', 'flurfunk/update-draft' ), array_keys( Flurfunk\Modules\Ai\writable_abilities() ) ) && str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $dr_t ), 0, $ai_bot )['system'], 'flurfunk/create-draft' ), $dr_names );
+	$as( $team );
+	ob_start();
+	Flurfunk\Modules\Ai\render_section();
+	$dr_html2 = (string) ob_get_clean();
+	$check( '… and the settings say it: writes drafts, changes by itself: drafts only', (bool) preg_match( '/name="ai\[' . $ai_bot . '\]\[packs\]\[\]" value="drafts"\s+checked/', $dr_html2 ) && str_contains( $dr_html2, 'drafts only, never published' ) );
+	add_filter( 'flurfunk_ai_pre_answer', $dr_fake = static fn () => array( 'text' => 'Ich habe den Entwurf geschrieben.', 'tokens' => 5, 'drafts' => array( $dr_p->ID ) ), 30 );
+	$as( $lim_ed );
+	$dr_m = Store\add_message( $dr_t, array( 'body' => "<@$ai_bot> Mach daraus einen Entwurf" ) );
+	$dr_r = Flurfunk\Modules\Ai\run( $dr_t, $dr_m, $ai_bot );
+	remove_filter( 'flurfunk_ai_pre_answer', $dr_fake, 30 );
+	$dr_last = end( Store\full_thread( $dr_t, $lim_ed )['messages'] );
+	$check( 'the answer carries the draft as a card – the editor sees it', is_int( $dr_r ) && 'flurfunk/post' === ( $dr_last['attachments'][0]['provider'] ?? '' ) && $dr_p->ID === (int) ( $dr_last['attachments'][0]['snapshot']['target']['id'] ?? 0 ), array( $dr_r, $dr_last['attachments'] ?? null ) );
+	$check( '… with the link to the editor (WordPress decides who may open it)', str_contains( (string) ( $dr_last['attachments'][0]['snapshot']['url'] ?? '' ), 'post=' . $dr_p->ID ), $dr_last['attachments'][0]['snapshot'] ?? null );
+	foreach ( array( $dr_p->ID, (int) ( $dr_c2['id'] ?? 0 ), (int) ( $dr_b['id'] ?? 0 ) ) as $dr_id ) {
+		$dr_id && wp_delete_post( $dr_id, true );
+	}
+	$as( $team );
+}
+wp_delete_attachment( $dr_img, true );
+wp_delete_attachment( $dr_hid, true );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
 foreach ( array( $lim_draft, $lim_own, $lim_k0, $lim_k1, $lim_k2 ) as $lim_post ) {
 	wp_delete_post( $lim_post, true );
 }

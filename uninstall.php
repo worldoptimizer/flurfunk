@@ -85,4 +85,8 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 	delete_metadata( 'user', 0, 'flurfunk_bot', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_day', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_last', '', true );
+	// Marks on drafts written from conversations (the drafts themselves are the site's posts and stay).
+	foreach ( array( '_flurfunk_draft_saved', '_flurfunk_assistant', '_flurfunk_thread' ) as $flurfunk_k ) {
+		delete_post_meta_by_key( $flurfunk_k );
+	}
 }

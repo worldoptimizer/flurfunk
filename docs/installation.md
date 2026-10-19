@@ -263,6 +263,7 @@ What an assistant can do is chosen as **packs**, each marked "reads" or "suggest
 | Pack | What it stands for |
 | --- | --- |
 | Proofreading | Reads the post the thread is about, not just the thread. |
+| Drafts | Writes drafts from the conversation, with its images, and changes them until someone else works on them – never publishes; the person asking is the author. Needs their right to create posts (and to upload files for images), within the assistant's limit. |
 | Looking things up | Flurfunk's reading tools: other conversations in its channels. |
 | Tasks | May suggest new tasks and conversations (as cards a person confirms). |
 | SEO and teasers | Titles, excerpts, descriptions – needs SEOPress or the WordPress plugin "AI". |
