@@ -63,6 +63,7 @@ require_once FLURFUNK_DIR . 'inc/admin.php';
 require_once FLURFUNK_DIR . 'inc/standalone.php';
 require_once FLURFUNK_DIR . 'inc/transfer.php';
 require_once FLURFUNK_DIR . 'inc/data.php';
+require_once FLURFUNK_DIR . 'inc/abilities.php'; // WordPress abilities (6.9+); without the API the hooks never fire.
 
 require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 

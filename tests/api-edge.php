@@ -903,6 +903,26 @@ wp_delete_post( $rp, true );
 null === $review_opt ? delete_option( 'flurfunk_module_settings' ) : update_option( 'flurfunk_module_settings', $review_opt );
 Flurfunk\Notify\deliver();
 
+if ( function_exists( 'wp_get_ability' ) ) {
+	WP_CLI::log( 'Abilities' );
+	$as( $team );
+	$ab_t = Store\create_thread( array( 'channel' => 'ff-test', 'title' => 'Ability-Test', 'body' => "Frage an <@$team2>" ) );
+	$ab_l = wp_get_ability( 'flurfunk/list-threads' )->execute( array( 'channel' => 'ff-test', 'limit' => 5 ) );
+	$check( 'list-threads: the conversations of a channel, briefly', is_array( $ab_l ) && in_array( $ab_t, array_column( $ab_l, 'id' ), true ), $ab_l );
+	$ab_g = wp_get_ability( 'flurfunk/get-thread' )->execute( array( 'id' => $ab_t ) );
+	$check( 'get-thread: the conversation with readable mentions', ! is_wp_error( $ab_g ) && 'Ability-Test' === $ab_g['title'] && str_contains( $ab_g['text'], '@' . Store\person( $team2 )['name'] ), $ab_g );
+	$ab_r = wp_get_ability( 'flurfunk/reply' )->execute( array( 'id' => $ab_t, 'text' => 'Antwort über eine Ability' ) );
+	$check( 'reply: as the current user', ! is_wp_error( $ab_r ) && $team === (int) end( Store\full_thread( $ab_t, $team )['messages'] )['author'], $ab_r );
+	$check( 'reading abilities are public, writing ones are not (by default)', true === wp_get_ability( 'flurfunk/get-thread' )->get_meta()['public'] && false === wp_get_ability( 'flurfunk/reply' )->get_meta()['public'] );
+	$as( $guest );
+	$ab_x = wp_get_ability( 'flurfunk/get-thread' )->execute( array( 'id' => $ab_t ) );
+	$check( 'a conversation the person may not read stays closed', is_wp_error( $ab_x ), $ab_x );
+	wp_set_current_user( 0 );
+	$check( 'logged out: no abilities', is_wp_error( wp_get_ability( 'flurfunk/list-threads' )->execute( array() ) ) );
+	$as( $team );
+	Flurfunk\Notify\deliver();
+}
+
 WP_CLI::log( 'AI assistants module' );
 $check( 'the AI module is registered and needs the WordPress AI client', isset( Flurfunk\Modules\registry()['flurfunk/ai'] ) && Flurfunk\Modules\available( Flurfunk\Modules\registry()['flurfunk/ai'] ) === function_exists( 'wp_ai_client_prompt' ) );
 $fresh_rate();
@@ -952,6 +972,7 @@ $as( $team2 );
 Store\add_message( $ai_t, array( 'body' => 'Ich lese mit.' ) );
 $as( $team );
 $ai_r = null;
+Flurfunk\Notify\deliver(); // Earlier notifications (the mention itself) out of the way first.
 list( $ai_notes ) = $flush( function () use ( &$ai_r, $ai_t, $ai_m, $ai_bot ) {
 	$ai_r = Flurfunk\Modules\Ai\run( $ai_t, $ai_m, $ai_bot );
 } );
