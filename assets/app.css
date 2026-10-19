@@ -539,3 +539,7 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-thinking::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: ff-dots 1.2s steps( 4, end ) infinite; }
 @keyframes ff-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 @media ( prefers-reduced-motion: reduce ) { .ff-root .ff-thinking::after { animation: none; } }
+
+/* Long messages start folded ("Show more"), like in Slack */
+.ff-root .ff-text.is-long:not(.is-open) { max-height: 13.5em; overflow: hidden; -webkit-mask-image: linear-gradient( to bottom, #000 70%, transparent ); mask-image: linear-gradient( to bottom, #000 70%, transparent ); }
+.ff-root .ff-more-text { display: block; margin: .15rem 0 .25rem; font-size: .8125rem; }

@@ -940,7 +940,14 @@ $ai_t = Store\create_thread( array( 'channel' => 'ff-test', 'title' => 'KI-Frage
 $ai_m = Store\add_message( $ai_t, array( 'body' => "<@$ai_bot> Was steht oben?" ) );
 $check( 'a mention queues a run and shows the agent as thinking', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ai_t, $ai_m, $ai_bot ) ) && in_array( $ai_bot, Store\full_thread( $ai_t, $team )['thinking'] ?? array(), true ) );
 $check( 'the channel tells which AI assistants answer there', in_array( $ai_bot, Store\format_channel( $ai_ch )['agents'] ?? array(), true ) );
-$ai_r    = Flurfunk\Modules\Ai\run( $ai_t, $ai_m, $ai_bot );
+$as( $team2 );
+Store\add_message( $ai_t, array( 'body' => 'Ich lese mit.' ) );
+$as( $team );
+$ai_r = null;
+list( $ai_notes ) = $flush( function () use ( &$ai_r, $ai_t, $ai_m, $ai_bot ) {
+	$ai_r = Flurfunk\Modules\Ai\run( $ai_t, $ai_m, $ai_bot );
+} );
+$check( 'an AI answer notifies only the person who asked, not everyone in the thread', 'reply' === ( $ai_notes[ $team ] ?? '' ) && ! isset( $ai_notes[ $team2 ] ), $ai_notes );
 $ai_full = Store\full_thread( $ai_t, $team );
 $ai_last = end( $ai_full['messages'] );
 $check( 'the run answers in the thread as the agent and stops thinking', is_int( $ai_r ) && $ai_bot === (int) $ai_last['author'] && 'Kurze Antwort der KI.' === $ai_last['text'] && array() === $ai_full['thinking'], array( $ai_r, $ai_last ) );

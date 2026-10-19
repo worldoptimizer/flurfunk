@@ -478,6 +478,12 @@
 	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.moderate );
 	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
+	// Long messages (an AI answer, a pasted text) start folded, like in Slack: "Show more" opens them.
+	const longText = ( text ) => {
+		const long = text.length > 700 || text.split( '\n' ).length > 12;
+		return '<div class="ff-text' + ( long ? ' is-long' : '' ) + '">' + rich( text ) + '</div>'
+			+ ( long ? '<button type="button" class="ff-link ff-more-text" data-ff="expand" aria-expanded="false">' + esc( t( 'Show more' ) ) + '</button>' : '' );
+	};
 	const messagesHtml = ( th ) => {
 		let html = '';
 		let prev = null;
@@ -525,7 +531,7 @@
 			const unread = th.read >= 0 && m.id > th.read && m.author !== boot.me.id;
 			html += '<li class="ff-msg' + ( cont ? ' is-cont' : '' ) + ( unread ? ' is-unread' : '' ) + '" id="ff-m-' + m.id + '">' + ava( m.author ) + '<div class="ff-msg-body">'
 				+ ( cont ? '' : '<p class="ff-who">' + nameHtml( m.author ) + ' <span>' + esc( person( m.author ).role ) + ' · ' + esc( when( m.created ) ) + '</span></p>' )
-				+ ( m.text ? '<div class="ff-text">' + rich( m.text ) + '</div>' : '' )
+				+ ( m.text ? longText( m.text ) : '' )
 				+ ( m.edited ? '<small class="ff-edited">' + esc( t( '(edited)' ) ) + '</small>' : '' )
 				+ cards( m.attachments ) + files( m.files )
 				+ actions( m ) + '</div></li>';
@@ -1952,6 +1958,11 @@
 				closeThread();
 			} else if ( 'more' === act ) {
 				loadList( true );
+			} else if ( 'expand' === act ) {
+				const open = 'true' !== el.getAttribute( 'aria-expanded' );
+				el.previousElementSibling.classList.toggle( 'is-open', open );
+				el.setAttribute( 'aria-expanded', String( open ) );
+				el.textContent = open ? t( 'Show less' ) : t( 'Show more' );
 			} else if ( 'push-toggle' === act ) {
 				el.disabled = true;
 				try {
