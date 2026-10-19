@@ -81,7 +81,7 @@ function for_threads( array $thread_ids, bool $roots_only = false ): array {
 		return array();
 	}
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Flurfunk's own table; the IN list is placeholders.
-	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT thread_id, message_id, user_id, emoji FROM %i WHERE thread_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ')' . ( $roots_only ? ' AND message_id = 0' : '' ) . ' ORDER BY created, user_id', array_merge( array( table( 'reactions' ) ), $ids ) ) );
+	$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT thread_id, message_id, user_id, emoji FROM %i WHERE thread_id IN (' . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ') AND ( %d = 0 OR message_id = 0 ) ORDER BY created, user_id', array_merge( array( table( 'reactions' ) ), $ids, array( (int) $roots_only ) ) ) );
 	$group = array();
 	foreach ( (array) $rows as $r ) {
 		$group[ (int) $r->thread_id ][ (int) $r->message_id ][ (string) $r->emoji ][] = (int) $r->user_id;
