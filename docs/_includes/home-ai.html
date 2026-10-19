@@ -1,0 +1,54 @@
+{%- assign h = '/assets/hero/' | relative_url -%}
+{%- capture spark -%}<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg>{%- endcapture -%}
+<section class="section section-band" id="ai" aria-labelledby="ai-title">
+  <div class="wrap split">
+    <header class="section-head">
+      <p class="kicker">AI assistants</p>
+      <h2 id="ai-title">An assistant that works with you, not past you.</h2>
+      <p class="lead">Mention an assistant in a thread, or talk to it in private. It reads what you may read, writes drafts if you let it, and suggests changes to posts as one card you apply or undo. WordPress 7.0 or newer, with the AI provider your site already has.</p>
+      <ul class="checks">
+        <li>Never more rights than the person asking, and it never administers the site. A role can limit it further.</li>
+        <li>Drafts with you as the author, images from the conversation included. It never publishes.</li>
+        <li>Corrections for several posts as one card with before and after: untick, apply, undo.</li>
+        <li>Follow-ups without a new mention. A thanks gets a reaction, not another message.</li>
+        <li>Off by default, a monthly budget per assistant, a log without content.</li>
+      </ul>
+      <p><a href="{{ '/user-guide.html#ai-assistants' | relative_url }}">AI assistants in the user guide</a></p>
+    </header>
+
+    <div class="showcase ai-stage">
+      <p class="visually-hidden">Illustration: Ana Klein asks the assistant Proofreading to check the three latest articles. It answers with one card that changes three posts, each with the old and the new wording; two rows are ticked, one is not, with the buttons Dismiss and Apply. Ana thanks it, and the assistant reacts with a thumbs-up.</p>
+      <div class="mock ai-thread" aria-hidden="true">
+        <div class="ai-msg">
+          <img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96" loading="lazy">
+          <div>
+            <p class="ai-who"><b>Ana Klein</b>10:02</p>
+            <p><span class="ai-at">@Proofreading</span> please check the three latest articles and suggest the corrections</p>
+          </div>
+        </div>
+        <div class="ai-msg">
+          <span class="ai-ava">{{ spark }}</span>
+          <div>
+            <p class="ai-who"><b>Proofreading</b><span class="ai-pill">AI</span>10:02</p>
+            <p>Three mistakes, one card. Nothing changes until someone applies it.</p>
+            <div class="ai-card">
+              <div class="ai-card-head"><small>Suggestion &middot; waiting for you</small><b>Change 3 posts</b></div>
+              <div class="ai-row"><i class="ai-box"></i><div><b>Pool opens in May</b><span>&hellip;the city renovated <del>teh</del><ins>the</ins> pool</span></div></div>
+              <div class="ai-row"><i class="ai-box"></i><div><b>City festival with a new programme</b><span>&hellip;we look forward to many <del>vistors</del><ins>visitors</ins></span></div></div>
+              <div class="ai-row is-off"><i class="ai-box"></i><div><b>New bus line to the station</b><span>Title <del>New bus line to the station</del> &rarr; <ins>Line 7 to the station</ins></span></div></div>
+              <div class="ai-bar"><span class="ai-btn">Dismiss</span><span class="ai-btn is-primary">Apply</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ai-msg">
+          <img src="{{ h }}avatar-ana.webp" alt="" width="96" height="96" loading="lazy">
+          <div>
+            <p class="ai-who"><b>Ana Klein</b>10:05</p>
+            <p>Thanks!</p>
+            <span class="ai-react">&#128077; 1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

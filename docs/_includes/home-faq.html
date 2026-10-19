@@ -1,4 +1,4 @@
-<section class="section section-band" id="faq" aria-labelledby="faq-title">
+<section class="section" id="faq" aria-labelledby="faq-title">
   <div class="wrap faq-wrap">
     <header class="section-head">
       <p class="kicker">FAQ</p>
@@ -12,7 +12,11 @@
       </details>
       <details>
         <summary>Does it need an external service?</summary>
-        <p>No. Flurfunk keeps everything in its own tables in your WordPress database and needs no external service, library or API key. Mail goes through <code>wp_mail()</code>. Web Push is encrypted by the plugin itself and sent directly to the browsers&rsquo; push services, which needs HTTPS and PHP&rsquo;s OpenSSL extension.</p>
+        <p>No. Flurfunk keeps everything in its own tables in your WordPress database and needs no external service, library or API key. Mail goes through <code>wp_mail()</code>. Web Push is encrypted by the plugin itself and sent directly to the browsers&rsquo; push services, which needs HTTPS and PHP&rsquo;s OpenSSL extension. Only the optional AI assistants talk to an AI provider &ndash; the one you choose.</p>
+      </details>
+      <details>
+        <summary>What can the AI assistants do, and what not?</summary>
+        <p>They are a module, off by default, for WordPress 7.0 or newer; the provider and its key are the ones set up under <em>Settings &rarr; Connectors</em>. Per assistant you choose what it may do: read posts and look things up, suggest tasks, write drafts, propose changes to posts as a card with before and after. It works with the rights of the person asking, never more, and never administers the site; it never publishes, and every change to an existing post needs a person to apply it. What it reads is sent to the provider, so mention it in your privacy policy. <a href="{{ '/installation.html#ai-assistants' | relative_url }}">AI assistants for admins</a></p>
       </details>
       <details>
         <summary>Does it work with OpenStation?</summary>
