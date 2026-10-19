@@ -26,10 +26,16 @@ A channel holds threads. A thread has an optional title, a text, replies, files 
 overview at *Flurfunk* in the admin menu has three columns: the sidebar with channels and views,
 the thread list, and the open thread.
 
+A channel reads top to bottom, as in Slack: the newest thread sits right above the writing box,
+each day starts with a date that stays at the top while you scroll through it, and a thread keeps
+its place when someone replies. Scrolled up, a **Latest** button brings you back down. Enter sends,
+Shift+Enter starts a new line.
+
 The sidebar shows:
 
 - **All threads**, **Mentions**, **My tasks** and **Open tasks**
 - the channels you can see, with unread numbers
+- **Assistants**, for private conversations with an AI assistant
 - posts (or other targets) with recent conversations
 - the bell with your notifications
 - your name at the bottom, which opens your personal settings
@@ -61,6 +67,12 @@ a lightbox; audio and video show as players. Uploaded files stay out of the medi
 someone adds them, without being copied or moved.
 
 ![An image from a message in the lightbox](assets/screenshot-lightbox.png)
+
+### Reactions
+
+Point at a thread or reply and pick an emoji, as in Slack. The picker shows the ones you use most
+first and finds any other by name (in English and German). Reactions show as small capsules with a
+count; nobody is notified.
 
 ### Slash commands and cards
 
@@ -95,10 +107,22 @@ with an application password.
 ### AI assistants
 
 With WordPress 7.0 or newer, an assistant can answer with AI when someone mentions it – in the
-thread, with the rights of the person asking, within a monthly budget. It can read the post a thread
-is about, look things up in its channels and suggest tasks or other actions as cards that a person
-confirms; it never changes anything by itself. "Summarize" gives anyone a private summary of a long
-thread. Off by default; the provider is the one set up under *Settings → Connectors*.
+thread, within a monthly budget. Follow-ups need no new mention, and a thanks gets a 👍 instead of
+a reply. Under **Assistants** in the sidebar anyone allowed can talk to it in private.
+
+What each assistant may do is switched on in packs:
+
+- **Read and look up:** the post a thread is about, the latest posts and drafts, other
+  conversations in its channels.
+- **Suggest:** tasks, new conversations and other actions as cards that a person confirms.
+- **Write drafts:** "make an article of this thread, with the photo" gives a draft with the person
+  asking as its author – never published – and follow-ups change it.
+- **Change posts:** corrections, titles, categories or featured images for several posts as one
+  card with before and after; a person applies it and can undo it.
+
+An assistant never has more rights than the person asking and never administers the site; a role
+can limit it further, for what it reads as well. "Summarize" gives anyone a private summary of a
+long thread. Off by default; the provider is the one set up under *Settings → Connectors*.
 
 ### Embeds
 
