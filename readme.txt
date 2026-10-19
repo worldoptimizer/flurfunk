@@ -114,17 +114,16 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
-= 0.3.1 (in development) =
-* New: AI assistants can find and read posts – "proofread the latest article" or "the article about …" works. Two new abilities, flurfunk/find-posts and flurfunk/get-post, with the rights of the person asking (drafts only for those who may edit them, guests only their own posts).
-* New: right after an assistant's answer you can simply write on – a follow-up without a new mention goes to it; if it needs no answer ("thanks"), the assistant stays quiet. Developers can switch this off with flurfunk_ai_follow_ups.
-* Changed: as in Slack, Enter sends and Shift+Enter makes a new line (Ctrl/Cmd+Enter still sends; on touch screens Enter makes a new line).
-
 = 0.3.0 =
 * New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
 * New: what an assistant can do is set as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) that say what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".
 * New: AI answers carry a spark avatar, an "AI" label and a line with what they were based on and who was notified; while an assistant works, the thread shows what it is doing. Proposal cards say in plain words what would happen ("Task: …") and name the button after it. A channel's header explains which assistants take part and what they read.
 * New: "Summarize" gives a private summary of a thread; threads with many unread messages offer one of just those.
 * New: abilities for the WordPress Abilities API and MCP: list channels, list and read conversations (public), reply and start conversations (not public by default).
+* New: AI assistants can find and read posts – "proofread the latest article" or "the article about …" works. Two new abilities, flurfunk/find-posts and flurfunk/get-post, with the rights of the person asking (drafts only for those who may edit them, guests only their own posts).
+* New: right after an assistant's answer you can simply write on – a follow-up without a new mention goes to it; if it needs no answer ("thanks"), the assistant stays quiet. Developers can switch this off with flurfunk_ai_follow_ups.
+* Changed: as in Slack, Enter sends and Shift+Enter makes a new line (Ctrl/Cmd+Enter still sends; on touch screens Enter makes a new line).
+* Changed: one icon set instead of text links and characters – in the sidebar, the thread's header (follow, mute, remind, summarize, close), the writing box (file, media library, @, /, send) and on messages, whose edit and delete now sit in a small bar on hover, with tooltips as in Slack.
 * Changed: the app asks the server in the language of the person using it, and mails and pushes go out in the recipient's language.
 * Changed: Enter or Tab takes the first suggestion in the @ and / lists, as in Slack.
 * Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.
@@ -153,7 +152,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 == Upgrade Notice ==
 
 = 0.3.0 =
-New: optional AI assistants (WordPress 7.0+, off by default), Flurfunk abilities for the Abilities API and MCP. Mails and pushes now go out in each recipient's language.
+New: optional AI assistants (WordPress 7.0+, off by default), Flurfunk abilities for the Abilities API and MCP, icons instead of text links. As in Slack, Enter now sends (Shift+Enter: new line). Mails and pushes go out in each recipient's language.
 
 = 0.2.1 =
 Small update: module settings can pick people, and review requests close when their post is trashed or deleted.

@@ -73,21 +73,23 @@ Use the box at the bottom of the thread list:
 2. Optionally pick what the thread is about under **Attached to** (a post, or another type a
    plugin added). Search by typing.
 3. Optionally tick **Task**, set a due date and click **Assign** to choose responsible people.
-4. Press Enter or click **Start thread**. Shift+Enter makes a new line.
+4. Press Enter or click the send button (the paper plane). Shift+Enter makes a new line.
 
 ### Reply
 
-Click a thread to open it, write in the **Reply** box and press Enter or click **Reply** (Shift+Enter for a new line).
+Click a thread to open it, write in the reply box and press Enter or click the send button (Shift+Enter for a new line). The @ and / buttons under the box start a mention or a card, as typing the character does.
 
 What you type is kept as a draft in this browser until you send it, even if you reload the page
 or open another thread.
 
 ### Edit and delete
 
-Your own messages have **Edit** and **Delete** next to them. Administrators can edit and delete
-all messages. An edited message is marked "(edited)". A deleted message leaves a short note
-("… deleted a message") so the replies after it keep their context. The text of the thread
-itself and its title can be changed with **Edit** below it.
+Point at one of your own messages: a small bar appears on its top edge with **Edit** (pencil) and
+**Delete** (bin) – hold the pointer on an icon to see its name. On phones and tablets the icons
+are always shown under the message. Administrators can edit and delete all messages. An edited
+message is marked "(edited)". A deleted message leaves a short note ("… deleted a message") so
+the replies after it keep their context. The text of the thread itself and its title are edited
+the same way, from the bar on the first message.
 
 ## Formatting
 
@@ -189,9 +191,9 @@ Your administrator can switch on more under *Settings → Flurfunk → Modules*:
 
 There are two ways to add files to a reply:
 
-- **Attach file** uploads files from your computer. You can pick several at once. Wait until the
+- **Attach file** (the paper clip under the box) uploads files from your computer. You can pick several at once. Wait until the
   upload has finished, then send.
-- **From media library** opens WordPress's media dialog. Pick one or more files that are already
+- **From media library** (the picture icon) opens WordPress's media dialog. Pick one or more files that are already
   in the library. Nothing is copied: the message refers to the file where it is.
 
 A message can carry up to 50 files. You can attach your own files and files you may edit.
@@ -221,7 +223,7 @@ library** buttons.
 Any thread can be a task.
 
 - When starting a thread, tick **Task**.
-- In an open thread, click **Make it a task**.
+- In an open thread, point at the first message and click **Make it a task** (the ticked box) in its bar.
 
 A task has:
 
@@ -292,15 +294,16 @@ guests can read.
 
 ## Follow, mute, remind me
 
-The header of an open thread has three controls:
+The header of an open thread has these icons (hold the pointer on one to see its name):
 
-| Control | Effect |
+| Icon | Effect |
 | --- | --- |
-| **Follow** | You are notified about every reply, even if you never wrote in the thread. |
-| **Mute** | You are only notified when someone mentions you or gives you a task. |
-| **Remind me …** | In an hour, tomorrow or next Monday (at your chosen hour). You get a "Reminder" notification for the thread. Choose **No reminder** to remove it. |
+| Bell – **Follow** | You are notified about every reply, even if you never wrote in the thread. |
+| Crossed-out bell – **Mute** | You are only notified when someone mentions you or gives you a task. |
+| Clock – **Remind me …** | In an hour, tomorrow or next Monday (at your chosen hour). You get a "Reminder" notification for the thread. Choose **No reminder** to remove it. |
+| Spark – **Summarize** | A short summary from an AI assistant, only for you (if the site has one in this channel). |
 
-Click **Following** or **Muted** again to go back to normal. A reminder that falls into your
+A highlighted bell means you follow or muted the thread; click it again to go back to normal. A reminder that falls into your
 quiet hours or a pause waits until they end.
 
 ## Notifications

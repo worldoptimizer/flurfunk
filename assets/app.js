@@ -111,15 +111,34 @@
 	};
 	const size = ( b ) => ( b < 1048576 ? Math.max( 1, Math.round( b / 1024 ) ) + ' KB' : ( b / 1048576 ).toFixed( 1 ) + ' MB' );
 
+	// One icon set: 24 px grid, 1.75 px stroke, round ends, the colour of the text.
+	const svg = ( d, w ) => '<svg class="ff-i" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="' + ( w || 1.75 ) + '" stroke-linecap="round" stroke-linejoin="round" d="' + d + '"/></svg>';
 	const icon = {
-		clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L14 7"/></svg>',
-		file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>',
-		doc: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M6 3h8l4 4v14H6zM9 12h6M9 16h6"/></svg>',
-		image: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="9" r="1.5" fill="currentColor"/></svg>',
-		bell: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></svg>',
+		clip: svg( 'M21.4 11.05l-9.2 9.2a6 6 0 0 1-8.5-8.5l8.6-8.6a4 4 0 1 1 5.7 5.7l-8.6 8.6a2 2 0 0 1-2.8-2.8l8.5-8.5' ),
+		file: svg( 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6' ),
+		doc: svg( 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5' ),
+		image: svg( 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM11 9a2 2 0 1 1-4 0a2 2 0 1 1 4 0M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21' ),
+		bell: svg( 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0' ),
+		bellOff: svg( 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0M3 3l18 18' ),
 		chev: '<svg class="ff-chev" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 7 5l-4 3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
-		gear: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>',
+		gear: svg( 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4' ),
+		list: svg( 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01' ),
+		at: svg( 'M16 12a4 4 0 1 1-8 0a4 4 0 1 1 8 0M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8' ),
+		check: svg( 'M21 12a9 9 0 1 1-18 0a9 9 0 1 1 18 0M8 12l3 3 5-6' ),
+		square: svg( 'M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z' ),
+		board: svg( 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8 7v7M12 7v4M16 7v9' ),
+		hash: svg( 'M4 9h16M4 15h16M10 3L8 21M16 3l-2 18' ),
+		clock: svg( 'M21 12a9 9 0 1 1-18 0a9 9 0 1 1 18 0M12 7v5l3 2' ),
+		task: svg( 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 12l2 2 4-4' ),
+		pencil: svg( 'M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z' ),
+		trash: svg( 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6' ),
+		send: svg( 'M22 2L11 13M22 2l-7 20-4-9-9-4z' ),
+		slash: svg( 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM15 7l-6 10' ),
+		x: svg( 'M18 6L6 18M6 6l12 12' ),
+		back: svg( 'M15 18l-6-6 6-6' ),
 	};
+	// A button that is only an icon: its name for screen readers and as a tooltip (like Slack's).
+	const ib = ( act, ic, label, attrs, cls ) => '<button type="button" class="ff-ib' + ( cls ? ' ' + cls : '' ) + '" data-ff="' + act + '" aria-label="' + esc( label ) + '" data-tip="' + esc( label ) + '"' + ( attrs || '' ) + '>' + ic + '</button>';
 
 	const initials = ( name ) => String( name || '?' ).trim().split( /\s+/ ).slice( 0, 2 ).map( ( w ) => w[ 0 ] ).join( '' ).toUpperCase();
 	const photo = ( p ) => ( p.avatar ? '<img src="' + esc( p.avatar ) + '" alt="" loading="lazy" onerror="this.remove()">' : '' );
@@ -522,7 +541,7 @@
 	// One-line preview for lists: mentions and links stay, formatting and line structure don't.
 	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.moderate );
-	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions"><button type="button" data-ff="msg-edit" data-mid="' + m.id + '">' + esc( t( 'Edit' ) ) + '</button><button type="button" data-ff="msg-del" data-mid="' + m.id + '">' + esc( t( 'Delete' ) ) + '</button></span>' : '' );
+	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ib( 'msg-edit', icon.pencil, t( 'Edit' ), ' data-mid="' + m.id + '"' ) + ib( 'msg-del', icon.trash, t( 'Delete' ), ' data-mid="' + m.id + '"' ) + '</span>' : '' );
 	// Long messages (an AI answer, a pasted text) start folded, like in Slack: "Show more" opens them.
 	const longText = ( text ) => {
 		const long = text.length > 700 || text.split( '\n' ).length > 12;
@@ -1143,11 +1162,13 @@
 			+ '<textarea id="' + id + '" rows="' + ( o.autoGrow ? 1 : 2 ) + '" placeholder="' + esc( o.placeholder || t( 'Write … (@name, / for cards)' ) ) + '"' + ( o.label ? '' : ' aria-label="' + esc( o.placeholder || t( 'Message' ) ) + '"' ) + '></textarea>'
 			+ '<div class="ff-menu-slot"></div><div class="ff-pending"></div>'
 			+ '<div class="ff-row"><div class="ff-left">'
-			+ ( boot.me.upload ? '<label class="ff-link ff-upload">' + icon.clip + '<span>' + esc( t( 'Attach file' ) ) + '</span><input type="file" multiple hidden></label>' : '' )
-			+ ( boot.me.upload && window.wp && window.wp.media ? '<button type="button" class="ff-link ff-upload" data-ff="library">' + icon.image + '<span>' + esc( t( 'From media library' ) ) + '</span></button>' : '' )
+			+ '<span class="ff-tools">'
+			+ ( boot.me.upload ? '<label class="ff-ib ff-upload" data-tip="' + esc( t( 'Attach file' ) ) + '">' + icon.clip + '<span class="screen-reader-text">' + esc( t( 'Attach file' ) ) + '</span><input type="file" multiple hidden></label>' : '' )
+			+ ( boot.me.upload && window.wp && window.wp.media ? ib( 'library', icon.image, t( 'From media library' ) ) : '' )
+			+ ib( 'type-at', icon.at, t( 'Mention someone' ) ) + ib( 'type-slash', icon.slash, t( 'Insert a card' ) ) + '</span>'
 			+ ( o.extra || '' ) + '</div>'
 			+ ( touch() ? '' : '<span class="ff-hint">' + esc( t( 'Shift+Enter for a new line' ) ) + '</span>' )
-			+ '<button type="submit" class="ff-send">' + esc( o.submitLabel || t( 'Send' ) ) + '</button></div>'
+			+ '<button type="submit" class="ff-send is-icon" aria-label="' + esc( o.submitLabel || t( 'Send' ) ) + '" data-tip="' + esc( o.submitLabel || t( 'Send' ) ) + '">' + icon.send + '</button></div>'
 			+ '<p class="ff-error" role="alert" hidden></p>';
 		const ta = $( 'textarea', el );
 		const slot = $( '.ff-menu-slot', el );
@@ -1286,6 +1307,15 @@
 			} else if ( 'file-x' === act ) {
 				state.files.splice( +b.dataset.i, 1 );
 				showPending();
+			} else if ( 'type-at' === act || 'type-slash' === act ) {
+				// The @ and / buttons start a mention or a card, as typing the character does.
+				const at = ta.selectionStart;
+				const before = ta.value.slice( 0, at );
+				const ch = ( before && ! /\s$/.test( before ) ? ' ' : '' ) + ( 'type-at' === act ? '@' : '/' );
+				ta.value = before + ch + ta.value.slice( ta.selectionEnd );
+				ta.focus();
+				ta.setSelectionRange( at + ch.length, at + ch.length );
+				ta.dispatchEvent( new Event( 'input', { bubbles: true } ) );
 			} else if ( 'library' === act ) {
 				// WordPress's own media dialog; the file stays where it is, the message refers to it.
 				const frame = window.wp.media( { title: t( 'Attach from the media library' ), multiple: 'add', button: { text: t( 'Attach' ) } } );
@@ -1546,14 +1576,14 @@
 			nav.innerHTML = resizer( 'nav', t( 'Drag to make the sidebar wider or narrower' ) ) + '<div class="ff-ws">' + ( boot.look.logo ? '<img src="' + esc( boot.look.logo ) + '" alt="">' : '' ) + '<span>' + esc( boot.look.name ) + '</span>'
 				+ '<button type="button" class="ff-bell" data-ff="nav" data-view="notifications"' + ( 'notifications' === ui.view ? ' aria-current="true"' : '' ) + ' aria-label="' + esc( c.notifications ? t( 'Notifications (%s new)', c.notifications ) : t( 'Notifications' ) ) + '">' + icon.bell + ( c.notifications ? '<b>' + c.notifications + '</b>' : '' ) + '</button></div>'
 				+ '<div class="ff-nav-list">'
-				+ btn( 'all', '≡', t( 'All threads' ), 0 )
-				+ btn( 'mentions', '@', t( 'Mentions' ), c.mentions )
-				+ btn( 'mine', '✓', t( 'My tasks' ), c.mine || 0, c.overdue ? t( '%s overdue', c.overdue ) : '' ).replace( '<b>', c.overdue ? '<b class="is-over">' : '<b class="is-soft">' )
-				+ btn( 'tasks', '☐', t( 'Open tasks' ), 0 )
-				+ btn( 'board', '▦', t( 'Board' ), 0 )
+				+ btn( 'all', icon.list, t( 'All threads' ), 0 )
+				+ btn( 'mentions', icon.at, t( 'Mentions' ), c.mentions )
+				+ btn( 'mine', icon.check, t( 'My tasks' ), c.mine || 0, c.overdue ? t( '%s overdue', c.overdue ) : '' ).replace( '<b>', c.overdue ? '<b class="is-over">' : '<b class="is-soft">' )
+				+ btn( 'tasks', icon.square, t( 'Open tasks' ), 0 )
+				+ btn( 'board', icon.board, t( 'Board' ), 0 )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
-				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, ch.auto && ch.auto.length ? spark : '#', ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
-				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, '▤', x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
+				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, ch.auto && ch.auto.length ? spark : icon.hash, ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
+				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, icon.doc, x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
 				+ '<button type="button" class="ff-me-tile" data-ff="settings" aria-expanded="' + ui.settings + '"><span class="ff-sq" aria-hidden="true">' + esc( initials( boot.me.name ) ) + photo( person( boot.me.id ) ) + '</span><span class="ff-me-name"><strong>' + esc( boot.me.name ) + '</strong><small>' + esc( paused() ? t( 'Paused until %s', pausedUntil() ) : boot.me.role ) + '</small></span>' + icon.gear + '<span class="screen-reader-text">' + esc( t( 'My settings' ) ) + '</span></button></div>';
@@ -1834,14 +1864,15 @@
 			const opts = ( set
 				? [ [ '', t( 'Reminder: %s', set.toLocaleString( locale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } ) ) ], [ 'none', t( 'No reminder' ) ] ]
 				: [ [ '', t( 'Remind me …' ) ] ] ).concat( [ [ 'hour', t( 'In an hour' ) ], [ 'tomorrow', t( 'Tomorrow, %s', h ) ], [ 'monday', t( 'Next Monday, %s', h ) ] ] );
-			return '<select class="ff-remind' + ( set ? ' is-set' : '' ) + '" data-ff="remind" aria-label="' + esc( t( 'Remind me about this thread' ) ) + '">'
-				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '">' + esc( l ) + '</option>' ).join( '' ) + '</select>';
+			const label = set ? opts[ 0 ][ 1 ] : t( 'Remind me about this thread' );
+			return '<span class="ff-ib ff-remind-ib' + ( set ? ' is-set' : '' ) + '" data-tip="' + esc( label ) + '">' + icon.clock + '<select class="ff-remind' + ( set ? ' is-set' : '' ) + '" data-ff="remind" aria-label="' + esc( label ) + '">'
+				+ opts.map( ( [ v, l ] ) => '<option value="' + v + '">' + esc( l ) + '</option>' ).join( '' ) + '</select></span>';
 		};
 		// "Summarize": a private summary from an AI assistant of the channel, only for me (like Slack AI).
 		const summaryButton = ( th ) => {
 			const ch = channelOf( th.channel );
 			const replies = ( th.messages || [] ).filter( ( m ) => 'message' === m.type ).length;
-			return ch && ch.summary && replies >= 4 ? '<button type="button" class="ff-link" data-ff="summary" title="' + esc( t( 'A short summary from the AI assistant, only for you' ) ) + '">' + esc( t( 'Summarize' ) ) + '</button>' : '';
+			return ch && ch.summary && replies >= 4 ? ib( 'summary', spark, t( 'Summarize – only for you' ), ' data-ai="1"' ) : '';
 		};
 		// Many new messages since my last visit: offer a short private summary of just those.
 		const summaryOffer = ( th ) => {
@@ -1904,16 +1935,18 @@
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
 			const follow = th.follow || 0;
-			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">‹ ' + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
-				+ '<span class="ff-follow"><button type="button" class="ff-link" data-ff="follow" data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '" title="' + esc( t( 'Get notified about every reply' ) ) + '">' + esc( 1 === follow ? t( 'Following' ) : t( 'Follow' ) ) + '</button>'
-				+ '<button type="button" class="ff-link" data-ff="follow" data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '" title="' + esc( t( 'Only mentions and tasks' ) ) + '">' + esc( -1 === follow ? t( 'Muted' ) : t( 'Mute' ) ) + '</button>' + remindSelect( th ) + summaryButton( th ) + '</span>'
-				+ '<button type="button" class="ff-x" data-ff="close" aria-label="' + esc( t( 'Close thread' ) ) + '">×</button></header>'
+			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">' + icon.back + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
+				+ '<span class="ff-follow">' + ib( 'follow', icon.bell, 1 === follow ? t( 'Following – notified about every reply' ) : t( 'Follow: get notified about every reply' ), ' data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '"' )
+				+ ib( 'follow', icon.bellOff, -1 === follow ? t( 'Muted – only mentions and tasks' ) : t( 'Mute: only mentions and tasks' ), ' data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '"' )
+				+ remindSelect( th ) + summaryButton( th )
+				+ ib( 'close', icon.x, t( 'Close thread' ), ' data-x="1"', 'ff-x' ) + '</span></header>'
 				+ '<div class="ff-pane-body"><div class="ff-root-msg">' + ava( th.author ) + '<div class="ff-msg-body">'
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ files( th.files ) + cards( th.attachments ) + targetChip( th )
 				+ taskControls( th )
-				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + ( null === th.status ? '<button type="button" class="ff-link" data-ff="make-task">' + esc( t( 'Make it a task' ) ) + '</button>' : '' ) + ( mine( th.author ) && th.body ? '<button type="button" class="ff-link" data-ff="thread-edit" data-tid="' + th.id + '">' + esc( t( 'Edit' ) ) + '</button>' : '' ) + '</div>'
+				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + '</div>'
+				+ ( null === th.status || ( mine( th.author ) && th.body ) ? '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ( null === th.status ? ib( 'make-task', icon.task, t( 'Make it a task' ) ) : '' ) + ( mine( th.author ) && th.body ? ib( 'thread-edit', icon.pencil, t( 'Edit' ), ' data-tid="' + th.id + '"' ) : '' ) + '</span>' : '' )
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div>' + thinkingHtml( th ) + '<div class="ff-reply-slot"></div></div>';
 			watchThinking( th );
 			if ( ui.summaries && ui.summaries[ th.id ] ) {

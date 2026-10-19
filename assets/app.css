@@ -319,7 +319,7 @@
 	.ff-nav-list { max-height: 40vh; }
 	.ff-app.has-pane .ff-nav, .ff-app.has-pane .ff-main { display: none; }
 	.ff-back { display: inline-block; }
-	.ff-pane-head .ff-x { display: none; }
+	.ff-pane-head .ff-x, .ff-pane-head [data-x] { display: none; }
 	.ff-feed { max-height: none; }
 	.ff-hint { display: none; }
 	.ff-resize { display: none; }
@@ -597,3 +597,57 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-prop-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; padding: 10px 14px; border-top: 1px solid var(--ff-line); background: var(--ff-soft); }
 .ff-root .ff-prop-bar > span { margin-right: auto; font-size: 12px; color: var(--ff-muted); }
 .ff-root .ff-prop + .ff-card-confirm, .ff-root .ff-card.is-bare .ff-card-confirm { padding: 10px 14px; }
+
+/* Icons and icon buttons, like Slack: one 18 px icon in a 32 px button, a dark tooltip on hover. */
+.ff-i { width: 18px; height: 18px; flex: none; display: block; }
+.ff-root .ff-ib { position: relative; display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; margin: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--ff-muted); font: inherit; cursor: pointer; }
+.ff-root .ff-ib:hover, .ff-root .ff-ib:focus-within { background: var(--ff-soft2); color: var(--ff-ink); }
+.ff-root .ff-ib:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 1px; }
+.ff-root .ff-ib .ff-i { width: 18px; height: 18px; }
+.ff-root .ff-ib[aria-pressed="true"], .ff-root .ff-ib.is-set, .ff-root .ff-ib[data-ai] { color: var(--ff-accent-text); }
+.ff-root .ff-ib[data-ai] svg { width: 17px; height: 17px; }
+@media (pointer: coarse) { .ff-root .ff-ib { width: 40px; height: 40px; } }
+.ff-root [data-tip]::after { content: attr(data-tip); display: none; position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); z-index: 40; padding: 5px 8px; border-radius: 6px; background: #1d1c1d; color: #fff; font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; }
+.ff-root [data-tip]:hover::after, .ff-root [data-tip]:focus-visible::after { display: block; animation: ff-tip .12s .3s both; }
+@keyframes ff-tip { from { opacity: 0; } to { opacity: 1; } }
+.ff-root .ff-actions [data-tip]:last-child::after { left: auto; right: 0; transform: none; }
+.ff-root .ff-pane-head [data-tip]::after { bottom: auto; top: calc(100% + 6px); left: auto; right: 0; transform: none; }
+.ff-root .ff-send[data-tip]::after { left: auto; right: 0; transform: none; }
+@media (hover: none) { .ff-root [data-tip]::after { display: none; } }
+
+/* The thread's header in one line: title left, icons right. */
+.ff-root .ff-pane-head { flex-wrap: nowrap; }
+.ff-root .ff-pane-head .ff-follow { order: 0; flex: none; flex-basis: auto; flex-wrap: nowrap; gap: 2px; margin: 0 -6px 0 auto; }
+.ff-root .ff-back { align-items: center; gap: 2px; }
+.ff-root .ff-back .ff-i { display: inline-block; vertical-align: -4px; margin-left: -6px; }
+.ff-root .ff-remind-ib select.ff-remind { position: absolute; inset: 0; width: 100%; max-width: none; height: 100%; min-height: 0; padding: 0; opacity: 0; cursor: pointer; }
+
+/* Actions on a message: a small floating bar on its top edge, on hover or keyboard focus. */
+.ff-root .ff-msgs .ff-msg { margin-inline: -8px; padding-inline: 8px; border-radius: 8px; }
+.ff-root .ff-msgs .ff-msg:hover { background: var(--ff-soft); }
+.ff-root .ff-root-msg { position: relative; }
+.ff-root .ff-actions { position: absolute; top: -14px; right: 4px; z-index: 5; display: flex; gap: 2px; padding: 2px; border: 1px solid var(--ff-line); border-radius: 8px; background: var(--ff-paper); box-shadow: 0 2px 8px rgb(0 0 0 / .08); opacity: 0; pointer-events: none; transition: opacity .1s; }
+.ff-root .ff-root-msg .ff-actions { top: -6px; }
+.ff-root .ff-msg:hover .ff-actions, .ff-root .ff-msg:focus-within .ff-actions, .ff-root .ff-root-msg:hover .ff-actions, .ff-root .ff-root-msg:focus-within .ff-actions { opacity: 1; pointer-events: auto; }
+.ff-root .ff-actions .ff-ib { width: 30px; height: 30px; }
+.ff-root .ff-actions .ff-ib .ff-i { width: 17px; height: 17px; }
+@media (hover: none) { .ff-root .ff-actions { position: static; opacity: 1; pointer-events: auto; border: 0; padding: 0; margin-top: 4px; background: none; box-shadow: none; grid-column: 2; } }
+
+/* Writing: icons for files, mentions and cards; the send button lights up once there is something to send. */
+.ff-root .ff-tools { display: inline-flex; gap: 2px; margin-left: -6px; }
+.ff-root .ff-send.is-icon { display: inline-grid; place-items: center; position: relative; width: 40px; min-height: 32px; height: 32px; padding: 0; border-radius: 6px; background: var(--ff-accent); color: #fff; }
+.ff-root .ff-send.is-icon .ff-i { width: 17px; height: 17px; }
+.ff-root .ff-compose:not(.has-text) .ff-send.is-icon { background: var(--ff-soft2); color: var(--ff-muted); }
+
+/* Sidebar: icons instead of characters. */
+.ff-root .ff-glyph { display: grid; place-items: center; width: 18px; opacity: 1; color: var(--ff-side-muted); }
+.ff-root .ff-glyph .ff-i { width: 16px; height: 16px; color: inherit; }
+.ff-root button[aria-current="true"] .ff-glyph { color: inherit; }
+.ff-root .ff-compose .ff-left { flex: 1 0 auto; }
+.ff-root .ff-compose .ff-hint { flex: 0 1 auto; min-width: 0; margin-left: auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ff-root .ff-compose:not(.has-text) .ff-hint { visibility: hidden; }
+.ff-root .ff-compose .ff-row { flex-wrap: nowrap; }
+.ff-root .ff-new-thread .ff-row, .ff-root .ff-embed .ff-row { flex-wrap: wrap; }
+.ff-root .ff-new-thread .ff-left, .ff-root .ff-embed .ff-left { flex: 1 1 auto; min-width: 0; }
+.ff-root .ff-new-thread .ff-hint, .ff-root .ff-embed .ff-hint { margin-left: auto; }
+.ff-root .ff-compose > .ff-row { min-width: 0; }
