@@ -24,6 +24,9 @@ add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\\register' );
  * The category.
  */
 function category(): void {
+	if ( ! function_exists( 'wp_register_ability_category' ) ) {
+		return; // WordPress before 6.9: no abilities.
+	}
 	wp_register_ability_category(
 		'flurfunk',
 		array(
@@ -82,6 +85,9 @@ function names( string $text ): string {
  * Register the abilities.
  */
 function register(): void {
+	if ( ! function_exists( 'wp_register_ability' ) ) {
+		return; // WordPress before 6.9: no abilities.
+	}
 	$read  = (bool) apply_filters( 'flurfunk_abilities_public', true );
 	$write = (bool) apply_filters( 'flurfunk_abilities_public_write', false );
 	wp_register_ability(

@@ -192,13 +192,13 @@ function proposal_snapshot( array $ref, int $user_id = 0 ): ?array {
 			'label' => __( 'Waiting for a person', 'flurfunk' ),
 			'tone'  => 'warning',
 		),
-		/* translators: %s: person */
 		'done'      => array(
+			/* translators: %s: person */
 			'label' => sprintf( __( 'Run by %s', 'flurfunk' ), $who ),
 			'tone'  => 'positive',
 		),
-		/* translators: %s: person */
 		'dismissed' => array(
+			/* translators: %s: person */
 			'label' => sprintf( __( 'Dismissed by %s', 'flurfunk' ), $who ),
 			'tone'  => 'neutral',
 		),

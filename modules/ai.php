@@ -450,6 +450,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		return null;
 	}
 	$lock = 'flurfunk_ai_' . $thread_id . '_' . $agent;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- a database lock, nothing to cache.
 	if ( ! $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 0)', $lock ) ) ) {
 		return null; // Already running (cron and the shutdown run met).
 	}
@@ -514,6 +515,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		return reply( $thread_id, $agent, $text, $cards );
 	} finally {
 		answering( $agent, 0 );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- a database lock, nothing to cache.
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		set_busy( $thread_id, $agent, false );
 	}
