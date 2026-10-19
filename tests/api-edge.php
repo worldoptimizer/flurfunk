@@ -1378,6 +1378,104 @@ Flurfunk\Modules\Ai\render_section();
 $ai_html = (string) ob_get_clean();
 $check( 'the settings section shows the profile of each assistant', str_contains( $ai_html, 'name="ai[' . $ai_bot . '][instructions]"' ) && (bool) preg_match( '/name="ai\[' . $ai_bot . '\]\[channels\]\[\]" value="ff-test"\s+checked/', $ai_html ) && str_contains( $ai_html, 'name="ai_channels[ff-test]"' ), array( str_contains( $ai_html, 'name="ai[' . $ai_bot . '][instructions]"' ), preg_match( '/name="ai\[' . $ai_bot . '\]\[channels\]\[\]" value="ff-test"[^>]*/', $ai_html, $mm ) ? $mm[0] : 'kein ff-test', str_contains( $ai_html, 'name="ai_channels[ff-test]"' ) ) );
 $check( '… as packs to tick, with a role and a line that says what it reads, suggests and changes', (bool) preg_match( '/name="ai\[' . $ai_bot . '\]\[packs\]\[\]" value="proofread"\s+checked/', $ai_html ) && str_contains( $ai_html, 'name="ai[' . $ai_bot . '][packs_form]"' ) && str_contains( $ai_html, 'value="liest gegen"' ) && str_contains( $ai_html, 'Changes by itself: nothing' ) && ! str_contains( $ai_html, 'name="ai[' . $ai_bot . '][posts]"' ) );
+// Limits: an assistant never can more than the person asking, nor more than its limit; never administers.
+WP_CLI::log( 'AI assistant limits' );
+$lim_users = array();
+foreach ( array( 'editor', 'author', 'contributor' ) as $lim_role ) {
+	$lim_users[ $lim_role ] = (int) wp_insert_user( array( 'user_login' => 'ff-test-lim-' . $lim_role . '-' . strtolower( wp_generate_password( 4, false, false ) ), 'user_pass' => wp_generate_password(), 'user_email' => 'ff-test-lim-' . $lim_role . '-' . wp_generate_password( 4, false, false ) . '@invalid.invalid', 'role' => $lim_role ) );
+	( new WP_User( $lim_users[ $lim_role ] ) )->add_cap( Caps\TEAM );
+}
+$lim_ed  = $lim_users['editor'];
+$lim_au  = $lim_users['author'];
+$lim_co  = $lim_users['contributor'];
+$lim_set = static fn ( string $limit ) => Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test', 'ff-test-lim' ), 'posts' => '1', 'proposals' => array( 'flurfunk/start-thread' ), 'limit' => $limit ) );
+$check( 'limits offered: the site\'s roles without those that administer it', ! array_diff( array( 'editor', 'author', 'contributor', 'subscriber' ), array_keys( Flurfunk\Modules\Ai\limit_roles() ) ) && ! isset( Flurfunk\Modules\Ai\limit_roles()['administrator'] ), Flurfunk\Modules\Ai\limit_roles() );
+$check( '… an administering or unknown role cannot be stored as a limit; the default is the person asking', '' === $lim_set( 'administrator' )['limit'] && '' === $lim_set( 'no-such-role' )['limit'] && 'author' === $lim_set( 'author' )['limit'] && '' === Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1' ) )['limit'] );
+$as( $team );
+$lim_draft = wp_insert_post( array( 'post_title' => 'ff-test Grenzentwurf', 'post_status' => 'draft', 'post_author' => $team, 'post_content' => 'Ein Entwurf der Chefin.' ) );
+$lim_own   = wp_insert_post( array( 'post_title' => 'ff-test Autorentwurf', 'post_status' => 'draft', 'post_author' => $lim_au, 'post_content' => 'Ein eigener Entwurf.' ) );
+$lim_reads = static function ( int $asker, string $limit, int $post ) use ( $lim_set, $ai_bot ): bool {
+	$lim_set( $limit );
+	return Flurfunk\Modules\Ai\with_limit( $ai_bot, $asker, static fn () => '' !== Flurfunk\Modules\Ai\post_text( $post, $asker ) );
+};
+$lim_m = array(
+	'editor asks, limit: the person asking' => array( $lim_reads( $lim_ed, '', $lim_draft ), true ),
+	'editor asks, limit: Editor'            => array( $lim_reads( $lim_ed, 'editor', $lim_draft ), true ),
+	'editor asks, limit: Author'            => array( $lim_reads( $lim_ed, 'author', $lim_draft ), false ),
+	'author asks, limit: Editor'            => array( $lim_reads( $lim_au, 'editor', $lim_draft ), false ),
+	'contributor asks, limit: the person'   => array( $lim_reads( $lim_co, '', $lim_draft ), false ),
+	'author, own draft, limit: Contributor' => array( $lim_reads( $lim_au, 'contributor', $lim_own ), true ),
+	'author, own draft, limit: Subscriber'  => array( $lim_reads( $lim_au, 'subscriber', $lim_own ), false ),
+);
+$check( 'reading others\' drafts: only what both the person asking and the limit allow', ! array_filter( $lim_m, static fn ( $r ) => $r[0] !== $r[1] ), array_map( static fn ( $r ) => $r[0], $lim_m ) );
+if ( function_exists( 'wp_get_ability' ) ) {
+	$as( $lim_ed );
+	$lim_find = static fn () => in_array( $lim_draft, array_column( (array) wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'Grenzentwurf' ) ), 'id' ), true );
+	$lim_set( '' );
+	$lim_f1 = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, $lim_find );
+	$lim_set( 'author' );
+	$lim_f2 = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, $lim_find );
+	$check( '… the same for its tools: find-posts finds the draft for an editor, not within the limit Author', $lim_f1 && ! $lim_f2 && $lim_find(), array( $lim_f1, $lim_f2 ) );
+}
+$as( $team );
+$lim_set( '' );
+$lim_caps = static fn ( int $u ) => array_map( static fn ( $c ) => user_can( $u, $c ), array( 'manage_options', 'unfiltered_html', 'edit_users', 'administrator', 'list_users', 'install_plugins', Caps\MANAGE, 'edit_others_posts', 'publish_posts', Caps\TEAM ) );
+$lim_in = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => array( $lim_caps( $team ), user_can( $lim_ed, 'edit_others_posts' ) ) );
+$check( 'an administrator asking: the assistant never administers (options, users, plugins, unfiltered HTML, Flurfunk settings) – editing and Flurfunk stay', array( false, false, false, false, false, false, false, true, true, true ) === $lim_in[0], $lim_in[0] );
+$check( '… other people are not touched, and afterwards everything is as before', true === $lim_in[1] && array( true, true, true, true, true, true, true, true, true, true ) === $lim_caps( $team ) && array() === Flurfunk\Modules\Ai\limits(), $lim_caps( $team ) );
+$lim_raw = '<p>ok</p><script>alert(1)</script>';
+$lim_k0  = wp_insert_post( array( 'post_title' => 'ff-test kses 0', 'post_status' => 'draft', 'post_content' => $lim_raw ) );
+$lim_k1  = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => wp_insert_post( array( 'post_title' => 'ff-test kses 1', 'post_status' => 'draft', 'post_content' => $lim_raw ) ) );
+$lim_k2  = wp_insert_post( array( 'post_title' => 'ff-test kses 2', 'post_status' => 'draft', 'post_content' => $lim_raw ) );
+$check( 'what is saved within a limit goes through kses, even for an administrator; afterwards not', str_contains( get_post( $lim_k0 )->post_content, '<script>' ) === str_contains( get_post( $lim_k2 )->post_content, '<script>' ) && ! str_contains( get_post( $lim_k1 )->post_content, '<script>' ) && str_contains( get_post( $lim_k1 )->post_content, '<p>ok</p>' ), get_post( $lim_k1 )->post_content );
+Store\ensure_channel( 'ff-test-lim', array( 'name' => 'Grenze', 'capability' => 'edit_others_posts' ), true );
+$lim_ch = Store\channel_by_slug( 'ff-test-lim' );
+$lim_set( 'author' );
+$lim_l = array( Flurfunk\Access\level( $lim_ch, $lim_ed ), Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => Flurfunk\Access\level( $lim_ch, $lim_ed ) ), Flurfunk\Access\level( $lim_ch, $lim_ed ) );
+$check( 'a channel that needs a capability the limit lacks is closed while the assistant works – and open again afterwards', array( 'all', 'none', 'all' ) === $lim_l, $lim_l );
+$lim_set( '' );
+$check( 'the assistant is told whose rights it has and that it never administers', str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), 0, $ai_bot )['system'], 'never administer the site' ) );
+$lim_set( 'author' );
+$check( '… and its limit, with where to change it', (bool) preg_match( '/at most those of the role "[^"]+".*Settings → Flurfunk → AI assistants/', Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), 0, $ai_bot )['system'] ) );
+if ( function_exists( 'wp_get_ability' ) ) {
+	$as( $lim_ed );
+	$lim_in2 = array( 'channel' => 'ff-test-lim', 'title' => 'Grenzfall', 'text' => 'x' );
+	$lim_set( 'author' );
+	$lim_p0 = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => Flurfunk\Modules\Ai\may_propose( 'flurfunk/start-thread', $lim_in2 ) );
+	$lim_set( '' );
+	$lim_p1 = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => Flurfunk\Modules\Ai\may_propose( 'flurfunk/start-thread', $lim_in2 ) );
+	$check( 'proposals: what the limit does not allow is not proposed at all', is_wp_error( $lim_p0 ) && true === $lim_p1, array( $lim_p0, $lim_p1 ) );
+	$as( $team );
+	$lim_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Grenzen testen' ) );
+	$lim_pid = Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', $lim_in2, $ai_bot, $lim_t );
+	$lim_mid = Flurfunk\Modules\Ai\reply( $lim_t, $ai_bot, 'Ein Vorschlag.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $lim_pid ) ) ) );
+	$lim_card = 0;
+	foreach ( Store\full_thread( $lim_t, $lim_ed )['messages'] as $m ) {
+		if ( (int) $m['id'] === (int) $lim_mid ) {
+			$lim_card = (int) ( $m['attachments'][0]['id'] ?? 0 );
+		}
+	}
+	$lim_made = static fn () => (bool) array_filter( Store\list_threads( $lim_ed, array( 'channel' => 'ff-test-lim', 'limit' => 50 ) ), static fn ( $t ) => 'Grenzfall' === $t['title'] );
+	$lim_set( 'author' );
+	$as( $lim_ed );
+	list( $lim_s1 ) = $req( 'POST', 'cards/' . $lim_card . '/action/run', array( 'key' => 'lim1' ) );
+	$check( '… and a card runs within the limit too: an editor clicking cannot go past Author', 200 !== $lim_s1 && ! $lim_made() && 'open' === Flurfunk\Modules\Ai\proposal( $lim_pid )['state'], array( $lim_s1, Flurfunk\Modules\Ai\proposal( $lim_pid )['state'] ) );
+	$lim_set( '' );
+	list( $lim_s2 ) = $req( 'POST', 'cards/' . $lim_card . '/action/run', array( 'key' => 'lim2' ) );
+	$check( '… with the limit "the person asking" the same click works, with the editor\'s rights', 200 === $lim_s2 && $lim_made(), $lim_s2 );
+	$as( $team );
+}
+$lim_set( 'author' );
+ob_start();
+Flurfunk\Modules\Ai\render_section();
+$lim_html = (string) ob_get_clean();
+$check( 'the settings show "May at most act as" with the roles, without Administrator, and the limit in the summary line', str_contains( $lim_html, 'name="ai[' . $ai_bot . '][limit]"' ) && (bool) preg_match( '/<option value="author"\s+selected/', $lim_html ) && ! str_contains( $lim_html, '<option value="administrator"' ) && str_contains( $lim_html, 'At most as: ' ) );
+foreach ( array( $lim_draft, $lim_own, $lim_k0, $lim_k1, $lim_k2 ) as $lim_post ) {
+	wp_delete_post( $lim_post, true );
+}
+foreach ( $lim_users as $lim_u ) {
+	wp_delete_user( $lim_u );
+}
 remove_filter( 'flurfunk_ai_run_now', '__return_false' );
 wp_unschedule_hook( 'flurfunk_ai_run' );
 delete_transient( 'flurfunk_ai_busy_' . $ai_t );
@@ -1971,19 +2069,19 @@ $check( 'roles are back as before the tests', get_option( $roles_key ) === $role
 
 WP_CLI::log( 'Clean up' );
 global $wpdb;
-$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported')" ) );
+$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim')" ) );
 $ids = array_values( array_unique( array_merge( $ids, array_filter( array_map( 'intval', $extra_threads ?? array() ) ) ) ) );
 if ( $test_posts ) {
 	$ids = array_values( array_unique( array_merge( $ids, array_map( 'intval', $wpdb->get_col( "SELECT id FROM {$wpdb->prefix}flurfunk_threads WHERE target_type = 'post' AND target_id IN (" . implode( ',', array_map( 'intval', $test_posts ) ) . ')' ) ) ) ) );
 }
 if ( $ids ) {
 	$in = implode( ',', $ids );
-	foreach ( array( 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications' ) as $tb ) {
+	foreach ( array( 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications', 'reactions' ) as $tb ) {
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_$tb WHERE thread_id IN ($in)" );
 	}
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_threads WHERE id IN ($in)" );
 }
-$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported')" );
+$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim')" );
 if ( isset( $had_comments ) && ! $had_comments ) {
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug = 'comments'" );
 }

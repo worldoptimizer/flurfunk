@@ -2,7 +2,8 @@
 /**
  * AI assistants: proposals. An assistant may suggest actions that change something (abilities that
  * are not read-only, chosen per assistant) – but never run them. Each suggestion becomes a card in
- * its answer with "Run" and "Dismiss"; only a person can run it, with their own rights.
+ * its answer with "Run" and "Dismiss"; only a person can run it, with their own rights, within the
+ * assistant's limit (ai-limits.php). What the person asking may not do is not proposed at all.
  *
  * Proposals are kept in the option flurfunk_ai_proposals (id => ability, input, agent, thread,
  * state, by, at, result), the newest 500.
@@ -50,6 +51,23 @@ function writable_abilities(): array {
 function proposal_abilities( int $agent ): array {
 	$all = writable_abilities();
 	return array_values( array_filter( array_map( static fn ( string $n ) => $all[ $n ] ?? null, profile( $agent )['proposals'] ) ) );
+}
+
+/**
+ * May the current person (an assistant's asker, within its limit) run this ability with this input?
+ * Asked before a card is made, so an assistant never proposes what nobody here could run.
+ *
+ * @param string $ability Ability name.
+ * @param array  $input   Its input, as the AI gave it.
+ * @return true|\WP_Error
+ */
+function may_propose( string $ability, array $input ) {
+	$a = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
+	if ( ! $a ) {
+		return new \WP_Error( 'flurfunk_ai_gone', 'No such ability.' );
+	}
+	$ok = $a->check_permissions( $input );
+	return true === $ok ? true : ( is_wp_error( $ok ) ? $ok : new \WP_Error( 'flurfunk_forbidden', 'Not allowed.' ) );
 }
 
 /**
@@ -274,7 +292,8 @@ function build_snapshot( array $p ): array {
 }
 
 /**
- * "Run": the ability runs as the person who clicked, with its own permission check.
+ * "Run": the ability runs as the person who clicked, with its own permission check, within the
+ * limit of the assistant that proposed it.
  *
  * @param array $ref     { id }.
  * @param array $card    Card.
@@ -294,7 +313,8 @@ function run_proposal( array $ref, array $card, int $user_id ) {
 	$me = get_current_user_id();
 	wp_set_current_user( $user_id );
 	try {
-		$result = $ability->execute( (array) $p['input'] );
+		// With the clicker's rights, within the limit of the assistant that proposed it.
+		$result = with_limit( (int) $p['agent'], $user_id, static fn () => $ability->execute( (array) $p['input'] ) );
 	} finally {
 		wp_set_current_user( $me );
 	}

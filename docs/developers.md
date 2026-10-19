@@ -985,6 +985,20 @@ instructions), `flurfunk_ai_log` (the last 100 runs: time, agent, asker, thread,
 tokens, error, tools, kind), `flurfunk_ai_meta` (what the newest 2,000 answers were based on). User meta on assistants: `flurfunk_ai` (profile), `flurfunk_ai_usage`
 (tokens this month).
 
+### Limits of AI assistants
+
+While an assistant works for someone (an answer, a summary, a proposal being run), Flurfunk runs it
+as that person inside `Flurfunk\Modules\Ai\with_limit( $agent, $user_id, $fn )`. A `map_meta_cap`
+filter then turns every check of that person into `do_not_allow` if it needs a capability the
+assistant's limit lacks (`limit_caps()`: the capabilities of the role in its profile, or none for
+"the person asking") or one of `Flurfunk\Modules\Ai\BLOCKED` (administering users, plugins, themes,
+options, unfiltered HTML, `flurfunk_manage`, role names such as `administrator`). It only takes away,
+so abilities of other plugins are covered without knowing them; `kses_init()` runs again, so markup
+saved within a limit is filtered. `Flurfunk\Access\scope()` names the scope, so cached channel
+access is not shared between scopes. A proposal is only made if the ability's `permission_callback`
+passes for the person asking within the limit; `flurfunk/start-thread` and `flurfunk/reply` check the
+channel or conversation in their permission callbacks for that.
+
 ### Reactions and private conversations
 
 `POST threads/<id>/reactions` with `{ message, emoji }` (`message` 0 = the thread itself) adds the

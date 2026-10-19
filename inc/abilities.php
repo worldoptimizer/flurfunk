@@ -73,6 +73,28 @@ function allowed(): bool {
 }
 
 /**
+ * May the current person start a conversation in this channel? For the permission check of
+ * flurfunk/start-thread, so a refusal comes before running (an AI assistant then does not even
+ * propose it); the store checks again when it runs.
+ *
+ * @param array|null $input Ability input.
+ */
+function may_start( $input = null ): bool {
+	$ch = Store\channel_by_slug( sanitize_key( (string) ( ( (array) $input )['channel'] ?? '' ) ) );
+	return allowed() && $ch && Access\can_start( $ch, '', 0, get_current_user_id() );
+}
+
+/**
+ * May the current person reply in this conversation? For the permission check of flurfunk/reply.
+ *
+ * @param array|null $input Ability input.
+ */
+function may_reply( $input = null ): bool {
+	$t = Store\thread_row( (int) ( ( (array) $input )['id'] ?? 0 ) );
+	return allowed() && $t && Access\can_see( $t, get_current_user_id() );
+}
+
+/**
  * May this channel be used here? Other code can narrow it (the AI module does while an assistant
  * looks things up: only channels the assistant takes part in).
  *
@@ -449,7 +471,7 @@ function register(): void {
 				$id    = Store\add_message( (int) $input['id'], array( 'body' => (string) $input['text'] ) );
 				return is_wp_error( $id ) ? $id : array( 'message_id' => (int) $id );
 			},
-			'permission_callback' => __NAMESPACE__ . '\\allowed',
+			'permission_callback' => __NAMESPACE__ . '\\may_reply',
 			'meta'                => array(
 				'annotations' => array(
 					'readonly'    => false,
@@ -503,7 +525,7 @@ function register(): void {
 				);
 				return is_wp_error( $id ) ? $id : array( 'id' => (int) $id );
 			},
-			'permission_callback' => __NAMESPACE__ . '\\allowed',
+			'permission_callback' => __NAMESPACE__ . '\\may_start',
 			'meta'                => array(
 				'annotations' => array(
 					'readonly'    => false,

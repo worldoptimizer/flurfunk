@@ -125,8 +125,9 @@ function can_moderate( int $user_id = 0 ): bool {
  */
 function level( object $channel, int $user_id ): string {
 	static $cache = array();
-	// The channel's settings are part of the key, so a change within the request counts at once.
-	$key = implode( ':', array( $channel->id, $user_id, $channel->access_team, $channel->access_guests, (int) $channel->archived, required_cap( $channel ), (int) acting( $user_id ) ) );
+	// The channel's settings are part of the key, so a change within the request counts at once;
+	// so is the scope (an assistant working for this person may see less).
+	$key = implode( ':', array( $channel->id, $user_id, $channel->access_team, $channel->access_guests, (int) $channel->archived, required_cap( $channel ), (int) acting( $user_id ), scope() ) );
 	if ( isset( $cache[ $key ] ) ) {
 		return $cache[ $key ];
 	}
@@ -142,6 +143,21 @@ function level( object $channel, int $user_id ): string {
 	// people: return 'none' for everyone else.
 	$level = (string) apply_filters( 'flurfunk_channel_level', $level, $channel, $user_id, $kind );
 	return $cache[ $key ] = in_array( $level, LEVELS, true ) ? $level : 'none';
+}
+
+/**
+ * The capability scope code runs in ('' = normal). Code that narrows what people may – an AI
+ * assistant working for someone – names its scope, so access worked out outside it is not reused
+ * inside it (and the other way round).
+ *
+ * @param string|null $set New scope.
+ */
+function scope( ?string $set = null ): string {
+	static $scope = '';
+	if ( null !== $set ) {
+		$scope = $set;
+	}
+	return $scope;
 }
 
 /**

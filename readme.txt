@@ -114,6 +114,10 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
+= 0.5.0 (in development) =
+* New: limits for AI assistants. An assistant never can more than the person asking and never administers the site (users, plugins, themes, settings, unfiltered HTML are off while it works). "May at most act as" sets a role as a ceiling on top – also for what it reads, e.g. no other people's drafts within the limit Author. Proposals it may not make within the limit are not offered; a card runs within the limit too. The assistant says when its limit may hide something.
+* Changed: flurfunk/start-thread and flurfunk/reply check the channel or conversation in their permission check, not only when they run.
+
 = 0.4.0 =
 * Changed: a channel reads top to bottom, as in Slack – the oldest thread first, the newest right above the writing box; the day sits on a line between days and stays at the top while you scroll through it. A thread keeps its place when someone replies; older threads load at the top; scrolled up, a button brings you back down and counts new threads. All threads, a post's conversations and private conversations read the same way; mentions, tasks, search and the board stay lists by latest activity.
 * New: emoji reactions on threads and replies, as in Slack – one smiley in the hover bar opens a picker with the most used emoji first and all others with a search (English and German names); capsules with counts, click to add yours or take it back. Nobody is notified.

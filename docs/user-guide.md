@@ -163,6 +163,10 @@ their role.
   administrators. Each conversation is separate: a new one starts fresh, the assistant does not
   remember the others.
 
+- **Rights:** an assistant works with your rights, never more, and never administers the site.
+  Your administrators can limit it further (e.g. to what an author may); then it tells you when
+  something may be outside its limit instead of claiming it does not exist.
+
 What an assistant reads goes to the AI provider your site has chosen; your administrators decide
 which assistants exist, where they take part and who may ask them.
 

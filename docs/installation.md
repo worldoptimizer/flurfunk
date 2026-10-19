@@ -295,6 +295,15 @@ mentioned. Right after an answer, the person who asked can simply write on (a fo
 someone else writes, the assistant needs a new mention (`flurfunk_ai_follow_ups` switches follow-ups
 off).
 
+**Rights.** An assistant never can more than the person asking it, and never anything that
+administers the site: while it works, users, plugins, themes, settings, unfiltered HTML and
+Flurfunk's own settings are switched off, whoever asks. Under **Rights → May at most act as** you can
+set a ceiling on top: one of the site's roles (Editor, Author, Contributor, Subscriber or your own;
+roles that administer the site are not offered). Then it can only do – and read – what that role
+and the person asking may both do: an assistant limited to *Author* does not see other people's
+drafts, even when an editor asks, and says so. Its own account stays a subscriber; Flurfunk changes
+no roles. If you need single capabilities, make a role with a role editor plugin and choose it here.
+
 Everyone who may ask an assistant also finds it under **Assistants** in the sidebar, for **private
 conversations**: the assistant answers every message there, and only the person who started a
 conversation sees it – not the team and not administrators in Flurfunk (the conversations are in the
