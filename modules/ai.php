@@ -215,6 +215,62 @@ function log_run( array $entry ): void {
 }
 
 /**
+ * The language of a conversation, for what the assistant shows besides its answer (cards, notes):
+ * German or English if the question clearly is, else the asker's own language setting.
+ *
+ * @param string $text  The question.
+ * @param int    $asker Who asked.
+ */
+function conversation_locale( string $text, int $asker ): string {
+	$words = preg_split( '/[^\p{L}]+/u', mb_strtolower( wp_strip_all_tags( (string) preg_replace( '/<@\d+>/', ' ', $text ) ) ), -1, PREG_SPLIT_NO_EMPTY );
+	$de    = count( array_intersect( $words, array( 'der', 'die', 'das', 'und', 'ist', 'nicht', 'bitte', 'ich', 'wir', 'du', 'eine', 'ein', 'mit', 'für', 'auf', 'den', 'dem', 'wie', 'was', 'kannst', 'mach', 'leg', 'zu', 'auch' ) ) );
+	$en    = count( array_intersect( $words, array( 'the', 'and', 'is', 'not', 'please', 'we', 'you', 'a', 'an', 'with', 'for', 'on', 'what', 'how', 'can', 'make', 'to', 'of', 'this', 'it' ) ) );
+	if ( $de >= 2 && $de > $en ) {
+		return 'de_DE';
+	}
+	if ( $en >= 2 && $en > $de ) {
+		return 'en_US';
+	}
+	return get_user_locale( $asker );
+}
+
+/**
+ * Run something in a language (cards and notes of the assistant).
+ *
+ * @param string   $locale Locale.
+ * @param callable $fn     Work.
+ * @return mixed
+ */
+function in_locale( string $locale, callable $fn ) {
+	if ( '' === $locale || determine_locale() === $locale ) {
+		return $fn();
+	}
+	if ( switch_to_locale( $locale ) ) {
+		try {
+			return $fn();
+		} finally {
+			restore_previous_locale();
+		}
+	}
+	// The site does not have that language installed: Flurfunk brings its own translation, so at
+	// least Flurfunk's texts follow the conversation.
+	$file = FLURFUNK_DIR . 'languages/flurfunk-' . $locale . '.l10n.php';
+	if ( 'en_US' !== $locale && ! is_readable( $file ) ) {
+		return $fn();
+	}
+	unload_textdomain( 'flurfunk', true );
+	if ( 'en_US' !== $locale ) {
+		load_textdomain( 'flurfunk', FLURFUNK_DIR . 'languages/flurfunk-' . $locale . '.mo', $locale );
+	}
+	try {
+		return $fn();
+	} finally {
+		unload_textdomain( 'flurfunk', true );
+		load_plugin_textdomain( 'flurfunk', false, dirname( plugin_basename( FLURFUNK_FILE ) ) . '/languages' );
+	}
+}
+
+/**
  * Abilities an assistant may be given as tools: registered ones marked read-only.
  *
  * @return array<string, \WP_Ability> Name => ability.
@@ -467,7 +523,11 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		}
 		// Everything the agent posts in this run (answer, budget notice, error) notifies only the asker.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table.
-		answering( $agent, $message_id ? (int) $wpdb->get_var( $wpdb->prepare( 'SELECT author_id FROM %i WHERE id = %d', table( 'messages' ), $message_id ) ) : (int) $thread->author_id );
+		$question = $message_id ? $wpdb->get_row( $wpdb->prepare( 'SELECT author_id, body FROM %i WHERE id = %d', table( 'messages' ), $message_id ) ) : null;
+		answering( $agent, $question ? (int) $question->author_id : (int) $thread->author_id );
+		// Cards and notes in the language of the conversation.
+		$lang = conversation_locale( $question ? (string) $question->body : (string) $thread->title . ' ' . (string) $thread->body, answering( $agent ) );
+		language( $agent, $lang );
 		$p = profile( $agent );
 		$u = usage( $agent );
 		if ( $p['budget'] && $u['tokens'] >= $p['budget'] ) {
@@ -475,7 +535,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 				return null;
 			}
 			add_usage( $agent, 0, true );
-			return reply( $thread_id, $agent, __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ) );
+			return reply( $thread_id, $agent, in_locale( $lang, static fn () => __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ) ) );
 		}
 		$answer = flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) );
 		$ch     = Store\channel( (int) $thread->channel_id );
@@ -493,14 +553,14 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		);
 		if ( is_wp_error( $answer ) ) {
 			do_action( 'flurfunk_ai_error', $answer, $thread_id, $agent );
-			return reply( $thread_id, $agent, friendly_error( $answer ) );
+			return reply( $thread_id, $agent, in_locale( $lang, static fn () => friendly_error( $answer ) ) );
 		}
 		$before = usage( $agent )['tokens'];
 		add_usage( $agent, $answer['tokens'] );
 		$text = trim( $answer['text'] );
 		// Crossing 80 % of the budget: one short note under this answer, once.
 		if ( '' !== $text && $p['budget'] && $before < 0.8 * $p['budget'] && usage( $agent )['tokens'] >= 0.8 * $p['budget'] ) {
-			$text .= "\n\n" . __( '(Note: 80 % of my budget for this month is used.)', 'flurfunk' );
+			$text .= "\n\n" . in_locale( $lang, static fn () => __( '(Note: 80 % of my budget for this month is used.)', 'flurfunk' ) );
 		}
 		if ( '' === $text ) {
 			return null;
@@ -512,9 +572,10 @@ function run( int $thread_id, int $message_id, int $agent ) {
 			),
 			(array) ( $answer['ideas'] ?? array() )
 		);
-		return reply( $thread_id, $agent, $text, $cards );
+		return in_locale( $lang, static fn () => reply( $thread_id, $agent, $text, $cards ) );
 	} finally {
 		answering( $agent, 0 );
+		language( $agent, '' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- a database lock, nothing to cache.
 		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
 		set_busy( $thread_id, $agent, false );
@@ -712,6 +773,20 @@ function answering( int $agent, ?int $asker = null ): int {
 		$now[ $agent ] = $asker;
 	}
 	return (int) ( $now[ $agent ] ?? 0 );
+}
+
+/**
+ * The language of the conversation an agent is answering right now ('' = none).
+ *
+ * @param int         $agent  Assistant.
+ * @param string|null $locale Set ('' clears); null reads.
+ */
+function language( int $agent, ?string $locale = null ): string {
+	static $now = array();
+	if ( null !== $locale ) {
+		$now[ $agent ] = $locale;
+	}
+	return (string) ( $now[ $agent ] ?? '' );
 }
 
 /**

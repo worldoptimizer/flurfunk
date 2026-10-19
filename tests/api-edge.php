@@ -1037,7 +1037,7 @@ Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => arr
 $ai_m3 = Store\add_message( $ai_t, array( 'body' => "<@$ai_bot> Und jetzt?" ) );
 $ai_b  = Flurfunk\Modules\Ai\run( $ai_t, $ai_m3, $ai_bot );
 $ai_bm = $ai_lastm( $ai_t );
-$check( 'over budget: one notice, no AI call', is_int( $ai_b ) && 2 === count( $ai_seen ) && str_contains( $ai_bm['text'], trim( explode( '.', __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ) )[0] ) ), $ai_bm );
+$check( 'over budget: one notice, no AI call', is_int( $ai_b ) && 2 === count( $ai_seen ) && str_contains( $ai_bm['text'], 'Budget' ) && str_contains( $ai_bm['text'], 'Flurfunk' ), $ai_bm );
 $ai_m4 = Store\add_message( $ai_t, array( 'body' => "<@$ai_bot> Hallo?" ) );
 $check( '… and after that silence until next month', null === Flurfunk\Modules\Ai\run( $ai_t, $ai_m4, $ai_bot ) );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'budget' => 0 ) );
@@ -1130,6 +1130,14 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	// Proposals: the assistant never runs an ability that changes something; a person does, with a button.
 	$ai_pp = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'proposals' => array( 'flurfunk/start-thread', 'flurfunk/get-thread' ) ) );
 	$check( 'proposals: only abilities that change something can be chosen', array( 'flurfunk/start-thread' ) === $ai_pp['proposals'], $ai_pp['proposals'] );
+	$check( 'the conversation\'s language is recognised (German, English, else the person\'s setting)', 'de_DE' === Flurfunk\Modules\Ai\conversation_locale( 'Leg dafür bitte eine Aufgabe an, wir brauchen das bis Montag.', $team ) && 'en_US' === Flurfunk\Modules\Ai\conversation_locale( 'Please create a task for this, we need it by Monday.', $team ) && get_user_locale( $team ) === Flurfunk\Modules\Ai\conversation_locale( 'OK', $team ) );
+	Flurfunk\Modules\Ai\language( $ai_bot, 'de_DE' );
+	$ai_pde = Flurfunk\Modules\Ai\proposal_snapshot( array( 'id' => Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'text' => 'x', 'task' => true ), $ai_bot, $ai_e ) ) );
+	Flurfunk\Modules\Ai\language( $ai_bot, 'en_US' );
+	$ai_pen = Flurfunk\Modules\Ai\proposal_snapshot( array( 'id' => Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'text' => 'x' ), $ai_bot, $ai_e ) ) );
+	Flurfunk\Modules\Ai\language( $ai_bot, '' );
+	$check( 'a proposal card is in the language of the conversation, whatever the site\'s language', 'Gespräch beginnen' === $ai_pde['title'] && 'Als Aufgabe' === end( $ai_pde['fields'] )['label'] && 'Start a conversation' === $ai_pen['title'], array( $ai_pde['title'], $ai_pen['title'] ) );
+	$check( '… and the language is back afterwards', determine_locale() === get_locale() || determine_locale() === get_user_locale() );
 	$ai_pid = Flurfunk\Modules\Ai\add_proposal( 'flurfunk/start-thread', array( 'channel' => 'ff-test', 'title' => 'Vorgeschlagene Aufgabe', 'text' => 'Bitte erledigen', 'task' => true ), $ai_bot, $ai_e );
 	$ai_pm  = Flurfunk\Modules\Ai\reply( $ai_e, $ai_bot, 'Ich schlage eine Aufgabe vor.', array( array( 'provider' => 'flurfunk/ai-proposal', 'ref' => array( 'id' => $ai_pid ) ) ) );
 	$ai_pc  = null;

@@ -138,6 +138,7 @@ return array(
 		'Comment cards' => 'Kommentar-Karten',
 		'Comments' => 'Kommentare',
 		'Comments awaiting moderation' => 'Kommentare warten auf Freigabe',
+		'Conversation' => 'Gespräch',
 		'Conversations' => 'Gespräche',
 		'Conversations about' => 'Gespräche zu',
 		'Conversations about this' => 'Gespräche dazu',

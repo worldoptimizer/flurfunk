@@ -37,6 +37,35 @@ function category(): void {
 }
 
 /**
+ * Labels of Flurfunk's abilities that change something, translated when asked (so a proposal card
+ * can be shown in the language of the conversation, not only the one the request started in).
+ *
+ * @return array<string, array{label:string, description:string, fields:array<string,string>}>
+ */
+function texts(): array {
+	return array(
+		'flurfunk/reply'        => array(
+			'label'       => __( 'Reply in a conversation', 'flurfunk' ),
+			'description' => __( 'Adds a reply to a conversation as the current user, if they may write there. Mentions as <@user ID>.', 'flurfunk' ),
+			'fields'      => array(
+				'id'   => __( 'Conversation', 'flurfunk' ),
+				'text' => __( 'Text', 'flurfunk' ),
+			),
+		),
+		'flurfunk/start-thread' => array(
+			'label'       => __( 'Start a conversation', 'flurfunk' ),
+			'description' => __( 'Starts a conversation in a channel as the current user, optionally as a task.', 'flurfunk' ),
+			'fields'      => array(
+				'channel' => __( 'Channel', 'flurfunk' ),
+				'title'   => __( 'Title', 'flurfunk' ),
+				'text'    => __( 'Text', 'flurfunk' ),
+				'task'    => __( 'As a task', 'flurfunk' ),
+			),
+		),
+	);
+}
+
+/**
  * May the current user use Flurfunk at all?
  */
 function allowed(): bool {

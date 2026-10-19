@@ -70,6 +70,7 @@ function add_proposal( string $ability, array $input, int $agent, int $thread ):
 		'agent'   => $agent,
 		'thread'  => $thread,
 		'state'   => 'open',
+		'locale'  => language( $agent ),
 		'by'      => 0,
 		'at'      => 0,
 		'result'  => '',
@@ -160,13 +161,26 @@ function proposal_snapshot( array $ref, int $user_id = 0 ): ?array {
 	if ( ! $p ) {
 		return null;
 	}
+	// In the language of the conversation it came from.
+	return in_locale( (string) ( $p['locale'] ?? '' ), static fn () => build_snapshot( $p ) );
+}
+
+/**
+ * The card's content (in the current language).
+ *
+ * @param array $p Proposal.
+ */
+function build_snapshot( array $p ): array {
 	$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( (string) $p['ability'] ) : null;
 	$fields  = array();
 	$schema  = $ability ? (array) ( $ability->get_input_schema()['properties'] ?? array() ) : array();
+	// Flurfunk's own abilities: their labels in this language (registered ones are in the language
+	// of the request that registered them).
+	$own = \Flurfunk\Abilities\texts()[ (string) $p['ability'] ] ?? null;
 	foreach ( (array) $p['input'] as $key => $value ) {
 		$fields[] = array(
 			// The schema's title if it has one, else the key.
-			'label' => (string) ( $schema[ $key ]['title'] ?? ucfirst( str_replace( '_', ' ', (string) $key ) ) ),
+			'label' => (string) ( $own['fields'][ $key ] ?? $schema[ $key ]['title'] ?? ucfirst( str_replace( '_', ' ', (string) $key ) ) ),
 			'value' => mb_substr( is_scalar( $value ) ? (string) ( is_bool( $value ) ? ( $value ? __( 'yes', 'flurfunk' ) : __( 'no', 'flurfunk' ) ) : $value ) : (string) wp_json_encode( $value, JSON_UNESCAPED_UNICODE ), 0, 300 ),
 		);
 	}
@@ -207,8 +221,8 @@ function proposal_snapshot( array $ref, int $user_id = 0 ): ?array {
 		'tone'  => 'neutral',
 	);
 	return array(
-		'title'    => $ability ? $ability->get_label() : (string) $p['ability'],
-		'subtitle' => $ability ? $ability->get_description() : '',
+		'title'    => $own ? $own['label'] : ( $ability ? $ability->get_label() : (string) $p['ability'] ),
+		'subtitle' => $own ? $own['description'] : ( $ability ? $ability->get_description() : '' ),
 		'status'   => $status,
 		'fields'   => $fields,
 		'actions'  => 'open' === $p['state'] && $ability ? array( 'run', 'dismiss' ) : array(),
