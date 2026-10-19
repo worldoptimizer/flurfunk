@@ -92,6 +92,14 @@ Agents and scripts post through assistant accounts. They have no editing rights 
 are clearly marked "Assistant" in the conversation, and connect through WP-CLI or the REST API
 with an application password.
 
+### AI assistants
+
+With WordPress 7.0 or newer, an assistant can answer with AI when someone mentions it – in the
+thread, with the rights of the person asking, within a monthly budget. It can read the post a thread
+is about, look things up in its channels and suggest tasks or other actions as cards that a person
+confirms; it never changes anything by itself. "Summarize" gives anyone a private summary of a long
+thread. Off by default; the provider is the one set up under *Settings → Connectors*.
+
 ### Embeds
 
 Developers can put threads anywhere in wp-admin: next to the items of a checklist, as a whole
@@ -107,7 +115,7 @@ part in WordPress's personal data export and erase tools, and cleans up when use
 | Place | What |
 | --- | --- |
 | Admin menu *Flurfunk* | The overview app, with an unread badge |
-| *Settings → Flurfunk* | Name, logo, colours, team and guests, channels, assistants, post types, data |
+| *Settings → Flurfunk* | Name, logo, colours, team and guests, channels, assistants and AI assistants, post types, data |
 | Block editor | "Conversations" panel for the configured post types |
 | Posts list | Column with the number of conversations and open tasks |
 | Other admin screens | Embedded threads, if a plugin adds them |

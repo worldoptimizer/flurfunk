@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.1
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,7 @@ Flurfunk brings the conversations of an editorial team into wp-admin, next to th
 * Notifications: in-app list, mail (instant or daily summary), Web Push to browsers and phones, quiet hours, follow or mute threads.
 * Light and dark, everything each person sets for themselves.
 * Assistant accounts for agents and scripts, clearly marked in the conversation.
+* Optional AI assistants (WordPress 7.0+): mention one and it answers in the thread, with the rights of the person asking and a monthly budget; it can read the post, look things up and suggest tasks or other actions as cards a person confirms – it never changes anything by itself. Private summaries of long threads.
 * Works in plain wp-admin, full screen as an installable web app, and inside the OpenStation desktop.
 * Own tables, one JSON format for export and import (with files), privacy export/erase.
 
@@ -64,6 +65,10 @@ In uploads/flurfunk/, as normal attachments that the media library hides. "Add t
 
 Yes, as an assistant account. Create one under Settings → Flurfunk → Assistants, give it an application password (needs HTTPS) and send requests to the REST API, for example `POST /wp-json/flurfunk/v1/threads`. On the command line: `wp flurfunk bot-create`, then `wp flurfunk post`.
 
+= Can Flurfunk work with AI? =
+
+Yes, with WordPress 7.0 or newer. Set up a provider (Anthropic, Google or OpenAI) under Settings → Connectors, switch on the module "AI assistants" and give an assistant an AI profile under Settings → Flurfunk: what it can do (packs such as proofreading, looking things up or suggesting tasks), its channels, instructions and a monthly token budget. People then mention it in a thread. It reads that thread (and, if allowed, the post it is about), answers there and notifies only the person who asked. Anything that would change the site comes as a card with a button that a person clicks, with their own rights. Who may ask is the capability "Ask AI assistants" (flurfunk_use_ai). What is sent to the provider is described under External services.
+
 = What happens to the conversations when I delete the plugin? =
 
 By default they stay, so a reinstall picks up where you left off. Untick "Keep conversations when the plugin is deleted" under Settings → Flurfunk → Data to remove the tables, the Flurfunk files and the assistant accounts on deletion. Export them first if you want a copy.
@@ -87,7 +92,7 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 
 = AI assistants (optional, off by default) =
 
-Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, or asks for a summary of it, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. If the site allows it, the text of the post the conversation is about and what the assistant looks up with its tools (only what the person asking may see) are sent too. Email addresses and phone numbers are replaced before sending unless the site switches that off. Nothing is sent otherwise. The providers WordPress offers:
+Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, starts a conversation in a channel where an assistant answers every new one, or asks for a summary, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. If the site allows it, the text of the post the conversation is about and what the assistant looks up with its tools (only what the person asking may see) are sent too. Email addresses and phone numbers are replaced before sending unless the site switches that off. Nothing is sent otherwise. The providers WordPress offers:
 
 * Anthropic: [Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy](https://www.anthropic.com/legal/privacy)
 * Google (Gemini API): [Terms](https://ai.google.dev/gemini-api/terms), [Privacy](https://policies.google.com/privacy)
@@ -109,16 +114,17 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
-= 0.3.0 (in development) =
-* New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. "Summarize" gives a private summary of a thread. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
+= 0.3.0 =
+* New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
+* New: what an assistant can do is set as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) that say what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".
+* New: AI answers carry a spark avatar, an "AI" label and a line with what they were based on and who was notified; while an assistant works, the thread shows what it is doing. Proposal cards say in plain words what would happen ("Task: …") and name the button after it. A channel's header explains which assistants take part and what they read.
+* New: "Summarize" gives a private summary of a thread; threads with many unread messages offer one of just those.
 * New: abilities for the WordPress Abilities API and MCP: list channels, list and read conversations (public), reply and start conversations (not public by default).
-* Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.
-* New for developers: the flurfunk_thread_view and flurfunk_channel_view filters and the flurfunk_settings_sections action.
-* Changed: assistants show no WordPress role next to their name.
-* New: the settings show an assistant's abilities as packs (proofreading, looking things up, tasks, SEO and teasers, images, tech) with what each reads or suggests; packs the site cannot offer say what they need. Single abilities and the model stay behind "Single abilities and model …".
-* New: AI answers carry a spark avatar, an "AI" label and a line with what they were based on and who was notified; while an assistant works, the thread shows what it is doing (reading, looking things up, writing). Proposal cards say in plain words what would happen ("Task: …") and name the button after it. A channel's header explains which assistants take part and what they read. Threads with many unread messages offer a private summary of just those.
 * Changed: the app asks the server in the language of the person using it, and mails and pushes go out in the recipient's language.
 * Changed: Enter or Tab takes the first suggestion in the @ and / lists, as in Slack.
+* Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.
+* Changed: assistants show no WordPress role next to their name.
+* New for developers: the flurfunk_thread_view, flurfunk_channel_view and flurfunk_ai_packs filters and the flurfunk_settings_sections action.
 
 = 0.2.1 =
 * New for developers: module settings of the type `users` (pick people, optionally only those with a capability).
@@ -140,6 +146,9 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * First version.
 
 == Upgrade Notice ==
+
+= 0.3.0 =
+New: optional AI assistants (WordPress 7.0+, off by default), Flurfunk abilities for the Abilities API and MCP. Mails and pushes now go out in each recipient's language.
 
 = 0.2.1 =
 Small update: module settings can pick people, and review requests close when their post is trashed or deleted.

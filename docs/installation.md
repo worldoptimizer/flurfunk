@@ -252,9 +252,27 @@ With WordPress 7.0 or newer an assistant can answer with AI. Set up the provider
 or OpenAI) and its key under *Settings → Connectors* – on a live site preferably as a constant in
 `wp-config.php` (e.g. `define( 'ANTHROPIC_API_KEY', '…' );`), because the screen stores keys in the
 database. Then switch on the module **AI assistants** under *Settings → Flurfunk → Modules* and give
-an assistant an AI profile in the section **AI assistants** below it: tick the channels it takes part
-in, write a few lines of instructions, and set a monthly token budget (WordPress itself has no
-spending limit). People then write `@Name` in a thread; the assistant answers in that thread.
+an assistant an AI profile in the section **AI assistants** below it: switch it on, give it a role in
+a few words (shown next to its name, e.g. "proofreads, checks sources"), tick what it should be able
+to do, the channels it takes part in, write a few lines of instructions, and set a monthly token
+budget (WordPress itself has no spending limit). People then write `@Name` in a thread; the assistant
+answers in that thread.
+
+What an assistant can do is chosen as **packs**, each marked "reads" or "suggests":
+
+| Pack | What it stands for |
+| --- | --- |
+| Proofreading | Reads the post the thread is about, not just the thread. |
+| Looking things up | Flurfunk's reading tools: other conversations in its channels. |
+| Tasks | May suggest new tasks and conversations (as cards a person confirms). |
+| SEO and teasers | Titles, excerpts, descriptions – needs SEOPress or the WordPress plugin "AI". |
+| Images | Alt texts for images without one – needs the plugin "AI" with alt texts on. |
+| Tech | Reads the site's state and error log – needs abilities that offer this. |
+
+A pack the site cannot offer is shown dashed with what it needs. The line under the packs sums up
+what the assistant reads, what it suggests and that it changes nothing by itself. The single
+abilities and the preferred model are behind **Single abilities and model …**; plugins can add packs
+of their own (`flurfunk_ai_packs`).
 
 What it reads goes to the AI provider: the thread it was mentioned in and, if its profile allows it,
 the text of the post the thread is about (only if the person asking may read that post). With tools

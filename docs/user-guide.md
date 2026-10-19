@@ -124,6 +124,26 @@ channel or post, nothing reaches them.
 
 Your own name is highlighted when someone mentions you.
 
+## AI assistants
+
+If your site has set up AI assistants, a channel's header says so ("1 AI assistant"); click it to see
+what each assistant does there and what it reads. In the `@` list assistants are marked **AI** with
+their role.
+
+- **Ask:** mention the assistant in a thread, e.g. `@Proofreading Is the teaser clear?`. While it
+  works, the thread shows what it is doing (reading the thread, looking things up, writing). The
+  answer comes in the thread, and only you are notified.
+- **What it was based on:** under each AI answer a line says what it read (the thread, the post it is
+  about), which conversations it opened and which tools it used.
+- **Suggestions:** an assistant never changes anything by itself. When it suggests something – a
+  task, a new conversation, a reply – a card appears under its answer saying what would happen. A
+  button runs it with your rights; **Dismiss** drops it. The card then says who did what.
+- **Summarize:** in a thread's header, or offered when many messages are new to you – a short
+  summary only you see (of just the new messages if you have read the rest). Nothing is posted.
+
+What an assistant reads goes to the AI provider your site has chosen; your administrators decide
+which assistants exist, where they take part and who may ask them.
+
 ## Slash commands and cards
 
 Type `/` at the start of the text or after a space. A menu lists the commands you can use:
@@ -372,6 +392,7 @@ sidebar keeps your site's colour.
 | Escape | Lightbox | Close it |
 | Arrow left / right | Lightbox | Previous or next image |
 | Arrow down / up | Text box with an open menu, pickers | Move through the suggestions |
+| Enter or Tab | Text box with an open mention or command menu | Take the first suggestion |
 | Enter | Search box of the "Attached to" picker | Choose the first result |
 | Enter or Space | Focused thread in the list or card on the board | Open it |
 | Alt+Arrow left / right | Focused card on the board | Move it to the previous or next column |
