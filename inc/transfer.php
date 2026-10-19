@@ -77,6 +77,9 @@ function export( string $bundle = '' ): array {
 		unset( $msg );
 		$add( (int) $r->author_id );
 		$add( (int) $r->resolved_by );
+		if ( 'assistant' === $r->target_type ) {
+			$add( (int) $r->target_id ); // The assistant of a private conversation.
+		}
 		foreach ( $t['messages'] as $m ) {
 			$add( (int) $m['author'] );
 			foreach ( $m['reactions'] as $x ) {
@@ -168,10 +171,16 @@ function import( array $data, string $bundle = '' ): array {
 			++$count['skipped'];
 			continue;
 		}
+		// A private conversation stays private: the same person and assistant on this site.
+		$private = ! empty( $t['private'] ) && 'assistant' === ( $t['target']['type'] ?? '' );
+		if ( $private ) {
+			Store\ensure_channel( Store\PRIVATE_CHANNEL, array( 'name' => __( 'Private conversations', 'flurfunk' ), 'access_team' => 'none', 'access_guests' => 'none' ) );
+		}
 		$id = Store\create_thread(
 			array(
-				'channel'     => (string) $t['channel'],
-				'target'      => $t['target'] ?? null,
+				'channel'     => $private ? Store\PRIVATE_CHANNEL : (string) $t['channel'],
+				'target'      => $private ? array( 'type' => 'assistant', 'id' => $user( $t['target']['id'] ?? 0 ) ) : ( $t['target'] ?? null ),
+				'private_to'  => $private ? $user( $t['author'] ?? 0 ) : 0,
 				'title'       => (string) ( $t['title'] ?? '' ),
 				'body'        => $text( (string) ( $t['body'] ?? '' ) ),
 				'status'      => (string) ( $t['status'] ?? '' ),

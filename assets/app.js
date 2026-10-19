@@ -566,7 +566,7 @@
 
 	/* ------------------------------------------------------------------ pieces */
 
-	const targetChip = ( th ) => ( th.target && ! th.target.title ? '<span class="ff-target is-gone">' + icon.doc + '<span>' + esc( t( 'deleted' ) ) + '</span></span>' : th.target && th.target.title
+	const targetChip = ( th ) => ( th.private ? '' : th.target && ! th.target.title ? '<span class="ff-target is-gone">' + icon.doc + '<span>' + esc( t( 'deleted' ) ) + '</span></span>' : th.target && th.target.title
 		? '<a class="ff-target" href="' + esc( th.target.url ) + '" target="_top" data-ff="target" data-type="' + esc( th.target.type ) + '" data-id="' + th.target.id + '" title="' + esc( t( 'Conversations about this post' ) ) + '">' + icon.doc + '<span>' + esc( th.target.title ) + '</span></a>'
 		: '' );
 	const LANES = [ 'open', 'doing', 'waiting', 'done' ];
@@ -1644,13 +1644,18 @@
 
 		const viewInfo = () => {
 			const [ kind, a, b ] = ui.view.split( ':' );
+			const a_ = a;
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
 				return { title: '#' + chName( a ), sub: c ? c.topic : '', args: { channel: a, order: 'new' }, channel: a, stream: true, ai: c && c.agents && c.agents.length ? c : null };
 			}
+			if ( 'ai' === kind ) {
+				const a = ( boot.private || [] ).find( ( x ) => x.id === +a_ ) || { id: +a_, name: person( +a_ ).name };
+				return { title: a.name, sub: t( 'Private – only you see these conversations' ), args: { private_with: a.id, order: 'new' }, privateWith: a, stream: true };
+			}
 			if ( 'target' === kind ) {
 				const info = boot.recent.concat( boot.targets ).find( ( x ) => x.type === a && x.id === +b );
-				return { title: info ? info.title : t( 'Post' ), sub: t( 'All conversations about this post, from every channel' ), args: { target: a + ':' + b }, target: { type: a, id: +b }, url: info && info.url };
+				return { title: info ? info.title : t( 'Post' ), sub: t( 'All conversations about this post, from every channel' ), args: { target: a + ':' + b, order: 'new' }, target: { type: a, id: +b }, url: info && info.url, stream: true };
 			}
 			if ( 'mentions' === kind ) {
 				return { title: t( 'Mentions' ), sub: t( 'Where someone mentioned you' ), args: { view: 'mentions' } };
@@ -1671,7 +1676,7 @@
 				const q = ui.view.slice( 7 );
 				return { title: t( 'Search: %s', q ), sub: t( 'Threads and replies that contain it' ), args: { view: 'all', q }, search: q };
 			}
-			return { title: t( 'All threads' ), sub: t( 'Latest activity first' ), args: { view: 'all' } };
+			return { title: t( 'All threads' ), sub: t( 'From every channel, the newest at the bottom' ), args: { view: 'all', order: 'new' }, stream: true };
 		};
 
 		const syncUrl = () => {
@@ -1768,6 +1773,7 @@
 				+ btn( 'board', icon.board, t( 'Board' ), 0 )
 				+ '<h2 class="ff-nav-h">' + esc( t( 'Channels' ) ) + '</h2>'
 				+ boot.channels.map( ( ch ) => btn( 'channel:' + ch.id, ch.auto && ch.auto.length ? spark : icon.hash, ch.name || ch.id, c.channels[ ch.id ] || 0, ch.topic ) ).join( '' )
+				+ ( boot.private && boot.private.length ? '<h2 class="ff-nav-h">' + esc( t( 'Assistants' ) ) + '</h2>' + boot.private.map( ( a ) => btn( 'ai:' + a.id, spark, a.name, ( c.private || {} )[ a.id ] || 0, t( 'Private conversations with %s', a.name ) ) ).join( '' ) : '' )
 				+ ( targets.length ? '<h2 class="ff-nav-h">' + esc( 'guest' === boot.me.kind ? t( 'My posts' ) : targets.every( ( x ) => 'post' === x.type ) ? t( 'Posts' ) : t( 'Linked' ) ) + '</h2>' + targets.map( ( x ) => btn( 'target:' + x.type + ':' + x.id, icon.doc, x.title, c.targets[ x.type + ':' + x.id ] || 0, x.title ) ).join( '' ) : '' )
 				+ '</div>'
 				+ '<div class="ff-me">' + ( ui.settings ? settingsHtml() : '' )
@@ -1846,7 +1852,7 @@
 		};
 		const postHtml = ( th ) => '<article class="ff-post' + ( ui.thread === th.id ? ' is-current' : '' ) + ( th.unread ? ' is-unread' : '' ) + '" data-ff="open" data-id="' + th.id + '" tabindex="0" aria-label="' + esc( ( th.title || th.body || '' ).slice( 0, 80 ) ) + '">'
 			+ ava( th.author ) + '<div class="ff-post-body">'
-			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( viewInfo().stream ? clock( th.created ) : when( th.created ) ) + ( viewInfo().channel ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
+			+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( viewInfo().stream ? clock( th.created ) : when( th.created ) ) + ( viewInfo().channel || th.private ? '' : ' · #' + esc( chName( th.channel ) ) ) + '</span> ' + statusPill( th ) + ' ' + audiencePill( th ) + '</p>'
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<p class="ff-preview">' + preview( th.body ) + '</p>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
@@ -1973,15 +1979,16 @@
 			}
 			feed.innerHTML = ui.list.length
 				? ui.list.map( postHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '' )
-				: ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
+				: ui.loading ? skeleton( 6 ) : emptyFeed();
 		};
+		const emptyFeed = () => '<p class="ff-empty">' + esc( viewInfo().privateWith ? t( 'No conversations yet. Write below to start one – a new conversation starts fresh.' ) : 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
 		// A channel reads top to bottom, as in Slack: the oldest thread first, the newest right above the
-		// writing box. A thread keeps its place when someone replies; older ones load at the top. Scrolled
+		// writing box (so do all threads, a post's conversations and private ones). A thread keeps its place when someone replies; older ones load at the top. Scrolled
 		// up, a button leads back down and counts new threads; the place you read stays put.
 		const renderStream = () => {
 			const old = { top: feed.scrollTop, height: feed.scrollHeight, end: feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40 };
 			if ( ! ui.list.length ) {
-				feed.innerHTML = ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
+				feed.innerHTML = ui.loading ? skeleton( 6 ) : emptyFeed();
 				return;
 			}
 			const known = ui.seen;
@@ -2073,6 +2080,22 @@
 			const v = viewInfo();
 			if ( v.notifications || v.board ) {
 				slot.replaceChildren();
+				return;
+			}
+			if ( v.privateWith ) {
+				const pc = composer( {
+					key: 'new:' + ui.view,
+					className: 'ff-new-thread',
+					autoGrow: true,
+					placeholder: t( 'New conversation with %s …', v.privateWith.name ),
+					submitLabel: t( 'Start conversation' ),
+					onSubmit: async ( payload ) => {
+						const th = await api( 'threads', { method: 'POST', body: { private_with: v.privateWith.id, body: payload.body, files: payload.files } } );
+						await refresh();
+						openThread( th.id, th );
+					},
+				} );
+				slot.replaceChildren( pc );
 				return;
 			}
 			const startable = boot.channels.filter( ( c ) => 'all' === c.level || ( 'own-posts' === c.level && v.target ) || 'own-posts' === c.level );
@@ -2198,7 +2221,7 @@
 			pane.hidden = false;
 			app.classList.add( 'has-pane' );
 			const follow = th.follow || 0;
-			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">' + icon.back + esc( t( 'Back' ) ) + '</button><h2>' + esc( t( 'Thread' ) ) + ' <small>#' + esc( chName( th.channel ) ) + '</small></h2>'
+			pane.innerHTML = resizer( 'pane', t( 'Drag to make the thread wider or narrower' ) ) + '<header class="ff-pane-head"><button type="button" class="ff-back" data-ff="close">' + icon.back + esc( t( 'Back' ) ) + '</button><h2>' + esc( th.private ? t( 'Private conversation' ) : t( 'Thread' ) ) + ' <small>' + esc( th.private && th.target ? t( 'with %s', person( th.target.id ).name ) : '#' + chName( th.channel ) ) + '</small></h2>'
 				+ '<span class="ff-follow">' + ib( 'follow', icon.bell, 1 === follow ? t( 'Following – notified about every reply' ) : t( 'Follow: get notified about every reply' ), ' data-mode="' + ( 1 === follow ? 'default' : 'follow' ) + '" aria-pressed="' + ( 1 === follow ) + '"' )
 				+ ib( 'follow', icon.bellOff, -1 === follow ? t( 'Muted – only mentions and tasks' ) : t( 'Mute: only mentions and tasks' ), ' data-mode="' + ( -1 === follow ? 'default' : 'mute' ) + '" aria-pressed="' + ( -1 === follow ) + '"' )
 				+ remindSelect( th ) + summaryButton( th )

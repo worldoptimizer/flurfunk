@@ -434,8 +434,11 @@ function mail_one( array $n ): bool {
 	}
 	$w       = words( $n );
 	$channel = Store\channel( (int) $n['thread']->channel_id );
-	/* translators: 1: site/app name, 2: headline, 3: channel, 4: thread topic */
-	$subject = sprintf( __( '[%1$s] %2$s in #%3$s: %4$s', 'flurfunk' ), \Flurfunk\Settings\name(), $w['headline'], $channel ? $channel->slug : '', $w['topic'] );
+	$subject = empty( $n['thread']->private_to )
+		/* translators: 1: site/app name, 2: headline, 3: channel, 4: thread topic */
+		? sprintf( __( '[%1$s] %2$s in #%3$s: %4$s', 'flurfunk' ), \Flurfunk\Settings\name(), $w['headline'], $channel ? $channel->slug : '', $w['topic'] )
+		/* translators: 1: site/app name, 2: headline, 3: thread topic */
+		: sprintf( __( '[%1$s] %2$s (private): %3$s', 'flurfunk' ), \Flurfunk\Settings\name(), $w['headline'], $w['topic'] );
 	$body    = $w['headline'] . ":\n\n" . $w['text'] . "\n\n"
 		/* translators: %s: link */
 		. sprintf( __( 'Reply in Flurfunk: %s', 'flurfunk' ), \Flurfunk\Admin\url( 'thread:' . $n['thread']->id ) ) . "\n\n"
@@ -629,7 +632,7 @@ function list_for( int $user_id, int $before = 0, int $limit = 30 ): array {
 			'topic'    => $w['topic'],
 			// The title already shows as topic; the text continues from there, shortened with an ellipsis.
 			'text'     => mb_strimwidth( '' !== $w['topic'] && str_starts_with( $w['text'], $w['topic'] ) ? ltrim( substr( $w['text'], strlen( $w['topic'] ) ) ) : $w['text'], 0, 240, '…' ),
-			'channel'  => ( Store\channel( (int) $t->channel_id ) )->slug ?? '',
+			'channel'  => empty( $t->private_to ) ? ( ( Store\channel( (int) $t->channel_id ) )->slug ?? '' ) : '',
 		);
 	}
 	return $out;

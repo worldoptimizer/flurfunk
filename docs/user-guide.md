@@ -29,20 +29,21 @@ The overview has three columns:
    name at the bottom.
 2. **Threads** of the current view, with a box for starting a new thread at the bottom. A
    channel reads top to bottom, as in Slack: the oldest thread first, the newest right above the
-   box; the day sits on a line between days and stays at the top while you scroll through it; a thread keeps its place when someone replies (its "replies"
-   line shows the news). If you scroll up, a **Latest** button brings you back down. The other
-   views are lists with the latest activity first.
+   box; the day sits on a line between days and stays at the top while you scroll through it; a
+   thread keeps its place when someone replies (its "replies" line shows the news). If you scroll
+   up, a **Latest** button brings you back down. All threads, a post's conversations and private
+   conversations read the same way; mentions, tasks and search results are lists with the latest
+   activity first.
 3. **Thread pane** with the open thread and its replies.
 
 | View | Shows |
 | --- | --- |
-| All threads | Everything you can see, latest activity first |
+| All threads | Everything you can see from every channel, in the order it was started, the newest at the bottom |
 | A channel | Its threads in the order they were started, the newest at the bottom; older ones load at the top |
 | Mentions | Threads where someone mentioned you |
 | My tasks | Open tasks you are responsible for, by due date |
 | Open tasks | All tasks not ticked off yet |
 | Board | Tasks in columns by state: open, in progress, question, done |
-| `#channel` | The threads of one channel |
 | A post | All conversations about this post, from every channel |
 | Bell | Your notifications |
 
@@ -95,6 +96,13 @@ message is marked "(edited)". A deleted message leaves a short note ("… delete
 the replies after it keep their context. The text of the thread itself and its title are edited
 the same way, from the bar on the first message.
 
+## Reactions
+
+Point at a thread or a reply and click the smiley in its bar (or the smiley next to existing
+reactions): the picker shows the emoji you use most, then all of them by group, with a search
+(English and German names). A reaction shows as a small capsule with a count; click a capsule to add
+yours or take it back, point at it to see who reacted. Nobody is notified about reactions.
+
 ## Formatting
 
 Flurfunk uses a small, Slack-like formatting. There is no toolbar; you type the marks.
@@ -146,6 +154,14 @@ their role.
   button runs it with your rights; **Dismiss** drops it. The card then says who did what.
 - **Summarize:** in a thread's header, or offered when many messages are new to you – a short
   summary only you see (of just the new messages if you have read the rest). Nothing is posted.
+
+- **Follow-ups:** right after its answer you can simply write on, without mentioning it again. If
+  you only say thanks, it stays quiet. When someone else writes in between, mention it again.
+- **Private conversations:** under **Assistants** in the sidebar each assistant you may ask has its
+  own space. Write in the box at the bottom to start a conversation; it answers every message there
+  without a mention. Only you see these conversations – not your team, not the site's
+  administrators. Each conversation is separate: a new one starts fresh, the assistant does not
+  remember the others.
 
 What an assistant reads goes to the AI provider your site has chosen; your administrators decide
 which assistants exist, where they take part and who may ask them.

@@ -56,18 +56,18 @@ test.describe( 'team', () => {
 		await page.goto( APP + '&view=thread:' + th.id, { waitUntil: 'domcontentloaded' } );
 		const body = page.locator( '.ff-pane-body' );
 		await page.locator( '.ff-pane .ff-msg', { hasText: 'Antwort 25' } ).waitFor();
-		await expect( page.locator( '.ff-jump' ) ).not.toHaveClass( /is-shown/ );
+		await expect( page.locator( '.ff-pane .ff-jump' ) ).not.toHaveClass( /is-shown/ );
 		await body.evaluate( ( b ) => { b.scrollTop = 0; } );
-		await expect( page.locator( '.ff-jump' ) ).toHaveClass( /is-shown/ );
-		await page.locator( '.ff-jump' ).click();
+		await expect( page.locator( '.ff-pane .ff-jump' ) ).toHaveClass( /is-shown/ );
+		await page.locator( '.ff-pane .ff-jump' ).click();
 		await expect.poll( () => body.evaluate( ( b ) => b.scrollHeight - b.scrollTop - b.clientHeight ) ).toBeLessThan( 5 );
-		await expect( page.locator( '.ff-jump' ) ).not.toHaveClass( /is-shown/ );
+		await expect( page.locator( '.ff-pane .ff-jump' ) ).not.toHaveClass( /is-shown/ );
 		// The writing box stays in view at the bottom while scrolling.
 		await body.evaluate( ( b ) => { b.scrollTop = 0; } );
 		await expect( page.locator( '.ff-pane textarea' ) ).toBeInViewport();
 	} );
 
-	test( 'a channel reads top to bottom, as in Slack: new threads at the bottom, a reply moves nothing', async ( { page } ) => {
+	test( 'a channel and all threads read top to bottom, as in Slack: new threads at the bottom, a reply moves nothing', async ( { page } ) => {
 		const stamp = Date.now();
 		const a = await api( page, 'threads', { channel: 'general', body: 'e2e Verlauf A ' + stamp } );
 		const b = await api( page, 'threads', { channel: 'general', body: 'e2e Verlauf B ' + stamp } );
@@ -87,9 +87,17 @@ test.describe( 'team', () => {
 		await ta.press( 'Enter' );
 		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toContainText( 'e2e Verlauf C ' + stamp );
 		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toBeInViewport();
-		// "All threads" stays a list by latest activity.
+		// "All threads" reads the same way, with the channel next to the time.
 		await page.goto( APP + '&view=all', { waitUntil: 'domcontentloaded' } );
-		await expect( page.locator( '.ff-post' ).first() ).toContainText( 'e2e Verlauf C ' + stamp );
+		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toContainText( 'e2e Verlauf C ' + stamp );
+		await expect( page.locator( '.ff-feed .ff-post' ).last().locator( '.ff-who' ) ).toContainText( '#' );
+		await expect( page.locator( '.ff-feed .ff-day' ).last() ).toBeVisible();
+		const all = page.locator( '.ff-new-thread textarea' );
+		await all.click();
+		await all.pressSequentially( 'e2e Verlauf D ' + stamp );
+		await all.press( 'Enter' );
+		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toContainText( 'e2e Verlauf D ' + stamp );
+		await expect( page.locator( '.ff-feed .ff-post' ).last() ).toBeInViewport();
 	} );
 
 	test( 'closing a thread restores the two-column layout', async ( { page } ) => {
@@ -463,6 +471,8 @@ test.describe( 'team', () => {
 
 	test( 'after logging out the app says so', async ( { page } ) => {
 		await page.context().clearCookies();
+		// A Playground started with --login logs a request without cookies straight back in; answer as WordPress does once logged out.
+		await page.route( /flurfunk\/v1\/threads\/\d+/, ( r ) => r.fulfill( { status: 401, contentType: 'application/json', body: JSON.stringify( { code: 'rest_not_logged_in', message: 'You are not currently logged in.' } ) } ) );
 		await page.locator( '.ff-post' ).first().click();
 		await expect( page.locator( '.ff-session' ) ).toBeVisible();
 	} );
@@ -779,6 +789,8 @@ test.describe( 'team', () => {
 		const post = boot.targets[ 0 ];
 		await page.goto( '/wp-admin/post.php?action=edit&post=' + post.id + Q, { waitUntil: 'domcontentloaded' } );
 		await page.locator( '.editor-header, .edit-post-header' ).first().waitFor( { timeout: 90_000 } );
+		// A fresh site greets with the welcome guide, which hides everything else from the accessibility tree.
+		await page.evaluate( () => window.wp.data.dispatch( 'core/preferences' ).set( 'core/edit-post', 'welcomeGuide', false ) );
 		// The panel lives in the document sidebar; open it if this session has it closed.
 		const settings = page.getByRole( 'button', { name: /^(Einstellungen|Settings)$/ } ).first();
 		if ( 'false' === await settings.getAttribute( 'aria-pressed' ) ) {
@@ -1039,6 +1051,21 @@ test.describe( 'AI assistants', () => {
 		await expect( page.locator( '#ff-ai-info .ff-ai-note' ) ).toBeVisible();
 		await chip.click();
 		await expect( page.locator( '#ff-ai-info' ) ).toBeHidden();
+	} );
+
+	test( 'a private conversation with an assistant: only you see it, it answers without @', async ( { page } ) => {
+		const boot = await api( page, 'bootstrap' );
+		test.skip( ! boot.private || ! boot.private.length, 'no assistant to talk to in private' );
+		const agent = boot.private[ 0 ];
+		await page.locator( `[data-view="ai:${ agent.id }"]` ).click();
+		const ta = page.locator( '.ff-new-thread textarea' );
+		await ta.click();
+		await ta.pressSequentially( 'e2e privat: Antworte nur mit dem Wort Privatprobe' );
+		await ta.press( 'Enter' );
+		await expect( page.locator( '.ff-pane-head h2' ) ).toContainText( /Privat|Private/ );
+		await expect( page.locator( '.ff-pane .ff-msg', { hasText: agent.name } ).last() ).toContainText( /Privatprobe/i, { timeout: 90_000 } );
+		const all = await api( page, 'threads?view=all&q=Privatprobe' );
+		expect( all.length ).toBe( 0 );
 	} );
 
 	test( '"Summarize" shows a private summary and posts nothing', async ( { page } ) => {

@@ -131,6 +131,9 @@ function level( object $channel, int $user_id ): string {
 		return $cache[ $key ];
 	}
 	$kind  = kind( $user_id );
+	if ( \Flurfunk\Store\PRIVATE_CHANNEL === $channel->slug ) {
+		return $cache[ $key ] = 'none'; // Only a container for private conversations, never a channel.
+	}
 	$level = '' === $kind || ! empty( $channel->archived ) ? 'none' : ( 'team' === $kind ? (string) $channel->access_team : (string) $channel->access_guests );
 	if ( 'none' !== $level && ! passes( $channel, $user_id ) ) {
 		$level = 'none';
@@ -246,6 +249,11 @@ function owned_post_ids( int $user_id ): array {
  */
 function can_see( object $thread, int $user_id = 0 ): bool {
 	$user_id = $user_id ?: get_current_user_id();
+	// A private conversation with an assistant: the person and the assistant, nobody else – not
+	// moderators, not the site's administrators, whatever the channel settings say.
+	if ( ! empty( $thread->private_to ) ) {
+		return $user_id && ( (int) $thread->private_to === $user_id || ( 'assistant' === $thread->target_type && (int) $thread->target_id === $user_id ) );
+	}
 	$channel = \Flurfunk\Store\channel( (int) $thread->channel_id );
 	if ( ! $channel ) {
 		return false;
@@ -311,5 +319,6 @@ function where( int $user_id ): string {
 	if ( $posts ) {
 		$parts[] = $wpdb->prepare( '(t.channel_id IN (' . implode( ',', array_fill( 0, count( $own ), '%d' ) ) . ") AND t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $posts ), '%d' ) ) . '))', array_merge( $own, $posts ) );
 	}
-	return $parts ? '(' . implode( ' OR ', $parts ) . ')' : '0=1';
+	// Private conversations never show up in lists, numbers or searches; they have their own view.
+	return $parts ? '(' . implode( ' OR ', $parts ) . ') AND t.private_to = 0' : '0=1';
 }

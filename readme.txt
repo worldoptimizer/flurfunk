@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -92,7 +92,7 @@ Flurfunk shows profile pictures through WordPress's own avatar function. Unless 
 
 = AI assistants (optional, off by default) =
 
-Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, starts a conversation in a channel where an assistant answers every new one, or asks for a summary, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. If the site allows it, the text of the post the conversation is about and what the assistant looks up with its tools (only what the person asking may see) are sent too. Email addresses and phone numbers are replaced before sending unless the site switches that off. Nothing is sent otherwise. The providers WordPress offers:
+Only if a site switches on the module "AI assistants" and sets up an AI provider under Settings → Connectors (WordPress 7.0 or newer). When a person mentions an assistant with an AI profile in a conversation, starts a conversation in a channel where an assistant answers every new one, talks to an assistant in a private conversation, or asks for a summary, the text of that one conversation (names of the people in it, messages, titles of linked posts and files, the assistant's instructions) is sent through WordPress's AI client to the provider the site chose, which returns the answer. If the site allows it, the text of the post the conversation is about and what the assistant looks up with its tools (only what the person asking may see) are sent too. Email addresses and phone numbers are replaced before sending unless the site switches that off. Nothing is sent otherwise. The providers WordPress offers:
 
 * Anthropic: [Terms](https://www.anthropic.com/legal/commercial-terms), [Privacy](https://www.anthropic.com/legal/privacy)
 * Google (Gemini API): [Terms](https://ai.google.dev/gemini-api/terms), [Privacy](https://policies.google.com/privacy)
@@ -114,9 +114,12 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
-= 0.4.0 (in development) =
-* Changed: a channel reads top to bottom, as in Slack – the oldest thread first, the newest right above the writing box; the day sits on a line between days and stays at the top while you scroll through it. A thread keeps its place when someone replies; older threads load at the top; scrolled up, a button brings you back down and counts new threads. All threads, mentions, tasks and the board stay lists by latest activity.
-* New for developers: `order=new` and `before_id` for the thread list (REST `threads`).
+= 0.4.0 =
+* Changed: a channel reads top to bottom, as in Slack – the oldest thread first, the newest right above the writing box; the day sits on a line between days and stays at the top while you scroll through it. A thread keeps its place when someone replies; older threads load at the top; scrolled up, a button brings you back down and counts new threads. All threads, a post's conversations and private conversations read the same way; mentions, tasks, search and the board stay lists by latest activity.
+* New: emoji reactions on threads and replies, as in Slack – one smiley in the hover bar opens a picker with the most used emoji first and all others with a search (English and German names); capsules with counts, click to add yours or take it back. Nobody is notified.
+* New: private conversations with an AI assistant – under "Assistants" in the sidebar; it answers every message there; only the person who started a conversation sees it in Flurfunk (not the team, not administrators); each conversation starts fresh.
+* New for developers: `order=new`, `before_id` and `private_with` for the thread list, `POST threads/<id>/reactions`, `private_with` for new threads; the flurfunk_private_partners and flurfunk_reactions_per_minute filters and the flurfunk_reaction action.
+* Emoji names in the picker: Emojibase (MIT, emojibase.dev).
 
 = 0.3.0 =
 * New: AI assistants (module, off by default; WordPress 7.0+ and a provider under Settings → Connectors). An assistant with an AI profile answers in the thread when someone mentions it, in the channels it is allowed in, with instructions per assistant and channel and a monthly token budget. It can read the post a thread is about, look things up with read-only abilities and propose actions that a person runs with a button – always with the rights of the person asking or clicking. Privacy switches: email addresses and phone numbers are replaced before sending, a log without content, a capability for who may ask.
@@ -155,6 +158,9 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * First version.
 
 == Upgrade Notice ==
+
+= 0.4.0 =
+Channels and all threads now read top to bottom as in Slack, the newest right above the writing box, with the date at the top while you scroll. New: emoji reactions and private conversations with an AI assistant. Flurfunk updates its tables by itself.
 
 = 0.3.0 =
 New: optional AI assistants (WordPress 7.0+, off by default), Flurfunk abilities for the Abilities API and MCP, icons instead of text links. As in Slack, Enter now sends (Shift+Enter: new line). Mails and pushes go out in each recipient's language.

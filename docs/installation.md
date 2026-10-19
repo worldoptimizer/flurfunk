@@ -291,7 +291,15 @@ where, model, tokens, tools), and offer **Summarize** in threads – a private s
 who asks, never posted.
 
 For a help channel (e.g. #ask-ai) an assistant can answer every new thread there without being
-mentioned; replies in it still need a mention.
+mentioned. Right after an answer, the person who asked can simply write on (a follow-up); once
+someone else writes, the assistant needs a new mention (`flurfunk_ai_follow_ups` switches follow-ups
+off).
+
+Everyone who may ask an assistant also finds it under **Assistants** in the sidebar, for **private
+conversations**: the assistant answers every message there, and only the person who started a
+conversation sees it – not the team and not administrators in Flurfunk (the conversations are in the
+database and in exports, like everything else). Its channels and abilities are the same as anywhere
+else; it acts with the rights of that person.
 
 Abilities that change something (e.g. starting a task, updating an SEO title) can be given to an
 assistant as **proposals**: it never runs them itself, but puts a card under its answer, and a

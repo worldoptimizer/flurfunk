@@ -11,7 +11,7 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const OPTION     = 'flurfunk_db_version';
 
 /**
@@ -65,7 +65,9 @@ CREATE TABLE " . table( 'threads' ) . " (
   resolved_at datetime DEFAULT NULL,
   created datetime NOT NULL,
   last_activity datetime NOT NULL,
+  private_to bigint(20) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY  (id),
+  KEY private_to (private_to,target_id),
   KEY channel_activity (channel_id,last_activity),
   KEY target (target_type,target_id),
   KEY ref_key (ref_key),
@@ -175,8 +177,8 @@ CREATE TABLE " . table( 'attachments' ) . " (
  */
 function upgrade( int $from ): void {
 	// 6: channels.capability (dbDelta adds it; '' = no extra capability, so existing channels
-	// stay as they were). 7: the reactions table (dbDelta creates it). Nothing to rewrite.
-	// Example for later: if ( $from < 8 ) { … }
+	// stay as they were). 7: the reactions table (dbDelta creates it). 8: threads.private_to (0 =
+	// not private; dbDelta adds it). Nothing to rewrite. Example for later: if ( $from < 9 ) { … }
 	unset( $from );
 }
 

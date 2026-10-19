@@ -232,6 +232,7 @@ function bootstrap(): array {
 		),
 		'people'    => $people,
 		'channels'  => $channels,
+		'private'   => array_values( (array) apply_filters( 'flurfunk_private_partners', array(), $uid ) ),
 		'providers' => \Flurfunk\Providers\available( $uid ),
 		'counts'    => Store\counts( $uid ),
 		'targets'   => my_targets( $uid ),
@@ -304,7 +305,7 @@ function decorate( array $t ): array {
  * @param WP_REST_Request $r Request.
  */
 function list_threads( WP_REST_Request $r ): array {
-	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'before_id', 'after', 'limit', 'order', 'q', 'person' ) ) );
+	$args = array_intersect_key( $r->get_params(), array_flip( array( 'view', 'channel', 'target', 'ref_prefix', 'before', 'before_id', 'after', 'limit', 'order', 'q', 'person', 'private_with' ) ) );
 	return array_map( __NAMESPACE__ . '\\decorate', Store\list_threads( get_current_user_id(), array_map( 'sanitize_text_field', $args ) ) );
 }
 
@@ -336,6 +337,10 @@ function create_thread( WP_REST_Request $r ) {
 	$ref = sanitize_text_field( (string) ( $p['ref_key'] ?? '' ) );
 	if ( '' !== $ref && ( $existing = Store\thread_by_ref( $ref ) ) && Access\can_see( $existing ) ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition
 		return decorate( Store\full_thread( (int) $existing->id, get_current_user_id() ) );
+	}
+	if ( ! empty( $p['private_with'] ) ) {
+		$id = Store\start_private( get_current_user_id(), (int) $p['private_with'], array( 'body' => (string) ( $p['body'] ?? '' ), 'title' => (string) ( $p['title'] ?? '' ), 'files' => (array) ( $p['files'] ?? array() ) ) );
+		return is_wp_error( $id ) ? $id : decorate( Store\full_thread( $id, get_current_user_id() ) );
 	}
 	$id = Store\create_thread(
 		array(

@@ -270,7 +270,7 @@ Request bodies are JSON (`Content-Type: application/json`), except file uploads.
 | --- | --- | --- | --- |
 | GET | `bootstrap` | | Everything the app needs to start, see below |
 | GET | `counts` | | Unread numbers, see below |
-| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`, `board`), `channel` (slug), `target` (`type:id`), `person` (user ID: only tasks this person is responsible for), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `before_id` (thread ID, for paging with `order=new`), `limit` (1–200, default 40), `order` (`ref` = oldest first, `new` = newest started first, as a channel shows them) | Thread summaries |
+| GET | `threads` | `view` (`all`, `mentions`, `tasks`, `mine`, `board`), `channel` (slug), `target` (`type:id`), `person` (user ID: only tasks this person is responsible for), `ref_prefix`, `q` (search), `before` (ISO time, for paging by last activity), `before_id` (thread ID, for paging with `order=new`), `private_with` (an assistant's user ID: one's own private conversations with it), `limit` (1–200, default 40), `order` (`ref` = oldest first, `new` = newest started first, as a channel shows them) | Thread summaries |
 | POST | `threads` | `channel` (slug, required), `title`, `body`, `target` `{type, id}`, `task` (bool; implied by `due` or `assignees`), `due` (`Y-m-d`), `assignees` (user IDs), `attachments` (`[{provider, ref}]`), `ref_key` | The new thread (full). With a `ref_key` that exists already: that thread, unchanged |
 | GET | `threads/<id>` | `peek=1` to not mark it as read | Full thread; marks it and its notifications as read |
 | POST | `threads/<id>/messages` | `body`, `files` (attachment IDs: uploaded Flurfunk files or media library files, up to 50), `attachments` | The full thread |
@@ -963,6 +963,10 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_guidelines` (filter) | `string $text` | Editorial guidelines for the assistants. Default: the site's guidelines from the WordPress plugin "AI" (categories site, copy, additional), if it is active. |
 | `flurfunk_ai_summaries_per_hour` (filter) | `int $max` (20) | Private summaries per person and hour. |
 | `flurfunk_ability_channel` (filter) | `bool $ok`, `string $channel` | Narrow the channels Flurfunk's reading abilities return; the AI module uses it while an assistant looks things up. |
+| `flurfunk_ai_follow_ups` (filter) | `bool $on` (true), `int $thread_id`, `int $author` | false: a reply right after an assistant's answer needs a new mention. |
+| `flurfunk_private_partners` (filter) | `array $list`, `int $user_id` | Who a person may talk to in private: `[ { id, name, role } ]`. The AI module adds the assistants this person may ask. |
+| `flurfunk_reaction` (action) | `object $thread`, `int $message_id` (0 = the thread), `string $emoji`, `int $user_id`, `bool $added` | A reaction was added or taken back. |
+| `flurfunk_reactions_per_minute` (filter) | `int $max` (60), `int $user_id` | Brake for reactions. |
 | `flurfunk_ai_packs` (filter) | `array $packs` | The capability packs on the settings page (key → `label`, `desc`, `kind` read/propose, `posts`, `tools`, `proposals`, `needs`, `available`). A pack stands for those settings; ticking it adds them to a profile, unticking removes them. Add a pack for your plugin's abilities here. |
 
 REST: `POST flurfunk/v1/threads/<id>/summary` (optional `since`: a message ID – then only what came
@@ -980,6 +984,20 @@ Options: `flurfunk_ai_settings` (`redact`, `log`, `summary`), `flurfunk_ai_chann
 instructions), `flurfunk_ai_log` (the last 100 runs: time, agent, asker, thread, channel, model,
 tokens, error, tools, kind), `flurfunk_ai_meta` (what the newest 2,000 answers were based on). User meta on assistants: `flurfunk_ai` (profile), `flurfunk_ai_usage`
 (tokens this month).
+
+### Reactions and private conversations
+
+`POST threads/<id>/reactions` with `{ message, emoji }` (`message` 0 = the thread itself) adds the
+person's reaction or takes it back and returns `{ message, reactions }`. Threads and replies carry
+`reactions`: `[ { emoji, people } ]`. Any single emoji is accepted (at most 20 kinds per message); it is
+stored as code points without variation selectors, so 👍 and 👍️ are one reaction.
+
+`POST threads` with `{ private_with: <assistant ID>, body }` starts a private conversation
+(`Flurfunk\Store\start_private()`). Private threads (`private: true`, target `assistant:<ID>`) live
+in a container channel that never opens as a channel; only their person and the assistant can see
+them, and lists, numbers and searches leave them out (`Access\where()` adds `t.private_to = 0`).
+`GET threads?private_with=<ID>` lists one's own; `counts.private` has their unread replies per
+assistant. Export and import keep them private.
 
 ### Abilities
 

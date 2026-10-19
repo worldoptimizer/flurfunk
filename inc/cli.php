@@ -128,7 +128,7 @@ class Command {
 	public function status(): void {
 		global $wpdb;
 		$rows = array();
-		foreach ( \Flurfunk\Store\channels( true ) as $c ) {
+		foreach ( \Flurfunk\Store\real_channels( true ) as $c ) {
 			$rows[] = array(
 				'channel'  => $c->slug,
 				'name'     => $c->name,

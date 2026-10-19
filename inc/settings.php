@@ -249,7 +249,7 @@ function render(): void {
 		}
 		echo '</select>';
 	};
-	$channels = Store\channels( true );
+	$channels = Store\real_channels( true );
 	$caps     = channel_caps( array_map( static fn ( $c ) => (string) ( $c->capability ?? '' ), $channels ) );
 	$cap_pick = static function ( string $name, string $current ) use ( $caps ): void {
 		echo '<select name="' . esc_attr( $name ) . '" aria-label="' . esc_attr__( 'Also requires', 'flurfunk' ) . '">';

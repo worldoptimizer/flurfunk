@@ -82,6 +82,8 @@ function mentions_in( string $text, object $thread ): array {
  * Channels
  * ---------------------------------------------------------------------- */
 
+const PRIVATE_CHANNEL = 'flurfunk-private'; // Holds private conversations; never shown as a channel.
+
 /**
  * All channels (cached per request).
  *
@@ -95,6 +97,16 @@ function channels( bool $fresh = false ): array {
 		$rows = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY position, name', table( 'channels' ) ) );
 	}
 	return $rows;
+}
+
+/**
+ * The channels people see and set up (without the container of private conversations).
+ *
+ * @param bool $fresh Reload.
+ * @return object[]
+ */
+function real_channels( bool $fresh = false ): array {
+	return array_values( array_filter( channels( $fresh ), static fn ( object $c ): bool => PRIVATE_CHANNEL !== $c->slug ) );
 }
 
 /**
@@ -339,6 +351,55 @@ function rate_limit( int $user_id ) {
 }
 
 /**
+ * Start a private conversation of a person with an assistant (only the two of them see it). Other
+ * code (the AI module) says through flurfunk_private_partners who may be talked to this way.
+ *
+ * @param int   $user_id Who starts it.
+ * @param int   $partner The assistant.
+ * @param array $args    body, title, files (media IDs; checked as for any message). Cards come with replies.
+ * @return int|\WP_Error Thread ID.
+ */
+function start_private( int $user_id, int $partner, array $args ) {
+	$ok = in_array( $partner, array_map( static fn ( $p ) => (int) $p['id'], (array) apply_filters( 'flurfunk_private_partners', array(), $user_id ) ), true );
+	if ( ! $user_id || ! $ok || ! Access\can_use( $user_id ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot start a conversation here.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$rate = rate_limit( $user_id );
+	if ( is_wp_error( $rate ) ) {
+		return $rate;
+	}
+	ensure_channel(
+		PRIVATE_CHANNEL,
+		array(
+			'name'          => __( 'Private conversations', 'flurfunk' ),
+			'access_team'   => 'none',
+			'access_guests' => 'none',
+		)
+	);
+	$id = create_thread(
+		array(
+			'channel'    => PRIVATE_CHANNEL,
+			'target'     => array(
+				'type' => 'assistant',
+				'id'   => $partner,
+			),
+			'title'      => (string) ( $args['title'] ?? '' ),
+			'body'       => (string) ( $args['body'] ?? '' ),
+			'files'      => files( array_map( 'intval', (array) ( $args['files'] ?? array() ) ), $user_id, true ), // Checked here, kept as they are below.
+			'author'     => $user_id,
+			'private_to' => $user_id,
+		),
+		false
+	);
+	if ( is_int( $id ) ) {
+		// Created without the checks above (they were done here), but as any new thread.
+		mark_read( $id, $user_id );
+		do_action( 'flurfunk_thread_created', thread_row( $id ) );
+	}
+	return $id;
+}
+
+/**
  * Create a thread.
  *
  * @param array $args channel (short name), target {type,id}, title, body, task, attachments[], ref_key,
@@ -348,6 +409,7 @@ function rate_limit( int $user_id ) {
  */
 function create_thread( array $args, bool $check = true ) {
 	global $wpdb;
+	$private = $check ? 0 : (int) ( $args['private_to'] ?? 0 ); // Only through start_private() and the import.
 	$author  = (int) ( $args['author'] ?? get_current_user_id() );
 	$channel = channel_by_slug( (string) ( $args['channel'] ?? '' ) );
 	if ( ! $channel ) {
@@ -401,6 +463,7 @@ function create_thread( array $args, bool $check = true ) {
 			'resolved_at'   => mysql( $args['resolved']['at'] ?? null ),
 			'created'       => $created,
 			'last_activity' => $created,
+			'private_to'    => $private,
 		)
 	);
 	$id = (int) $wpdb->insert_id;
@@ -1096,6 +1159,7 @@ function format_thread( object $t, array $atts = array(), array $ments = array()
 			'id'   => (int) $t->target_id,
 		) : null,
 		'title'       => '' !== $t->title ? $t->title : null,
+		'private'     => ! empty( $t->private_to ),
 		'body'        => $t->body,
 		'files'       => array_map( __NAMESPACE__ . '\\file_view', json_decode( (string) ( $t->files ?? '' ), true ) ?: array() ),
 		'author'      => (int) $t->author_id,
@@ -1384,6 +1448,10 @@ function audience( object $t ): array {
 function list_threads( int $user_id, array $args = array() ): array {
 	global $wpdb;
 	$where = array( Access\where( $user_id ) );
+	if ( ! empty( $args['private_with'] ) ) {
+		// One's own private conversations with an assistant, and nothing else.
+		$where = array( $wpdb->prepare( "t.private_to = %d AND t.target_type = 'assistant' AND t.target_id = %d", $user_id, (int) $args['private_with'] ) );
+	}
 	$view  = (string) ( $args['view'] ?? 'all' );
 	if ( ! empty( $args['channel'] ) ) {
 		$c       = channel_by_slug( (string) $args['channel'] );
@@ -1556,6 +1624,15 @@ function counts( int $user_id ): array {
 			$out['overdue'] += $row->due_date && $row->due_date < $today ? 1 : 0;
 		}
 	}
+	// Private conversations, per assistant (only one's own).
+	$private = array();
+	foreach ( (array) $wpdb->get_results( $wpdb->prepare( "SELECT t.target_id AS agent, ( SELECT COUNT(*) FROM %i m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) ) AS unread FROM %i t LEFT JOIN %i r ON r.thread_id = t.id AND r.user_id = %d WHERE t.private_to = %d AND t.target_type = 'assistant'", table( 'messages' ), $user_id, table( 'threads' ), table( 'reads' ), $user_id, $user_id ) ) as $row ) {
+		if ( (int) $row->unread ) {
+			$private[ (string) $row->agent ] = ( $private[ (string) $row->agent ] ?? 0 ) + (int) $row->unread;
+			$out['total']                   += (int) $row->unread;
+		}
+	}
+	$out['private']       = (object) $private;
 	$out['notifications'] = \Flurfunk\Notify\unread( $user_id );
 	set_transient( $key, $out, 10 * MINUTE_IN_SECONDS );
 	return $out;
