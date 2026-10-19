@@ -136,6 +136,19 @@
 		slash: svg( 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM15 7l-6 10' ),
 		x: svg( 'M18 6L6 18M6 6l12 12' ),
 		back: svg( 'M15 18l-6-6 6-6' ),
+		down: svg( 'M12 5v14M19 12l-7 7-7-7' ),
+	};
+	// While something loads: grey lines where it will be (a screen reader hears "Loading …").
+	const skeleton = ( n ) => '<div class="ff-skeleton" aria-hidden="true">' + Array.from( { length: n }, ( _, i ) => '<div class="ff-skel-row"><span class="ff-skel-ava"></span><span class="ff-skel-lines"><span class="ff-skel" style="width:' + [ 34, 48, 28, 42, 38, 30 ][ i % 6 ] + '%"></span><span class="ff-skel" style="width:' + [ 86, 64, 92, 70, 58, 80 ][ i % 6 ] + '%"></span></span></div>' ).join( '' ) + '</div><p class="screen-reader-text" role="status">' + esc( t( 'Loading …' ) ) + '</p>';
+	const smooth = () => ( window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches ? 'auto' : 'smooth' );
+	// Fade something in once (on its next paint), e.g. a list that has just loaded.
+	const enter = ( el ) => {
+		if ( el ) {
+			el.classList.remove( 'is-entering' );
+			void el.offsetWidth;
+			el.classList.add( 'is-entering' );
+			setTimeout( () => el.classList.remove( 'is-entering' ), 400 );
+		}
 	};
 	// A button that is only an icon: its name for screen readers and as a tooltip (like Slack's).
 	const ib = ( act, ic, label, attrs, cls ) => '<button type="button" class="ff-ib' + ( cls ? ' ' + cls : '' ) + '" data-ff="' + act + '" aria-label="' + esc( label ) + '" data-tip="' + esc( label ) + '"' + ( attrs || '' ) + '>' + ic + '</button>';
@@ -1430,7 +1443,7 @@
 	/* ================================================================== app */
 
 	const mountApp = async ( root ) => {
-		root.innerHTML = '<p class="ff-loading">' + esc( t( 'Loading …' ) ) + '</p>';
+		root.innerHTML = '<div class="ff-app ff-booting"><nav class="ff-nav"></nav><section class="ff-main"><div class="ff-feed">' + skeleton( 7 ) + '</div></section></div>';
 		try {
 			await loadBoot();
 		} catch ( e ) {
@@ -1777,12 +1790,12 @@
 			if ( viewInfo().notifications ) {
 				feed.innerHTML = ui.notes && ui.notes.length
 					? ui.notes.map( noteHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older notifications' ) ) + '</button>' : '' )
-					: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : t( 'No notifications yet.' ) ) + '</p>';
+					: ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( t( 'No notifications yet.' ) ) + '</p>';
 				return;
 			}
 			feed.innerHTML = ui.list.length
 				? ui.list.map( postHtml ).join( '' ) + ( ui.more ? '<button type="button" class="ff-more" data-ff="more">' + esc( t( 'Load older threads' ) ) + '</button>' : '' )
-				: '<p class="ff-empty">' + esc( ui.loading ? t( 'Loading …' ) : 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
+				: ui.loading ? skeleton( 6 ) : '<p class="ff-empty">' + esc( 'guest' === boot.me.kind ? t( 'Conversations about your posts appear here, as soon as the team or you start one.' ) : t( 'Nothing here yet. Start a thread below.' ) ) + '</p>';
 		};
 		const loadList = async ( append ) => {
 			const v = viewInfo();
@@ -1791,8 +1804,12 @@
 				const items = await api( 'notifications?' + query( { limit: 40, before } ) );
 				ui.notes = append ? ( ui.notes || [] ).concat( items ) : items;
 				ui.more = items.length === 40;
+				const was = ui.loading;
 				ui.loading = false;
 				renderFeed();
+				if ( was ) {
+					enter( feed );
+				}
 				return;
 			}
 			const args = Object.assign( { limit: 40 }, v.args );
@@ -1802,8 +1819,12 @@
 			const items = await api( 'threads?' + query( args ) );
 			ui.list = append ? ui.list.concat( items ) : items;
 			ui.more = items.length === 40;
+			const was = ui.loading;
 			ui.loading = false;
 			renderFeed();
+			if ( was ) {
+				enter( feed );
+			}
 		};
 
 		/* composer for new threads */
@@ -1970,22 +1991,55 @@
 				},
 			} );
 			$( '.ff-reply-slot', pane ).replaceChildren( c );
+			$( '.ff-reply-slot', pane ).insertAdjacentHTML( 'afterbegin', '<button type="button" class="ff-jump" data-ff="jump" tabindex="-1" aria-hidden="true">' + icon.down + '<span>' + esc( t( 'Latest' ) ) + '</span></button>' );
 			const body = $( '.ff-pane-body', pane );
 			const first = $( '.ff-msg.is-unread', pane );
 			body.scrollTop = first ? first.offsetTop - 80 : body.scrollHeight;
+			body.addEventListener( 'scroll', () => jumpState( body ), { passive: true } );
+			jumpState( body );
 			return c;
+		};
+		// Scrolled up in a thread (as in Slack): a button back to the newest message, counting what came meanwhile.
+		const jumpState = ( body ) => {
+			const btn = $( '.ff-jump', pane );
+			if ( ! btn || ! body ) {
+				return;
+			}
+			const away = body.scrollHeight - body.scrollTop - body.clientHeight > 160;
+			if ( ! away ) {
+				ui.unseen = 0;
+			}
+			btn.classList.toggle( 'is-shown', away );
+			btn.classList.toggle( 'has-new', !! ui.unseen );
+			btn.tabIndex = away ? 0 : -1;
+			btn.setAttribute( 'aria-hidden', String( ! away ) );
+			$( 'span', btn ).textContent = ui.unseen ? ( 1 === ui.unseen ? t( '1 new message' ) : t( '%s new messages', ui.unseen ) ) : t( 'Latest' );
 		};
 		const openThread = async ( id, preset ) => {
 			ui.thread = id;
+			ui.unseen = 0;
 			syncUrl();
 			feed.querySelectorAll( '.ff-post, .ff-tcard' ).forEach( ( p ) => p.classList.toggle( 'is-current', +p.dataset.id === id ) );
+			const slow = preset && preset.messages ? 0 : setTimeout( () => {
+				if ( ui.thread === id ) {
+					pane.hidden = false;
+					app.classList.add( 'has-pane' );
+					pane.innerHTML = '<header class="ff-pane-head"><h2>' + esc( t( 'Thread' ) ) + '</h2></header><div class="ff-pane-body">' + skeleton( 4 ) + '</div>';
+				}
+			}, 150 );
 			try {
 				const th = preset && preset.messages ? preset : await api( 'threads/' + id );
+				clearTimeout( slow );
+				if ( ui.thread !== id ) {
+					return; // Someone opened another thread meanwhile.
+				}
 				ui.current = th;
 				const c = renderPane( th );
+				enter( $( '.ff-pane-body', pane ) );
 				c.focusText();
 				refresh();
 			} catch ( e ) {
+				clearTimeout( slow );
 				pane.hidden = false;
 				pane.innerHTML = '<p class="ff-empty">' + esc( e.message ) + '</p>';
 			}
@@ -2087,10 +2141,21 @@
 				const body = $( '.ff-pane-body', pane );
 				const atEnd = body && body.scrollHeight - body.scrollTop - body.clientHeight < 40;
 				const top = body ? body.scrollTop : 0;
+				const known = new Set( ( ui.current.messages || [] ).map( ( m ) => m.id ) );
+				const added = ( th.messages || [] ).filter( ( m ) => 'message' === m.type && ! known.has( m.id ) );
 				ui.current = th;
+				const keep = ui.unseen || 0;
 				renderPane( th );
+				ui.unseen = keep + ( atEnd ? 0 : added.filter( ( m ) => m.author !== boot.me.id ).length );
 				const nb = $( '.ff-pane-body', pane );
 				nb.scrollTop = atEnd ? nb.scrollHeight : top;
+				added.forEach( ( m ) => {
+					const el = $( '#ff-m-' + m.id, pane );
+					if ( el ) {
+						el.classList.add( 'is-new' );
+					}
+				} );
+				jumpState( nb );
 			}
 		};
 		const setView = ( view ) => {
@@ -2142,6 +2207,10 @@
 				if ( box ) {
 					box.hidden = ! open;
 				}
+			} else if ( 'jump' === act ) {
+				const body = $( '.ff-pane-body', pane );
+				ui.unseen = 0;
+				body.scrollTo( { top: body.scrollHeight, behavior: smooth() } );
 			} else if ( 'summary' === act ) {
 				if ( ui.current ) {
 					showSummary( ui.current, +( el.dataset.since || 0 ) );

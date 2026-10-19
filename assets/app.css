@@ -651,3 +651,30 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-new-thread .ff-left, .ff-root .ff-embed .ff-left { flex: 1 1 auto; min-width: 0; }
 .ff-root .ff-new-thread .ff-hint, .ff-root .ff-embed .ff-hint { margin-left: auto; }
 .ff-root .ff-compose > .ff-row { min-width: 0; }
+
+/* Loading: grey lines where the content will be, then a soft fade-in instead of a jump. */
+.ff-root .ff-skeleton { display: flex; flex-direction: column; gap: 18px; padding: 16px 18px; }
+.ff-root .ff-skel-row { display: flex; gap: 10px; align-items: flex-start; }
+.ff-root .ff-skel-ava { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ff-soft2); animation: ff-skel 1.4s ease-in-out infinite; }
+.ff-root .ff-skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 3px; }
+.ff-root .ff-booting .ff-nav { min-height: 100%; }
+@keyframes ff-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.ff-root .ff-feed.is-entering > *, .ff-root .ff-pane-body.is-entering { animation: ff-in .2s ease-out both; }
+.ff-root .ff-feed.is-entering > :nth-child(2) { animation-delay: .02s; }
+.ff-root .ff-feed.is-entering > :nth-child(3) { animation-delay: .04s; }
+.ff-root .ff-feed.is-entering > :nth-child(4) { animation-delay: .06s; }
+.ff-root .ff-feed.is-entering > :nth-child(n+5) { animation-delay: .08s; }
+.ff-root .ff-msg.is-new { animation: ff-in .25s ease-out both; }
+
+/* The thread's writing box stays at the bottom, as in Slack; above it a button back to the newest message. */
+.ff-root .ff-pane-body > .ff-reply-slot { position: sticky; bottom: -14px; z-index: 4; margin: 8px -16px -14px; padding: 10px 16px 14px; background: var(--ff-paper); }
+.ff-root .ff-jump { position: absolute; left: 50%; top: -42px; z-index: 5; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 10px; border: 1px solid var(--ff-line); border-radius: 999px; background: var(--ff-paper); color: var(--ff-ink); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgb(0 0 0 / .14); cursor: pointer; opacity: 0; pointer-events: none; transform: translate(-50%, 8px); transition: opacity .15s ease, transform .15s ease; }
+.ff-root .ff-jump.is-shown { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.ff-root .ff-jump:hover { background: var(--ff-soft); }
+.ff-root .ff-jump.has-new { background: var(--ff-accent); border-color: var(--ff-accent); color: #fff; }
+.ff-root .ff-jump .ff-i { width: 16px; height: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+	.ff-root .ff-feed.is-entering > *, .ff-root .ff-pane-body.is-entering, .ff-root .ff-msg.is-new, .ff-root .ff-skel-ava { animation: none; }
+	.ff-root .ff-jump { transition: none; }
+}

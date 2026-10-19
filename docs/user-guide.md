@@ -77,7 +77,7 @@ Use the box at the bottom of the thread list:
 
 ### Reply
 
-Click a thread to open it, write in the reply box and press Enter or click the send button (Shift+Enter for a new line). The @ and / buttons under the box start a mention or a card, as typing the character does.
+Click a thread to open it, write in the reply box at the bottom and press Enter or click the send button (Shift+Enter for a new line). If you scroll up in a long thread, a **Latest** button takes you back down; it counts the replies that came in meanwhile. The @ and / buttons under the box start a mention or a card, as typing the character does.
 
 What you type is kept as a draft in this browser until you send it, even if you reload the page
 or open another thread.

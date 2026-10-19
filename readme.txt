@@ -124,6 +124,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * New: right after an assistant's answer you can simply write on – a follow-up without a new mention goes to it; if it needs no answer ("thanks"), the assistant stays quiet. Developers can switch this off with flurfunk_ai_follow_ups.
 * Changed: as in Slack, Enter sends and Shift+Enter makes a new line (Ctrl/Cmd+Enter still sends; on touch screens Enter makes a new line).
 * Changed: one icon set instead of text links and characters – in the sidebar, the thread's header (follow, mute, remind, summarize, close), the writing box (file, media library, @, /, send) and on messages, whose edit and delete now sit in a small bar on hover, with tooltips as in Slack.
+* Changed: in a thread the writing box stays at the bottom; scrolled up, a button brings you back to the newest message and counts what arrived meanwhile, as in Slack. Lists and threads show grey placeholders while they load and fade in; new replies slide in.
 * Changed: the app asks the server in the language of the person using it, and mails and pushes go out in the recipient's language.
 * Changed: Enter or Tab takes the first suggestion in the @ and / lists, as in Slack.
 * Changed: long messages are folded ("Show more"); an AI answer notifies only the person who asked.

@@ -48,6 +48,25 @@ test.describe( 'team', () => {
 		}
 	} );
 
+	test( 'scrolled up in a long thread: a button brings you back to the newest message', async ( { page } ) => {
+		const th = await api( page, 'threads', { channel: 'general', body: 'e2e Scrollknopf ' + Date.now() } );
+		for ( let i = 1; i <= 25; i++ ) {
+			await api( page, 'threads/' + th.id + '/messages', { body: 'Antwort ' + i + '\nmit einer zweiten Zeile' } );
+		}
+		await page.goto( APP + '&view=thread:' + th.id, { waitUntil: 'domcontentloaded' } );
+		const body = page.locator( '.ff-pane-body' );
+		await page.locator( '.ff-pane .ff-msg', { hasText: 'Antwort 25' } ).waitFor();
+		await expect( page.locator( '.ff-jump' ) ).not.toHaveClass( /is-shown/ );
+		await body.evaluate( ( b ) => { b.scrollTop = 0; } );
+		await expect( page.locator( '.ff-jump' ) ).toHaveClass( /is-shown/ );
+		await page.locator( '.ff-jump' ).click();
+		await expect.poll( () => body.evaluate( ( b ) => b.scrollHeight - b.scrollTop - b.clientHeight ) ).toBeLessThan( 5 );
+		await expect( page.locator( '.ff-jump' ) ).not.toHaveClass( /is-shown/ );
+		// The writing box stays in view at the bottom while scrolling.
+		await body.evaluate( ( b ) => { b.scrollTop = 0; } );
+		await expect( page.locator( '.ff-pane textarea' ) ).toBeInViewport();
+	} );
+
 	test( 'closing a thread restores the two-column layout', async ( { page } ) => {
 		await page.locator( '.ff-post' ).first().click();
 		await expect( page.locator( '.ff-pane' ) ).toBeVisible();
@@ -919,7 +938,7 @@ test.describe( 'full screen', () => {
 
 		// Phone width: one column, no sideways scrolling.
 		await page.setViewportSize( { width: 390, height: 844 } );
-		await page.reload();
+		await page.goto( cfg.fullUrl ); // The list, not the thread just opened (on a phone that fills the screen).
 		await page.waitForSelector( '.ff-app .ff-me-tile' );
 		expect( await page.evaluate( () => document.documentElement.scrollWidth <= window.innerWidth ) ).toBe( true );
 		await page.locator( '.ff-post' ).first().click();
