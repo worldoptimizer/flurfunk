@@ -1752,10 +1752,10 @@
 		};
 		const showSummary = async ( th ) => {
 			const body = $( '.ff-pane-body', pane );
-			let box = $( '.ff-summary', pane );
+			let box = $( '.ff-ai-summary', pane );
 			if ( ! box ) {
 				box = document.createElement( 'section' );
-				box.className = 'ff-summary';
+				box.className = 'ff-ai-summary';
 				box.setAttribute( 'aria-live', 'polite' );
 				body.prepend( box );
 			}
@@ -1805,7 +1805,7 @@
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div>' + thinkingHtml( th ) + '<div class="ff-reply-slot"></div></div>';
 			watchThinking( th );
 			if ( ui.summaries && ui.summaries[ th.id ] ) {
-				$( '.ff-pane-body', pane ).insertAdjacentHTML( 'afterbegin', '<section class="ff-summary" aria-live="polite">' + ui.summaries[ th.id ] + '</section>' );
+				$( '.ff-pane-body', pane ).insertAdjacentHTML( 'afterbegin', '<section class="ff-ai-summary" aria-live="polite">' + ui.summaries[ th.id ] + '</section>' );
 			}
 			const c = composer( {
 				key: 'thread:' + th.id,
@@ -1992,7 +1992,7 @@
 					showSummary( ui.current );
 				}
 			} else if ( 'summary-close' === act ) {
-				el.closest( '.ff-summary' ).remove();
+				el.closest( '.ff-ai-summary' ).remove();
 				if ( ui.summaries && ui.current ) {
 					delete ui.summaries[ ui.current.id ];
 				}
