@@ -2,7 +2,9 @@
 /**
  * AI assistants: limits. An assistant can never do more than the person who asks it, and never
  * more than its limit – "may at most act as" a role of the site, or (the default) simply as the
- * person asking. That holds for reading as much as for proposals.
+ * person asking – nor more than the channel's limit, if the channel sets one (as in Claude Tag,
+ * a channel decides what its assistant may). That holds for reading as much as for proposals.
+ * A channel can also set a monthly token budget shared by all assistants there.
  *
  * While an assistant works for someone, a map_meta_cap filter turns every check of that person
  * into "do_not_allow" if it needs a capability the limit's role lacks, or one that administers the
@@ -20,6 +22,9 @@ namespace Flurfunk\Modules\Ai;
 use Flurfunk\Access;
 
 defined( 'ABSPATH' ) || exit;
+
+const CHANNEL_RULES = 'flurfunk_ai_channel_rules'; // slug => { limit, budget }.
+const CHANNEL_USAGE = 'flurfunk_ai_channel_usage'; // slug => { month, tokens, requests, warned }.
 
 // Never while an assistant works, whatever the person asking or the limit may: administering the
 // site, people, code and unfiltered markup. Role names count too (current_user_can( 'administrator' )).
@@ -95,30 +100,120 @@ function limit_roles(): array {
 }
 
 /**
- * The name of an assistant's limit, for people ("the person asking" or a role).
+ * The roles that limit an assistant here: its own limit and the channel's (each '' = none).
  *
- * @param int $agent Assistant.
+ * @param int    $agent   Assistant.
+ * @param string $channel Channel slug ('' = none, e.g. a private conversation).
+ * @return string[] Role slugs, at most two.
  */
-function limit_label( int $agent ): string {
-	$slug = profile( $agent )['limit'];
-	return '' === $slug ? __( 'the person asking', 'flurfunk' ) : ( limit_roles()[ $slug ] ?? $slug );
+function limit_slugs( int $agent, string $channel = '' ): array {
+	return array_values( array_unique( array_filter( array( profile( $agent )['limit'], '' !== $channel ? channel_rule( $channel )['limit'] : '' ) ) ) );
 }
 
 /**
- * The capabilities an assistant's limit allows, or null for "as the person asking" (then only the
- * blocked ones are taken away). A limit naming a role that is gone or administers the site allows
- * nothing but reading.
+ * The name of an assistant's limit, for people ("the person asking", a role, or two roles).
  *
- * @param int $agent Assistant.
- * @return array<string, bool>|null
+ * @param int    $agent   Assistant.
+ * @param string $channel Channel slug.
  */
-function limit_caps( int $agent ): ?array {
-	$slug = profile( $agent )['limit'];
-	if ( '' === $slug ) {
-		return null;
-	}
+function limit_label( int $agent, string $channel = '' ): string {
+	$names = array_map( static fn ( string $s ): string => limit_roles()[ $s ] ?? $s, limit_slugs( $agent, $channel ) );
+	/* translators: 1, 2: role names */
+	return $names ? ( 2 === count( $names ) ? sprintf( __( '%1$s and %2$s', 'flurfunk' ), $names[0], $names[1] ) : $names[0] ) : __( 'the person asking', 'flurfunk' );
+}
+
+/**
+ * The capabilities a role allows as a limit (a role that is gone or administers the site: reading).
+ *
+ * @param string $slug Role.
+ * @return array<string, bool>
+ */
+function role_caps( string $slug ): array {
 	$role = isset( limit_roles()[ $slug ] ) ? get_role( $slug ) : null;
 	return $role ? array_map( 'boolval', (array) $role->capabilities ) : array( 'read' => true );
+}
+
+/**
+ * The capabilities an assistant's limits allow here – its own and the channel's, both – or null
+ * for "as the person asking" (then only the blocked ones are taken away).
+ *
+ * @param int    $agent   Assistant.
+ * @param string $channel Channel slug ('' = none).
+ * @return array<string, bool>|null
+ */
+function limit_caps( int $agent, string $channel = '' ): ?array {
+	$caps = null;
+	foreach ( limit_slugs( $agent, $channel ) as $slug ) {
+		$role = array_filter( role_caps( $slug ) );
+		$caps = null === $caps ? $role : array_intersect_key( $caps, $role );
+	}
+	return $caps;
+}
+
+/**
+ * What a channel sets for AI assistants: a limit (a role, '' = none) and a monthly token budget
+ * shared by all assistants there (0 = none).
+ *
+ * @param string $slug Channel.
+ * @return array{limit:string, budget:int}
+ */
+function channel_rule( string $slug ): array {
+	$r = ( (array) get_option( CHANNEL_RULES, array() ) )[ $slug ] ?? array();
+	$l = (string) ( $r['limit'] ?? '' );
+	return array(
+		'limit'  => isset( limit_roles()[ $l ] ) ? $l : '',
+		'budget' => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+	);
+}
+
+/**
+ * Tokens the assistants used in a channel this month.
+ *
+ * @param string $slug Channel.
+ * @return array{month:string, tokens:int, requests:int, warned:bool}
+ */
+function channel_usage( string $slug ): array {
+	$u     = ( (array) get_option( CHANNEL_USAGE, array() ) )[ $slug ] ?? array();
+	$month = wp_date( 'Y-m' );
+	$u     = is_array( $u ) && ( $u['month'] ?? '' ) === $month ? $u : array();
+	return array(
+		'month'    => $month,
+		'tokens'   => (int) ( $u['tokens'] ?? 0 ),
+		'requests' => (int) ( $u['requests'] ?? 0 ),
+		'warned'   => ! empty( $u['warned'] ),
+	);
+}
+
+/**
+ * Count a run in a channel.
+ *
+ * @param string $slug   Channel.
+ * @param int    $tokens Tokens.
+ * @param bool   $warned The budget notice was posted.
+ */
+function add_channel_usage( string $slug, int $tokens, bool $warned = false ): void {
+	if ( '' === $slug ) {
+		return;
+	}
+	$all          = (array) get_option( CHANNEL_USAGE, array() );
+	$u            = channel_usage( $slug );
+	$all[ $slug ] = array(
+		'month'    => $u['month'],
+		'tokens'   => $u['tokens'] + max( 0, $tokens ),
+		'requests' => $u['requests'] + ( $tokens > 0 ? 1 : 0 ),
+		'warned'   => $u['warned'] || $warned,
+	);
+	update_option( CHANNEL_USAGE, $all, false );
+}
+
+/**
+ * Is a channel's budget used up this month?
+ *
+ * @param string $slug Channel.
+ */
+function channel_spent( string $slug ): bool {
+	$b = '' !== $slug ? channel_rule( $slug )['budget'] : 0;
+	return $b > 0 && channel_usage( $slug )['tokens'] >= $b;
 }
 
 /**
@@ -145,10 +240,11 @@ function limits( ?array $push = null, bool $pop = false ): array {
  * @param int      $agent   Assistant.
  * @param int      $user_id The person it works for.
  * @param callable $fn      What to run.
+ * @param string   $channel Channel slug, for the channel's limit ('' = none).
  * @return mixed What $fn returns.
  */
-function with_limit( int $agent, int $user_id, callable $fn ) {
-	$caps = limit_caps( $agent );
+function with_limit( int $agent, int $user_id, callable $fn, string $channel = '' ) {
+	$caps = limit_caps( $agent, $channel );
 	limits(
 		array(
 			'user'  => $user_id,

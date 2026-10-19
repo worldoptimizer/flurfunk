@@ -164,6 +164,19 @@ function agents(): array {
 }
 
 /**
+ * The channel a thread is in, for channel rules ('' for a private conversation).
+ *
+ * @param object $thread Thread row.
+ */
+function channel_slug( object $thread ): string {
+	if ( ! empty( $thread->private_to ) ) {
+		return '';
+	}
+	$c = Store\channel( (int) $thread->channel_id );
+	return $c ? (string) $c->slug : '';
+}
+
+/**
  * Instructions for a channel ('' = none).
  *
  * @param string $slug Channel.
@@ -832,7 +845,16 @@ function run( int $thread_id, int $message_id, int $agent ) {
 			return reply( $thread_id, $agent, in_locale( $lang, static fn () => __( 'My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ) ) );
 		}
 		// Everything it reads and proposes: within what the person asking may and its limit allows.
-		$answer = with_limit( $agent, answering( $agent ), static fn () => flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) ) );
+		$slug = channel_slug( $thread );
+		if ( channel_spent( $slug ) ) {
+			if ( channel_usage( $slug )['warned'] ) {
+				return null;
+			}
+			add_channel_usage( $slug, 0, true );
+			/* translators: %s: channel */
+			return reply( $thread_id, $agent, in_locale( $lang, static fn () => sprintf( __( 'The AI budget for #%s is used up for this month. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ), $slug ) ) );
+		}
+		$answer = with_limit( $agent, answering( $agent ), static fn () => flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) ), $slug );
 		$ch     = Store\channel( (int) $thread->channel_id );
 		log_run(
 			array(
@@ -852,6 +874,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		}
 		$before = usage( $agent )['tokens'];
 		add_usage( $agent, $answer['tokens'] );
+		add_channel_usage( $slug, (int) $answer['tokens'] );
 		$text  = trim( $answer['text'] );
 		$plain = empty( $answer['ideas'] ) && empty( $answer['drafts'] );
 		// Mentioned (or in private, where every message is for it), it never stays silent.
@@ -1136,7 +1159,7 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 						$ideas[] = add_proposal( $ability, (array) $call->getArgs(), $agent, (int) $context['thread'] );
 						$reply   = array( 'status' => 'proposed', 'note' => 'Not done yet: it appears as a card under your answer, and a person decides whether to run it.' );
 					} else {
-						$reply = array( 'status' => 'not_allowed', 'note' => sprintf( 'Not proposed: the person asking may not do this, or your limit (%s) does not allow it. Say so plainly, without a card; an administrator can change your limit under Settings → Flurfunk → AI assistants.', limit_label( $agent ) ) );
+						$reply = array( 'status' => 'not_allowed', 'note' => sprintf( 'Not proposed: the person asking may not do this, or your limit (%s) does not allow it. Say so plainly, without a card; an administrator can change your limit under Settings → Flurfunk → AI assistants.', limit_label( $agent, (string) ( $context['channel'] ?? '' ) ) ) );
 					}
 					$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( new \WordPress\AiClient\Tools\DTO\FunctionResponse( $call->getId(), $call->getName(), $reply ) );
 				} else {
@@ -1298,9 +1321,9 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 					: 'What you can do here: answer questions about this thread, check or proofread the text of a linked post when it is given, summarize, suggest wording or next steps. What you cannot do: change anything on the website, open links or files, read other threads, remember earlier conversations. If asked what you can do, say this briefly.',
 				proposal_abilities( $agent ) ? 'Some of your tools change something on the site. Calling them does not do it: it puts a card under your answer, and a person decides with a button. Use them when the person asks for it or it clearly helps, then say in one sentence what you proposed; never claim it is done. A card exists only if you call the tool in this answer: when you say you propose something, call the tool for it before you answer – never announce a card you did not create.' : '',
 				tools( $agent ) || proposal_abilities( $agent ) || profile( $agent )['posts']
-					? ( '' === profile( $agent )['limit']
+					? ( ! limit_slugs( $agent, channel_slug( $thread ) )
 						? sprintf( 'You work with the rights of %s, the person asking, and never administer the site (users, plugins, settings). When something is refused or not found for lack of rights, say so plainly.', $asker_name )
-						: sprintf( 'You work with the rights of %1$s, the person asking, but at most those of the role "%2$s" on this site, and never administer the site (users, plugins, settings). What that role may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit as "%2$s", and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, limit_label( $agent ) ) )
+						: sprintf( 'You work with the rights of %1$s, the person asking, but at most with what the role %2$s may on this site (your limit here), and never administer the site (users, plugins, settings). What that limit may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit (%2$s), and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, '"' . limit_label( $agent, channel_slug( $thread ) ) . '"' ) )
 					: '',
 				profile( $agent )['drafts'] && function_exists( 'wp_get_ability' ) && wp_get_ability( DRAFT_TOOLS[0] ) ? 'You can write drafts: flurfunk/create-draft makes one (never published; the person asking is its author), flurfunk/update-draft changes a draft made that way as long as nobody else has worked on it since. Use them when the person asks for a draft, an article, a text for the site or changes to the draft you wrote; do it, do not just announce it. Then say in one sentence what you wrote – a card with the draft appears under your answer. Write the text plainly: paragraphs separated by a blank line, "- " for lists, "## " for subheadings, no HTML. Files in the thread are shown as [File #ID: name]; when the person wants an image in the draft, pass its ID as featured_image (the main picture) or in images. If adding an image is refused, write the draft without it and say why. You can never publish; say so if asked.' : '',
 				in_array( \Flurfunk\Changes\NAME, array_map( static fn ( $a ) => $a->get_name(), proposal_abilities( $agent ) ), true ) ? 'To change existing posts (correct mistakes, set a title, excerpt, categories, tags or featured image), call flurfunk/update-posts once with all posts – it becomes one card with before and after, and a person applies it. Read the post first. For corrections in the text use replace: find = the exact wording as the post shows it (a short snippet that is unique, within one paragraph), with = the corrected wording. Change only what was asked for or what is clearly wrong; never invent facts. If a text is not found, quote it exactly and try again.' : '',
@@ -1321,9 +1344,10 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
 		'prompt' => options()['redact'] ? redact( $prompt ) : $prompt,
-		'asker'  => $asker,
-		'thread' => (int) $thread->id,
-		'posts'  => $read,
+		'asker'   => $asker,
+		'thread'  => (int) $thread->id,
+		'channel' => channel_slug( $thread ),
+		'posts'   => $read,
 	);
 }
 
@@ -1483,8 +1507,12 @@ function summarize( int $thread_id, int $user_id, int $since = 0 ) {
 			$task = sprintf( '%1$s has read this thread up to the message of %2$s and asks what happened since. Start with "Since …" and summarize only the newer messages (the older ones are context) – what was decided, what is open, who does what next; at most four short points.', $name, wp_date( 'j.n. H:i', (int) strtotime( $after . ' UTC' ) ) );
 		}
 	}
-	$context = with_limit( $agent, $user_id, static fn () => flurfunk_as( $agent, static fn () => context( $thread, 0, $agent, $task, $user_id ) ) );
-	$answer  = is_wp_error( $context ) ? $context : with_limit( $agent, $user_id, static fn () => flurfunk_as( $agent, static fn () => answer( $thread, 0, $agent, $context ) ) );
+	$slug = channel_slug( $thread );
+	if ( channel_spent( $slug ) ) {
+		return new \WP_Error( 'flurfunk_ai_budget', __( 'The AI budget for this month is used up.', 'flurfunk' ), array( 'status' => 429 ) );
+	}
+	$context = with_limit( $agent, $user_id, static fn () => flurfunk_as( $agent, static fn () => context( $thread, 0, $agent, $task, $user_id ) ), $slug );
+	$answer  = is_wp_error( $context ) ? $context : with_limit( $agent, $user_id, static fn () => flurfunk_as( $agent, static fn () => answer( $thread, 0, $agent, $context ) ), $slug );
 	log_run(
 		array(
 			'agent'   => $agent,
@@ -1501,6 +1529,7 @@ function summarize( int $thread_id, int $user_id, int $since = 0 ) {
 		return $answer;
 	}
 	add_usage( $agent, (int) $answer['tokens'] );
+	add_channel_usage( $slug, (int) $answer['tokens'] );
 	return array(
 		'text'  => trim( (string) $answer['text'] ),
 		'agent' => $agent,
@@ -1700,11 +1729,32 @@ function render_section(): void {
 			</fieldset>
 		<?php endforeach; ?>
 		<details style="max-width:46rem">
-			<summary><?php esc_html_e( 'Instructions per channel', 'flurfunk' ); ?></summary>
-			<p class="description"><?php esc_html_e( 'Added to the assistant\'s own instructions in that channel.', 'flurfunk' ); ?></p>
+			<summary><?php esc_html_e( 'Per channel: instructions, limit, budget', 'flurfunk' ); ?></summary>
+			<p class="description"><?php esc_html_e( 'Instructions are added to each assistant\'s own in that channel. A limit caps every assistant there, on top of its own – e.g. in a channel guest authors read, so it cannot quote internal drafts. The budget counts all assistants in the channel together.', 'flurfunk' ); ?></p>
 			<?php foreach ( $channels as $c ) : ?>
-				<p><label for="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>">#<?php echo esc_html( $c->slug ); ?></label><br>
-					<textarea id="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>" name="ai_channels[<?php echo esc_attr( $c->slug ); ?>]" rows="2" class="large-text"><?php echo esc_textarea( (string) ( $notes[ $c->slug ] ?? '' ) ); ?></textarea></p>
+				<?php
+				$rule = channel_rule( (string) $c->slug );
+				$cu   = channel_usage( (string) $c->slug );
+				?>
+				<fieldset style="margin:0 0 1em;padding:10px 12px;border:1px solid #dcdcde;border-radius:8px">
+					<legend style="padding:0 4px;font-weight:600">#<?php echo esc_html( $c->slug ); ?></legend>
+					<p style="margin:0 0 6px"><label for="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>"><?php esc_html_e( 'Instructions', 'flurfunk' ); ?></label><br>
+						<textarea id="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>" name="ai_channels[<?php echo esc_attr( $c->slug ); ?>]" rows="2" class="large-text"><?php echo esc_textarea( (string) ( $notes[ $c->slug ] ?? '' ) ); ?></textarea></p>
+					<p class="ff-ai-row" style="margin:0">
+						<label><?php esc_html_e( 'At most as', 'flurfunk' ); ?>
+							<select name="ai_rules[<?php echo esc_attr( $c->slug ); ?>][limit]">
+								<option value="" <?php selected( $rule['limit'], '' ); ?>><?php esc_html_e( 'no limit of its own', 'flurfunk' ); ?></option>
+								<?php foreach ( limit_roles() as $slug => $label ) : ?>
+									<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $rule['limit'], $slug ); ?>><?php echo esc_html( $label ); ?></option>
+								<?php endforeach; ?>
+							</select></label>
+						<label><?php esc_html_e( 'Monthly budget', 'flurfunk' ); ?> <input type="number" min="0" step="1000" style="width:8em" name="ai_rules[<?php echo esc_attr( $c->slug ); ?>][budget]" value="<?php echo (int) $rule['budget']; ?>"> <?php esc_html_e( 'tokens (0 = no limit)', 'flurfunk' ); ?></label>
+						<span class="description"><?php
+							/* translators: 1: tokens, 2: number of answers */
+							printf( esc_html__( 'This month: %1$s tokens in %2$s answers.', 'flurfunk' ), esc_html( number_format_i18n( $cu['tokens'] ) ), esc_html( number_format_i18n( $cu['requests'] ) ) );
+						?></span>
+					</p>
+				</fieldset>
 			<?php endforeach; ?>
 		</details>
 		<?php submit_button( __( 'Save AI assistants', 'flurfunk' ) ); ?>
@@ -1780,6 +1830,20 @@ function save(): void {
 		}
 	}
 	update_option( CHANNELS, $keep, false );
+	$rules_in = isset( $_POST['ai_rules'] ) && is_array( $_POST['ai_rules'] ) ? wp_unslash( $_POST['ai_rules'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- checked below (known roles, numbers).
+	$rules    = array();
+	foreach ( Store\real_channels() as $c ) {
+		$r     = (array) ( $rules_in[ $c->slug ] ?? array() );
+		$limit = sanitize_key( (string) ( $r['limit'] ?? '' ) );
+		$rule  = array(
+			'limit'  => isset( limit_roles()[ $limit ] ) ? $limit : '',
+			'budget' => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+		);
+		if ( '' !== $rule['limit'] || $rule['budget'] ) {
+			$rules[ $c->slug ] = $rule;
+		}
+	}
+	update_option( CHANNEL_RULES, $rules, false );
 	$o = isset( $_POST['ai_options'] ) && is_array( $_POST['ai_options'] ) ? wp_unslash( $_POST['ai_options'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only checked for presence.
 	update_option(
 		OPTIONS,

@@ -441,7 +441,7 @@ function run_proposal( array $ref, array $card, int $user_id, array $choice = ar
 	wp_set_current_user( $user_id );
 	try {
 		// With the clicker's rights, within the limit of the assistant that proposed it.
-		$result = with_limit( (int) $p['agent'], $user_id, static fn () => $ability->execute( $input ) );
+		$result = with_limit( (int) $p['agent'], $user_id, static fn () => $ability->execute( $input ), proposal_channel( $p ) );
 	} finally {
 		wp_set_current_user( $me );
 	}
@@ -479,7 +479,7 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 	$me = get_current_user_id();
 	wp_set_current_user( $user_id );
 	try {
-		$result = with_limit( (int) $p['agent'], $user_id, static fn () => \Flurfunk\Changes\undo( (array) $p['outcome'] ) );
+		$result = with_limit( (int) $p['agent'], $user_id, static fn () => \Flurfunk\Changes\undo( (array) $p['outcome'] ), proposal_channel( $p ) );
 	} finally {
 		wp_set_current_user( $me );
 	}
@@ -493,6 +493,16 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 		)
 	);
 	return null;
+}
+
+/**
+ * The channel a proposal was made in (for the channel's limit; '' if private or gone).
+ *
+ * @param array $p Proposal.
+ */
+function proposal_channel( array $p ): string {
+	$t = \Flurfunk\Store\thread_row( (int) ( $p['thread'] ?? 0 ) );
+	return $t ? channel_slug( $t ) : '';
 }
 
 /**

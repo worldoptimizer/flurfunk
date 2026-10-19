@@ -57,6 +57,11 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 	}
 	require_once __DIR__ . '/inc/schema.php';
 	Flurfunk\Schema\drop();
+	// Settings, log, proposals, channel rules and memory of the AI assistants.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- runs once on uninstall.
+	foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT option_name FROM %i WHERE option_name LIKE %s', $wpdb->options, $wpdb->esc_like( 'flurfunk_ai_' ) . '%' ) ) as $flurfunk_option ) {
+		delete_option( (string) $flurfunk_option );
+	}
 
 	// Assistant accounts exist only for Flurfunk. Their conversations are gone with the tables and
 	// their Flurfunk files above; anything they put into the media library goes to an administrator.

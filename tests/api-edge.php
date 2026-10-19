@@ -1453,7 +1453,7 @@ $check( 'a channel that needs a capability the limit lacks is closed while the a
 $lim_set( '' );
 $check( 'the assistant is told whose rights it has and that it never administers', str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), 0, $ai_bot )['system'], 'never administer the site' ) );
 $lim_set( 'author' );
-$check( '… and its limit, with where to change it', (bool) preg_match( '/at most those of the role "[^"]+".*Settings → Flurfunk → AI assistants/', Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), 0, $ai_bot )['system'] ) );
+$check( '… and its limit, with where to change it', (bool) preg_match( '/at most with what the role "[^"]+" may.*Settings → Flurfunk → AI assistants/', Flurfunk\Modules\Ai\context( Store\thread_row( $ai_t ), 0, $ai_bot )['system'] ) );
 if ( function_exists( 'wp_get_ability' ) ) {
 	$as( $lim_ed );
 	$lim_in2 = array( 'channel' => 'ff-test-lim', 'title' => 'Grenzfall', 'text' => 'x' );
@@ -1487,6 +1487,52 @@ ob_start();
 Flurfunk\Modules\Ai\render_section();
 $lim_html = (string) ob_get_clean();
 $check( 'the settings show "May at most act as" with the roles, without Administrator, and the limit in the summary line', str_contains( $lim_html, 'name="ai[' . $ai_bot . '][limit]"' ) && (bool) preg_match( '/<option value="author"\s+selected/', $lim_html ) && ! str_contains( $lim_html, '<option value="administrator"' ) && str_contains( $lim_html, 'At most as: ' ) );
+// A channel's limit caps every assistant there, on top of its own; its budget counts them all.
+$cr_old = get_option( 'flurfunk_ai_channel_rules', null );
+$lim_set( '' );
+update_option( 'flurfunk_ai_channel_rules', array( 'ff-test-lim' => array( 'limit' => 'author' ) ) );
+$cr_a = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => '' !== Flurfunk\Modules\Ai\post_text( $lim_draft, $lim_ed ), 'ff-test-lim' );
+$cr_b = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => '' !== Flurfunk\Modules\Ai\post_text( $lim_draft, $lim_ed ), 'ff-test' );
+$check( 'a channel limit: in a channel limited to Author an editor\'s assistant does not see others\' drafts – in another channel it does', ! $cr_a && $cr_b, array( $cr_a, $cr_b ) );
+$lim_set( 'contributor' );
+update_option( 'flurfunk_ai_channel_rules', array( 'ff-test-lim' => array( 'limit' => 'author' ) ) );
+$cr_c = Flurfunk\Modules\Ai\with_limit( $ai_bot, $lim_ed, static fn () => array( user_can( $lim_ed, 'upload_files' ), user_can( $lim_ed, 'edit_posts' ) ), 'ff-test-lim' );
+$check( '… both limits count: Contributor and Author leave what both allow (no uploads)', array( false, true ) === $cr_c && str_contains( Flurfunk\Modules\Ai\limit_label( $ai_bot, 'ff-test-lim' ), ' and ' ), $cr_c );
+$lim_set( '' );
+update_option( 'flurfunk_ai_channel_rules', array( 'ff-test' => array( 'budget' => 100 ) ) );
+delete_option( 'flurfunk_ai_channel_usage' );
+Flurfunk\Modules\Ai\add_channel_usage( 'ff-test', 150 );
+add_filter( 'flurfunk_ai_pre_answer', $cr_fake = static fn () => array( 'text' => 'Sollte nicht kommen.', 'tokens' => 5 ), 20 );
+$as( $team );
+$cr_t  = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Budget?" ) );
+$cr_r1 = Flurfunk\Modules\Ai\run( $cr_t, 0, $ai_bot );
+$cr_m  = Store\add_message( $cr_t, array( 'body' => "<@$ai_bot> Und jetzt?" ) );
+$cr_r2 = Flurfunk\Modules\Ai\run( $cr_t, $cr_m, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $cr_fake, 20 );
+$cr_msgs = array_values( array_filter( Store\full_thread( $cr_t, $team )['messages'], static fn ( $m ) => $ai_bot === (int) $m['author'] && 'message' === $m['type'] ) );
+$check( 'a channel budget used up: one note in the channel, then quiet until next month', is_int( $cr_r1 ) && null === $cr_r2 && 1 === count( $cr_msgs ) && str_contains( $cr_msgs[0]['text'], '#ff-test' ), $cr_msgs );
+update_option( 'flurfunk_ai_channel_rules', array() );
+delete_option( 'flurfunk_ai_channel_usage' );
+add_filter( 'flurfunk_ai_pre_answer', $cr_fake2 = static fn () => array( 'text' => 'Antwort.', 'tokens' => 70 ), 20 );
+$cr_t2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Zählt das?" ) );
+Flurfunk\Modules\Ai\run( $cr_t2, 0, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $cr_fake2, 20 );
+$check( '… and each answer counts in its channel', 70 === Flurfunk\Modules\Ai\channel_usage( 'ff-test' )['tokens'] );
+$_POST = array( '_wpnonce' => wp_create_nonce( 'flurfunk_ai' ), '_wp_http_referer' => '/', 'ai_rules' => array( 'ff-test' => array( 'limit' => 'administrator', 'budget' => '5000' ), 'ff-test-lim' => array( 'limit' => 'contributor', 'budget' => '-3' ), 'no-such' => array( 'limit' => 'author' ) ) );
+$_REQUEST = $_POST;
+add_filter( 'wp_redirect', $cr_stop = static function () { throw new RuntimeException( 'redirect' ); } );
+try {
+	Flurfunk\Modules\Ai\save();
+} catch ( RuntimeException $e ) {
+}
+remove_filter( 'wp_redirect', $cr_stop );
+$_POST = array();
+$_REQUEST = array();
+$cr_saved = (array) get_option( 'flurfunk_ai_channel_rules' );
+ksort( $cr_saved );
+$check( 'channel rules from the form: no administering role, no negative budget, no unknown channel', array( 'ff-test' => array( 'limit' => '', 'budget' => 5000 ), 'ff-test-lim' => array( 'limit' => 'contributor', 'budget' => 0 ) ) === $cr_saved, $cr_saved );
+null === $cr_old ? delete_option( 'flurfunk_ai_channel_rules' ) : update_option( 'flurfunk_ai_channel_rules', $cr_old );
+delete_option( 'flurfunk_ai_channel_usage' );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";
