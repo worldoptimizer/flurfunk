@@ -1345,7 +1345,9 @@
 			if ( 'channel' === kind ) {
 				const c = channelOf( a );
 				// AI assistants that answer here when mentioned: say so in the header.
-				const agents = c && c.agents && c.agents.length ? t( 'AI on mention: %s' ).replace( '%s', c.agents.map( ( id ) => person( id ).name ).join( ', ' ) ) : '';
+				const auto = ( c && c.auto ) || [];
+				const onMention = c && c.agents ? c.agents.filter( ( id ) => ! auto.includes( id ) ) : [];
+				const agents = [ auto.length ? t( 'AI answers new threads: %s' ).replace( '%s', auto.map( ( id ) => person( id ).name ).join( ', ' ) ) : '', onMention.length ? t( 'AI on mention: %s' ).replace( '%s', onMention.map( ( id ) => person( id ).name ).join( ', ' ) ) : '' ].filter( Boolean ).join( ' · ' );
 				return { title: '#' + chName( a ), sub: [ c ? c.topic : '', agents ].filter( Boolean ).join( ' · ' ), args: { channel: a }, channel: a };
 			}
 			if ( 'target' === kind ) {

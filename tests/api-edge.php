@@ -1072,6 +1072,15 @@ delete_option( 'flurfunk_ai_settings' );
 list( $s, $x ) = $ai_sum_none;
 $check( 'no assistant in the channel: a clear refusal', 400 === $s && 'flurfunk_ai_none' === ( $x['code'] ?? '' ), array( $s, $x ) );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'instructions' => 'Sei knapp.' ) );
+// A channel where the agent answers every new thread.
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'auto' => array( 'ff-test', 'general' ) ) );
+$check( 'auto-answer only in the assistant\'s own channels', array( 'ff-test' ) === Flurfunk\Modules\Ai\profile( $ai_bot )['auto'] );
+$ai_at = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Frage ohne Erwähnung' ) );
+$check( '… there a new thread asks it without a mention', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ai_at, 0, $ai_bot ) ) && in_array( $ai_bot, Store\format_channel( Store\channel_by_slug( 'ff-test' ) )['auto'] ?? array(), true ) );
+$ai_ar = Store\add_message( $ai_at, array( 'body' => 'Eine Antwort ohne Erwähnung' ) );
+$check( '… but a reply without a mention does not', ! wp_next_scheduled( 'flurfunk_ai_run', array( $ai_at, $ai_ar, $ai_bot ) ) );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+delete_transient( 'flurfunk_ai_busy_' . $ai_at );
 // Edge cases.
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'budget' => 0 ) );
 delete_user_meta( $ai_bot, 'flurfunk_ai_usage' );

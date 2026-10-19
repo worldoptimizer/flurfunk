@@ -111,6 +111,7 @@ function all(): array {
 		'Could not send.' => __( 'Could not send.', 'flurfunk' ),
 		'Loading …' => __( 'Loading …', 'flurfunk' ),
 		'Channels' => __( 'Channels', 'flurfunk' ),
+		'AI answers new threads: %s' => __( 'AI answers new threads: %s', 'flurfunk' ),
 		'AI on mention: %s' => __( 'AI on mention: %s', 'flurfunk' ),
 		'Post' => __( 'Post', 'flurfunk' ),
 		'All conversations about this post, from every channel' => __( 'All conversations about this post, from every channel', 'flurfunk' ),

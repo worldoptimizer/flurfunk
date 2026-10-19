@@ -272,6 +272,9 @@ before anything is sent (on by default), keep a log of the last 100 answers with
 where, model, tokens, tools), and offer **Summarize** in threads – a private summary for the person
 who asks, never posted.
 
+For a help channel (e.g. #ask-ai) an assistant can answer every new thread there without being
+mentioned; replies in it still need a mention.
+
 Abilities that change something (e.g. starting a task, updating an SEO title) can be given to an
 assistant as **proposals**: it never runs them itself, but puts a card under its answer, and a
 person clicks **Run** – with their own rights – or **Dismiss**.

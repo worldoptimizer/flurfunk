@@ -79,6 +79,7 @@ function profile( int $user_id ): array {
 		'posts'        => ! array_key_exists( 'posts', $p ) || ! empty( $p['posts'] ),
 		'tools'        => array_values( array_map( 'strval', (array) ( $p['tools'] ?? array() ) ) ),
 		'proposals'    => array_values( array_map( 'strval', (array) ( $p['proposals'] ?? array() ) ) ),
+		'auto'         => array_values( array_map( 'strval', (array) ( $p['auto'] ?? array() ) ) ),
 	);
 }
 
@@ -101,6 +102,8 @@ function save_profile( int $user_id, array $in ): array {
 		'posts'        => ! empty( $in['posts'] ),
 		'tools'        => array_values( array_intersect( array_keys( readonly_abilities() ), array_map( 'strval', (array) ( $in['tools'] ?? array() ) ) ) ),
 		'proposals'    => array_values( array_intersect( array_keys( writable_abilities() ), array_map( 'strval', (array) ( $in['proposals'] ?? array() ) ) ) ),
+		// Channels where it answers every new thread without being mentioned (only its own channels).
+		'auto'         => array_values( array_intersect( array_map( 'sanitize_key', (array) ( $in['channels'] ?? array() ) ), $slugs, array_map( 'sanitize_key', (array) ( $in['auto'] ?? array() ) ) ) ),
 	);
 	update_user_meta( $user_id, PROFILE, $p );
 	return profile( $user_id );
@@ -281,9 +284,18 @@ function may_answer( int $agent, int $author, object $channel ): bool {
  * @param object|null $thread Thread row.
  */
 function thread_created( $thread ): void {
-	if ( $thread ) {
-		queue( $thread, 0, (int) $thread->author_id, (string) $thread->body );
+	if ( ! $thread ) {
+		return;
 	}
+	$text    = (string) $thread->body;
+	$channel = Store\channel( (int) $thread->channel_id );
+	// Channels where an agent answers every new thread: as if it had been mentioned (once).
+	foreach ( $channel ? agents() : array() as $agent ) {
+		if ( in_array( (string) $channel->slug, profile( $agent )['auto'], true ) && ! str_contains( $text, '<@' . $agent . '>' ) ) {
+			$text .= ' <@' . $agent . '>';
+		}
+	}
+	queue( $thread, 0, (int) $thread->author_id, $text );
 }
 
 /**
@@ -414,6 +426,7 @@ function thread_view( array $view, object $thread ): array {
 function channel_view( array $view, object $channel ): array {
 	$view['agents']  = array_values( array_filter( agents(), static fn ( int $id ): bool => in_array( $channel->slug, profile( $id )['channels'], true ) ) );
 	$view['summary'] = $view['agents'] && options()['summary'] && current_user_can( CAP );
+	$view['auto']    = array_values( array_filter( $view['agents'], static fn ( int $id ): bool => in_array( $channel->slug, profile( $id )['auto'], true ) ) );
 	return $view;
 }
 
@@ -1032,6 +1045,11 @@ function render_section(): void {
 					<?php foreach ( $channels as $c ) : ?>
 						<label style="margin-right:1em;white-space:nowrap"><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[channels][]" value="<?php echo esc_attr( $c->slug ); ?>" <?php checked( in_array( $c->slug, $p['channels'], true ) ); ?>> #<?php echo esc_html( $c->slug ); ?></label>
 					<?php endforeach; ?></p>
+				<p><span><?php esc_html_e( 'Answers every new thread, without a mention, in', 'flurfunk' ); ?>:</span>
+					<?php foreach ( $channels as $c ) : ?>
+						<label style="margin-right:1em;white-space:nowrap"><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[auto][]" value="<?php echo esc_attr( $c->slug ); ?>" <?php checked( in_array( $c->slug, $p['auto'], true ) ); ?>> #<?php echo esc_html( $c->slug ); ?></label>
+					<?php endforeach; ?>
+					<br><span class="description"><?php esc_html_e( 'For a channel like #ask-ai. Only channels ticked above count; replies still need a mention.', 'flurfunk' ); ?></span></p>
 				<p><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[guests]" value="1" <?php checked( $p['guests'] ); ?>> <?php esc_html_e( 'Guests may ask it too', 'flurfunk' ); ?></label><br>
 					<label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[posts]" value="1" <?php checked( $p['posts'] ); ?>> <?php esc_html_e( 'May read the text of the post a thread is about (only if the person asking may read it)', 'flurfunk' ); ?></label></p>
 				<?php $abilities = readonly_abilities(); ?>
