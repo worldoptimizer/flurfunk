@@ -1052,7 +1052,16 @@ function render_log(): void {
 					<td><?php echo esc_html( $name( (int) $e['agent'] ) ); ?></td>
 					<td><?php echo esc_html( $e['asker'] ? $name( (int) $e['asker'] ) : '–' ); ?></td>
 					<td>#<?php echo esc_html( (string) $e['channel'] ); ?></td>
-					<td><?php echo '' !== (string) $e['error'] ? '<span style="color:#b32d2e">' . esc_html( (string) $e['error'] ) . '</span>' : esc_html( (string) $e['model'] ); ?></td>
+					<td><?php
+						echo '' !== (string) $e['error'] ? '<span style="color:#b32d2e">' . esc_html( (string) $e['error'] ) . '</span>' : esc_html( (string) $e['model'] );
+						if ( 'summary' === ( $e['kind'] ?? '' ) ) {
+							echo '<br><small>' . esc_html__( 'Summary', 'flurfunk' ) . '</small>';
+						}
+						if ( ! empty( $e['tools'] ) ) {
+							/* translators: %s: tool names */
+							echo '<br><small>' . esc_html( sprintf( __( 'Looked up: %s', 'flurfunk' ), implode( ', ', array_unique( (array) $e['tools'] ) ) ) ) . '</small>';
+						}
+					?></td>
 					<td><?php echo esc_html( number_format_i18n( (int) $e['tokens'] ) ); ?></td>
 				</tr>
 			<?php endforeach; ?>

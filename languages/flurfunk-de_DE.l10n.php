@@ -223,6 +223,7 @@ return array(
 		'Log in' => 'Anmelden',
 		'Logo' => 'Logo',
 		'Look' => 'Aussehen',
+		'Looked up: %s' => 'Nachgeschlagen: %s',
 		'Make it a task' => 'Zur Aufgabe machen',
 		'Manage' => 'Verwalten',
 		'Manage options' => 'Optionen verwalten',
