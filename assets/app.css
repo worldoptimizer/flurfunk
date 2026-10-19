@@ -693,3 +693,30 @@ dialog.ff-lightbox::backdrop { background: rgb(0 0 0 / .5); }
 .ff-root .ff-jump-dock .ff-jump.is-shown { transform: translateY(-100%); }
 .ff-root .ff-post.is-new { animation: ff-in .25s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .ff-root .ff-post.is-new { animation: none; } }
+
+/* Reactions: small capsules under a thread or reply, yours outlined; the smiley adds one. */
+.ff-root .ff-reacts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.ff-root .ff-react { position: relative; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px 0 7px; border: 1px solid var(--ff-line); border-radius: 999px; background: var(--ff-soft); color: var(--ff-ink); font: inherit; font-size: 12px; line-height: 1; cursor: pointer; }
+.ff-root .ff-react:hover { border-color: var(--ff-muted); background: var(--ff-paper); }
+.ff-root .ff-react.is-mine { border-color: var(--ff-accent); background: var(--ff-ai-soft); color: var(--ff-accent-text); }
+.ff-root .ff-react b { font-weight: 700; }
+.ff-root .ff-emoji, .ff-root .ff-emoji-cell { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--ff-sans, sans-serif); }
+.ff-root .ff-react .ff-emoji { font-size: 15px; }
+.ff-root .ff-react-add { width: 30px; padding: 0; justify-content: center; background: none; color: var(--ff-muted); }
+.ff-root .ff-react-add .ff-i { width: 16px; height: 16px; }
+.ff-root .ff-post { position: relative; }
+.ff-root .ff-post > .ff-actions { top: 6px; right: 14px; }
+.ff-root .ff-post:hover > .ff-actions, .ff-root .ff-post:focus-within > .ff-actions { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .ff-root .ff-post > .ff-actions { display: none; } }
+
+/* The emoji picker: the most used first, then all, with a search. */
+.ff-root .ff-emoji-pop { position: fixed; z-index: 100000; width: 344px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; border: 1px solid var(--ff-line); border-radius: 12px; background: var(--ff-paper); color: var(--ff-ink); box-shadow: 0 12px 32px rgb(0 0 0 / .18); overflow: hidden; }
+.ff-root .ff-emoji-q { flex: none; margin: 10px 10px 4px; height: 34px; padding: 0 10px; border: 1px solid var(--ff-line); border-radius: 8px; background: var(--ff-paper); color: var(--ff-ink); font: inherit; font-size: 14px; }
+.ff-root .ff-emoji-q:focus { border-color: var(--ff-accent); outline: 0; box-shadow: none; }
+.ff-root .ff-emoji-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 10px; }
+.ff-root .ff-emoji-h { margin: 10px 4px 4px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ff-muted); }
+.ff-root .ff-emoji-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; }
+.ff-root .ff-emoji-cell { display: grid; place-items: center; height: 36px; padding: 0; border: 0; border-radius: 8px; background: none; font-size: 22px; line-height: 1; cursor: pointer; }
+.ff-root .ff-emoji-cell:hover, .ff-root .ff-emoji-cell:focus-visible { background: var(--ff-soft2); outline: 0; }
+.ff-root .ff-emoji-pop.is-searching .ff-emoji-scroll > .ff-emoji-h:first-child, .ff-root .ff-emoji-pop.is-searching .ff-emoji-scroll > .ff-emoji-grid:nth-child(2) { display: none; }
+.ff-root .ff-emoji-none { margin: 0; padding: 18px 8px; text-align: center; color: var(--ff-muted); }

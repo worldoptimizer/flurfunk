@@ -50,6 +50,7 @@ function config(): array {
 			),
 			FLURFUNK_URL . 'assets/sw.js'
 		),
+		'emojiUrl'      => FLURFUNK_URL . 'assets/emoji.json?v=' . rawurlencode( FLURFUNK_VERSION ),
 		'i18n'          => \Flurfunk\Strings\all(),
 	);
 }

@@ -39,9 +39,10 @@ function export( string $bundle = '' ): array {
 	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own tables, read once for the export.
 	$rows  = (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY id', table( 'threads' ) ) );
 	$ids   = array_map( static fn ( $r ) => (int) $r->id, $rows );
-	$atts  = Store\attachments_for( $ids );
-	$ments = Store\mentions_for( $ids );
-	$reads = array();
+	$atts   = Store\attachments_for( $ids );
+	$ments  = Store\mentions_for( $ids );
+	$reacts = \Flurfunk\Reactions\for_threads( $ids );
+	$reads  = array();
 	foreach ( (array) $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i', table( 'reads' ) ) ) as $r ) {
 		$reads[ (int) $r->thread_id ][ (int) $r->user_id ] = (int) $r->last_message_id;
 	}
@@ -68,11 +69,22 @@ function export( string $bundle = '' ): array {
 			unset( $msg );
 			$t['files'] = array_pop( $t['messages'] )['files'];
 		}
-		$t['read']     = (object) ( $reads[ (int) $r->id ] ?? array() );
+		$t['read']      = (object) ( $reads[ (int) $r->id ] ?? array() );
+		$t['reactions'] = $reacts[ (int) $r->id ][0] ?? array();
+		foreach ( $t['messages'] as &$msg ) {
+			$msg['reactions'] = ! empty( $msg['id'] ) ? ( $reacts[ (int) $r->id ][ (int) $msg['id'] ] ?? array() ) : array();
+		}
+		unset( $msg );
 		$add( (int) $r->author_id );
 		$add( (int) $r->resolved_by );
 		foreach ( $t['messages'] as $m ) {
 			$add( (int) $m['author'] );
+			foreach ( $m['reactions'] as $x ) {
+				array_map( $add, $x['people'] );
+			}
+		}
+		foreach ( $t['reactions'] as $x ) {
+			array_map( $add, $x['people'] );
 		}
 		$threads[] = $t;
 	}
@@ -180,8 +192,16 @@ function import( array $data, string $bundle = '' ): array {
 			continue;
 		}
 		++$count['threads'];
+		$react = static function ( int $mid, array $list ) use ( $id, $user ): void {
+			foreach ( $list as $x ) {
+				foreach ( (array) ( $x['people'] ?? array() ) as $who ) {
+					\Flurfunk\Reactions\put( $id, $mid, (int) $user( $who ), (string) ( $x['emoji'] ?? '' ) );
+				}
+			}
+		};
+		$react( 0, (array) ( $t['reactions'] ?? array() ) );
 		foreach ( (array) ( $t['messages'] ?? array() ) as $m ) {
-			Store\add_message(
+			$mid = Store\add_message(
 				$id,
 				array(
 					'type'        => $m['type'] ?? 'message',
@@ -204,6 +224,9 @@ function import( array $data, string $bundle = '' ): array {
 				),
 				false
 			);
+			if ( is_int( $mid ) ) {
+				$react( $mid, (array) ( $m['reactions'] ?? array() ) );
+			}
 			++$count['messages'];
 		}
 		// Everything imported counts as read, so nobody gets a wall of "new".

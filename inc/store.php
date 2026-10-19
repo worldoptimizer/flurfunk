@@ -1304,8 +1304,14 @@ function full_thread( int $id, int $user_id ) {
 	$messages = format_messages( $t, $atts, $ments, $limit );
 	global $wpdb;
 	$total = count( $messages ) < $limit ? count( $messages ) : (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE thread_id = %d', table( 'messages' ), $id ) );
+	$reacts = \Flurfunk\Reactions\for_threads( array( $id ) )[ $id ] ?? array();
+	foreach ( $messages as &$msg ) {
+		$msg['reactions'] = $reacts[ (int) $msg['id'] ] ?? array();
+	}
+	unset( $msg );
 	$view = format_thread( $t, $atts, $ments ) + array(
-		'messages' => $messages,
+		'reactions' => $reacts[0] ?? array(),
+		'messages'  => $messages,
 		'older'    => max( 0, $total - count( $messages ) ),
 		'read'     => read_state( array( $id ), $user_id )[ $id ] ?? 0,
 		'follow'   => follows( $id )[ $user_id ] ?? 0,
@@ -1470,7 +1476,8 @@ function summarize( array $rows, int $user_id ): array {
 	foreach ( $wpdb->get_results( $wpdb->prepare( "SELECT m.thread_id, COUNT(*) n FROM %i m LEFT JOIN %i r ON r.thread_id = m.thread_id AND r.user_id = %d WHERE m.thread_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) GROUP BY m.thread_id", array_merge( array( $m, table( 'reads' ), $user_id ), $ids, array( $user_id ) ) ) ) as $r ) {
 		$unread[ (int) $r->thread_id ] = (int) $r->n;
 	}
-	$out = array();
+	$reacts = \Flurfunk\Reactions\for_threads( $ids, true );
+	$out    = array();
 	foreach ( $rows as $r ) {
 		$tid   = (int) $r->id;
 		$l     = $last[ $tid ] ?? null;
@@ -1485,6 +1492,7 @@ function summarize( array $rows, int $user_id ): array {
 			'activity'     => iso( $r->last_activity ),
 			'unread'       => ( $unread[ $tid ] ?? 0 ) + ( -1 === $read[ $tid ] && (int) $r->author_id !== $user_id ? 1 : 0 ),
 			'audience'     => audience( $r ),
+			'reactions'    => $reacts[ $tid ][0] ?? array(),
 		);
 	}
 	return $out;

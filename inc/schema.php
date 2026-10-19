@@ -11,13 +11,13 @@ namespace Flurfunk\Schema;
 
 defined( 'ABSPATH' ) || exit;
 
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const OPTION     = 'flurfunk_db_version';
 
 /**
  * Table name.
  *
- * @param string $name channels|threads|messages|mentions|reads|attachments|assignees|notifications|push.
+ * @param string $name channels|threads|messages|mentions|reads|attachments|assignees|notifications|push|reactions.
  */
 function table( string $name ): string {
 	global $wpdb;
@@ -110,6 +110,15 @@ CREATE TABLE " . table( 'push' ) . " (
   UNIQUE KEY endpoint_hash (endpoint_hash),
   KEY user_id (user_id)
 ) $c;
+CREATE TABLE " . table( 'reactions' ) . " (
+  thread_id bigint(20) unsigned NOT NULL,
+  message_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  user_id bigint(20) unsigned NOT NULL,
+  emoji varchar(96) NOT NULL,
+  created datetime NOT NULL,
+  PRIMARY KEY  (thread_id,message_id,user_id,emoji),
+  KEY user_id (user_id)
+) $c;
 CREATE TABLE " . table( 'messages' ) . " (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   thread_id bigint(20) unsigned NOT NULL,
@@ -166,7 +175,8 @@ CREATE TABLE " . table( 'attachments' ) . " (
  */
 function upgrade( int $from ): void {
 	// 6: channels.capability (dbDelta adds it; '' = no extra capability, so existing channels
-	// stay as they were). Nothing to rewrite. Example for later: if ( $from < 7 ) { … }
+	// stay as they were). 7: the reactions table (dbDelta creates it). Nothing to rewrite.
+	// Example for later: if ( $from < 8 ) { … }
 	unset( $from );
 }
 
@@ -205,7 +215,7 @@ add_action(
  */
 function drop(): void {
 	global $wpdb;
-	foreach ( array( 'channels', 'threads', 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications', 'push' ) as $t ) {
+	foreach ( array( 'channels', 'threads', 'messages', 'mentions', 'reads', 'attachments', 'assignees', 'notifications', 'push', 'reactions' ) as $t ) {
 		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', table( $t ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- removing our own tables on uninstall.
 	}
 	delete_option( OPTION );

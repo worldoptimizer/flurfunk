@@ -51,6 +51,7 @@ require_once FLURFUNK_DIR . 'inc/schema.php';
 require_once FLURFUNK_DIR . 'inc/access.php';
 require_once FLURFUNK_DIR . 'inc/caps.php';
 require_once FLURFUNK_DIR . 'inc/store.php';
+require_once FLURFUNK_DIR . 'inc/reactions.php';
 require_once FLURFUNK_DIR . 'inc/providers.php';
 require_once FLURFUNK_DIR . 'inc/targets.php';
 require_once FLURFUNK_DIR . 'inc/files.php';

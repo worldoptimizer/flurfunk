@@ -60,10 +60,14 @@ function export( string $email, int $page = 1 ): array {
 			"SELECT 'thread' kind, t.id, t.id thread_id, t.title, t.body, t.created FROM %i t WHERE t.author_id = %d
 			UNION ALL
 			SELECT 'message' kind, m.id, m.thread_id, '' title, m.body, m.created FROM %i m WHERE m.author_id = %d AND m.type = 'message'
+			UNION ALL
+			SELECT 'reaction' kind, x.message_id id, x.thread_id, '' title, x.emoji body, x.created FROM %i x WHERE x.user_id = %d
 			ORDER BY created LIMIT %d OFFSET %d",
 			table( 'threads' ),
 			$user->ID,
 			table( 'messages' ),
+			$user->ID,
+			table( 'reactions' ),
 			$user->ID,
 			PAGE,
 			$offset
@@ -74,14 +78,14 @@ function export( string $email, int $page = 1 ): array {
 		$data[] = array(
 			'group_id'    => 'flurfunk',
 			'group_label' => __( 'Flurfunk conversations', 'flurfunk' ),
-			'item_id'     => 'flurfunk-' . $r->kind . '-' . $r->id,
+			'item_id'     => 'flurfunk-' . $r->kind . '-' . $r->id . ( 'reaction' === $r->kind ? '-' . $r->thread_id . '-' . $r->body : '' ),
 			'data'        => array_values(
 				array_filter(
 					array(
-						array( 'name' => __( 'Type', 'flurfunk' ), 'value' => 'thread' === $r->kind ? __( 'Thread', 'flurfunk' ) : __( 'Message', 'flurfunk' ) ),
+						array( 'name' => __( 'Type', 'flurfunk' ), 'value' => 'thread' === $r->kind ? __( 'Thread', 'flurfunk' ) : ( 'reaction' === $r->kind ? __( 'Reaction', 'flurfunk' ) : __( 'Message', 'flurfunk' ) ) ),
 						array( 'name' => __( 'Thread', 'flurfunk' ), 'value' => (string) $r->thread_id ),
 						'' !== $r->title ? array( 'name' => __( 'Title', 'flurfunk' ), 'value' => $r->title ) : null,
-						array( 'name' => __( 'Text', 'flurfunk' ), 'value' => \Flurfunk\Notify\readable( (string) $r->body ) ),
+						array( 'name' => __( 'Text', 'flurfunk' ), 'value' => 'reaction' === $r->kind ? \Flurfunk\Reactions\char( (string) $r->body ) : \Flurfunk\Notify\readable( (string) $r->body ) ),
 						array( 'name' => __( 'Date', 'flurfunk' ), 'value' => (string) \Flurfunk\Store\iso( $r->created ) ),
 					)
 				)
@@ -130,6 +134,7 @@ function forget( int $uid ): void {
 	$wpdb->delete( table( 'assignees' ), array( 'user_id' => $uid ) );
 	$wpdb->delete( table( 'notifications' ), array( 'user_id' => $uid ) );
 	$wpdb->delete( table( 'push' ), array( 'user_id' => $uid ) );
+	$wpdb->delete( table( 'reactions' ), array( 'user_id' => $uid ) );
 	delete_user_meta( $uid, \Flurfunk\Notify\PREFS );
 	foreach ( \Flurfunk\Notify\KEYS as $k ) {
 		delete_user_meta( $uid, \Flurfunk\Notify\PREFS . '_' . $k );

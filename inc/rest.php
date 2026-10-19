@@ -104,6 +104,7 @@ function routes(): void {
 			'args'                => $id,
 		)
 	);
+	register_rest_route( NS, '/threads/(?P<id>\d+)/reactions', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\react', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/task', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\set_task', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route( NS, '/threads/(?P<id>\d+)/edit', array( 'methods' => 'POST', 'callback' => __NAMESPACE__ . '\\edit_thread', 'permission_callback' => $auth, 'args' => $id ) );
 	register_rest_route(
@@ -409,6 +410,22 @@ function edit_thread( WP_REST_Request $r ) {
 function edit_message( WP_REST_Request $r ) {
 	$tid = Store\edit_message( (int) $r['id'], (string) ( $r->get_json_params()['body'] ?? '' ) );
 	return is_wp_error( $tid ) ? $tid : decorate( Store\full_thread( $tid, get_current_user_id() ) );
+}
+
+/**
+ * POST threads/<id>/reactions: { message (0 = the thread), emoji } adds the reaction, or takes it
+ * back if it was there.
+ *
+ * @param WP_REST_Request $r Request.
+ */
+function react( WP_REST_Request $r ) {
+	$p    = (array) $r->get_json_params();
+	$mid  = (int) ( $p['message'] ?? 0 );
+	$list = \Flurfunk\Reactions\toggle( (int) $r['id'], $mid, (string) ( $p['emoji'] ?? '' ), get_current_user_id() );
+	return is_wp_error( $list ) ? $list : array(
+		'message'   => $mid,
+		'reactions' => $list,
+	);
 }
 
 /**

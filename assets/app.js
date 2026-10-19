@@ -146,7 +146,147 @@
 		x: svg( 'M18 6L6 18M6 6l12 12' ),
 		back: svg( 'M15 18l-6-6 6-6' ),
 		down: svg( 'M12 5v14M19 12l-7 7-7-7' ),
+		smile: svg( 'M22 11v1a10 10 0 1 1-9-10M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01M16 5h6M19 2v6' ),
 	};
+	/*
+	 * Reactions, as in Slack: a row of emoji under a thread or reply, a click adds yours or takes it
+	 * back. The smiley opens the picker: the most used first, then all of them with a search.
+	 */
+	const reactsHtml = ( list, tid, mid ) => '<div class="ff-reacts" data-tid="' + tid + '" data-mid="' + mid + '"' + ( list && list.length ? '' : ' hidden' ) + '>'
+		+ ( list || [] ).map( ( x ) => {
+			const mine = !! boot && x.people.includes( boot.me.id );
+			const who = x.people.map( ( id ) => ( boot && id === boot.me.id ? t( 'you' ) : person( id ).name ) ).join( ', ' );
+			return '<button type="button" class="ff-react' + ( mine ? ' is-mine' : '' ) + '" data-ff="react-toggle" data-emoji="' + esc( x.emoji ) + '" aria-pressed="' + mine + '" aria-label="' + esc( t( '%1$s from %2$s', x.emoji, who ) ) + '" data-tip="' + esc( who ) + '"><span class="ff-emoji">' + esc( x.emoji ) + '</span><b>' + x.people.length + '</b></button>';
+		} ).join( '' )
+		+ '<button type="button" class="ff-react ff-react-add" data-ff="react" aria-label="' + esc( t( 'Add reaction' ) ) + '" data-tip="' + esc( t( 'Add reaction' ) ) + '">' + icon.smile + '</button></div>';
+	const FREQUENT = [ '👍', '✅', '👀', '🙏', '❤️', '😂', '🎉', '🔥', '👏', '🤔', '😮', '🚀', '💯', '👌', '😢', '🙌' ];
+	const recentKey = () => 'flurfunk-emoji-' + ( boot ? boot.me.id : 0 );
+	const recentEmoji = () => {
+		try {
+			return JSON.parse( window.localStorage.getItem( recentKey() ) || '[]' );
+		} catch ( e ) {
+			return [];
+		}
+	};
+	let emojiData = null;
+	const loadEmoji = () => {
+		emojiData = emojiData || fetch( cfg.emojiUrl, { credentials: 'same-origin' } ).then( ( r ) => r.json() ).catch( () => ( { groups: {}, list: [] } ) );
+		return emojiData;
+	};
+	const closePicker = () => {
+		const pop = document.querySelector( '.ff-emoji-pop' );
+		if ( pop ) {
+			pop.remove();
+		}
+	};
+	const openPicker = ( anchor, onPick ) => {
+		closePicker();
+		const root = anchor.closest( '.ff-root' ) || document.body;
+		const pop = document.createElement( 'div' );
+		pop.className = 'ff-emoji-pop';
+		pop.setAttribute( 'role', 'dialog' );
+		pop.setAttribute( 'aria-label', t( 'Add reaction' ) );
+		const top = [ ...new Set( recentEmoji().concat( FREQUENT ) ) ].slice( 0, 16 );
+		const cell = ( e, label ) => '<button type="button" class="ff-emoji-cell" data-emoji="' + esc( e ) + '"' + ( label ? ' title="' + esc( label ) + '" aria-label="' + esc( label ) + '"' : '' ) + '>' + esc( e ) + '</button>';
+		pop.innerHTML = '<input type="search" class="ff-emoji-q" placeholder="' + esc( t( 'Search emoji' ) ) + '" aria-label="' + esc( t( 'Search emoji' ) ) + '">'
+			+ '<div class="ff-emoji-scroll"><p class="ff-emoji-h">' + esc( t( 'Frequently used' ) ) + '</p><div class="ff-emoji-grid">' + top.map( ( e ) => cell( e ) ).join( '' ) + '</div>'
+			+ '<div class="ff-emoji-all">' + skeleton( 2 ) + '</div></div>';
+		root.appendChild( pop );
+		// Below the button, or above it when there is no room.
+		const r = anchor.getBoundingClientRect();
+		const h = Math.min( 380, window.innerHeight - 24 );
+		pop.style.height = h + 'px';
+		pop.style.left = Math.max( 12, Math.min( r.left, window.innerWidth - 352 ) ) + 'px';
+		pop.style.top = ( r.bottom + 6 + h < window.innerHeight ? r.bottom + 6 : Math.max( 12, r.top - 6 - h ) ) + 'px';
+		const q = $( '.ff-emoji-q', pop );
+		const all = $( '.ff-emoji-all', pop );
+		const lang = /^de/i.test( locale() ) ? 3 : 2;
+		loadEmoji().then( ( data ) => {
+			if ( ! pop.isConnected ) {
+				return;
+			}
+			const names = data.groups[ 3 === lang ? 'de' : 'en' ] || data.groups.en || {};
+			const draw = ( words ) => {
+				const hits = words ? data.list.filter( ( x ) => words.every( ( w ) => x[ lang ].includes( w ) || x[ 2 ].includes( w ) ) ) : null;
+				if ( hits ) {
+					all.innerHTML = hits.length ? '<div class="ff-emoji-grid">' + hits.slice( 0, 160 ).map( ( x ) => cell( x[ 0 ], x[ lang ].split( ' ' ).slice( 0, 4 ).join( ' ' ) ) ).join( '' ) + '</div>' : '<p class="ff-emoji-none">' + esc( t( 'No emoji found' ) ) + '</p>';
+					return;
+				}
+				let html = '';
+				let g = null;
+				data.list.forEach( ( x ) => {
+					if ( x[ 1 ] !== g ) {
+						html += ( null === g ? '' : '</div>' ) + '<p class="ff-emoji-h">' + esc( names[ x[ 1 ] ] || '' ) + '</p><div class="ff-emoji-grid">';
+						g = x[ 1 ];
+					}
+					html += cell( x[ 0 ], x[ lang ].split( ' ' ).slice( 0, 4 ).join( ' ' ) );
+				} );
+				all.innerHTML = html + ( null === g ? '' : '</div>' );
+			};
+			draw( null );
+			q.addEventListener( 'input', () => {
+				const words = q.value.toLowerCase().trim().split( /\s+/ ).filter( Boolean );
+				pop.classList.toggle( 'is-searching', words.length > 0 );
+				draw( words.length ? words : null );
+			} );
+		} );
+		pop.addEventListener( 'click', ( e ) => {
+			const b = e.target.closest( '.ff-emoji-cell' );
+			if ( b ) {
+				const emoji = b.dataset.emoji;
+				try {
+					window.localStorage.setItem( recentKey(), JSON.stringify( [ emoji ].concat( recentEmoji().filter( ( x ) => x !== emoji ) ).slice( 0, 8 ) ) );
+				} catch ( x ) {}
+				closePicker();
+				anchor.focus();
+				onPick( emoji );
+			}
+		} );
+		pop.addEventListener( 'keydown', ( e ) => {
+			if ( 'Escape' === e.key ) {
+				e.preventDefault();
+				e.stopPropagation();
+				closePicker();
+				anchor.focus();
+			} else if ( 'Enter' === e.key && e.target === q ) {
+				e.preventDefault();
+				const first = $( '.ff-emoji-all .ff-emoji-cell', pop ) || $( '.ff-emoji-cell', pop );
+				if ( first ) {
+					first.click();
+				}
+			}
+		} );
+		setTimeout( () => {
+			document.addEventListener( 'pointerdown', function away( e ) {
+				if ( ! pop.isConnected ) {
+					document.removeEventListener( 'pointerdown', away );
+				} else if ( ! pop.contains( e.target ) && e.target !== anchor ) {
+					closePicker();
+					document.removeEventListener( 'pointerdown', away );
+				}
+			} );
+		}, 0 );
+		q.focus();
+	};
+	// After a reaction: the row everywhere it is shown (list and thread), and the data behind it.
+	const paintReacts = ( tid, mid, list, threads ) => {
+		document.querySelectorAll( '.ff-reacts[data-tid="' + tid + '"][data-mid="' + mid + '"]' ).forEach( ( el ) => {
+			el.outerHTML = reactsHtml( list, tid, mid );
+		} );
+		( threads || [] ).forEach( ( th ) => {
+			if ( th && th.id === tid ) {
+				if ( ! mid ) {
+					th.reactions = list;
+				}
+				( th.messages || [] ).forEach( ( m ) => {
+					if ( m.id === mid ) {
+						m.reactions = list;
+					}
+				} );
+			}
+		} );
+	};
+
 	// While something loads: grey lines where it will be (a screen reader hears "Loading …").
 	const skeleton = ( n ) => '<div class="ff-skeleton" aria-hidden="true">' + Array.from( { length: n }, ( _, i ) => '<div class="ff-skel-row"><span class="ff-skel-ava"></span><span class="ff-skel-lines"><span class="ff-skel" style="width:' + [ 34, 48, 28, 42, 38, 30 ][ i % 6 ] + '%"></span><span class="ff-skel" style="width:' + [ 86, 64, 92, 70, 58, 80 ][ i % 6 ] + '%"></span></span></div>' ).join( '' ) + '</div><p class="screen-reader-text" role="status">' + esc( t( 'Loading …' ) ) + '</p>';
 	const smooth = () => ( window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches ? 'auto' : 'smooth' );
@@ -563,7 +703,7 @@
 	// One-line preview for lists: mentions and links stay, formatting and line structure don't.
 	const preview = ( text ) => rich( String( text || '' ).replace( /```[\s\S]*?```/g, ' … ' ).replace( /^\s*(?:[-•*]|\d+[.)]|>)\s+/gm, '' ).replace( /[*_~`]/g, '' ).replace( /\s*\n+\s*/g, ' · ' ) );
 	const mine = ( author ) => !! boot && ( author === boot.me.id || boot.me.moderate );
-	const actions = ( m ) => ( mine( m.author ) ? '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ib( 'msg-edit', icon.pencil, t( 'Edit' ), ' data-mid="' + m.id + '"' ) + ib( 'msg-del', icon.trash, t( 'Delete' ), ' data-mid="' + m.id + '"' ) + '</span>' : '' );
+	const actions = ( m, tid ) => '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ( tid ? ib( 'react', icon.smile, t( 'Add reaction' ), ' data-tid="' + tid + '" data-mid="' + m.id + '"' ) : '' ) + ( mine( m.author ) ? ib( 'msg-edit', icon.pencil, t( 'Edit' ), ' data-mid="' + m.id + '"' ) + ib( 'msg-del', icon.trash, t( 'Delete' ), ' data-mid="' + m.id + '"' ) : '' ) + '</span>';
 	// Long messages (an AI answer, a pasted text) start folded, like in Slack: "Show more" opens them.
 	const longText = ( text ) => {
 		const long = text.length > 700 || text.split( '\n' ).length > 12;
@@ -642,7 +782,8 @@
 				+ aiMetaLine( th, m )
 				+ ( m.edited ? '<small class="ff-edited">' + esc( t( '(edited)' ) ) + '</small>' : '' )
 				+ cards( m.attachments ) + files( m.files )
-				+ actions( m ) + '</div></li>';
+				+ reactsHtml( m.reactions, th.id, m.id )
+				+ actions( m, th.id ) + '</div></li>';
 			prev = m;
 		} );
 		return html ? '<ol class="ff-thread">' + html + '</ol>' : '';
@@ -889,6 +1030,28 @@
 	 */
 	const messageAction = async ( el, threads, onUpdate ) => {
 		const act = el.dataset.ff;
+		if ( 'react' === act || 'react-toggle' === act ) {
+			const row = el.closest( '.ff-reacts' );
+			const tid = +( el.dataset.tid || ( row && row.dataset.tid ) );
+			const mid = +( el.dataset.mid || ( row && row.dataset.mid ) || 0 );
+			const send = async ( emoji ) => {
+				try {
+					const r = await api( 'threads/' + tid + '/reactions', { method: 'POST', body: { message: mid, emoji } } );
+					paintReacts( tid, mid, r.reactions, threads );
+				} catch ( e ) {
+					const note = Object.assign( document.createElement( 'p' ), { className: 'ff-error', textContent: e.message } );
+					note.setAttribute( 'role', 'alert' );
+					el.closest( '.ff-reacts, .ff-actions' ).after( note );
+					setTimeout( () => note.remove(), 4000 );
+				}
+			};
+			if ( 'react-toggle' === act ) {
+				await send( el.dataset.emoji );
+			} else {
+				openPicker( el, send );
+			}
+			return true;
+		}
 		if ( 'msg-edit' === act || 'msg-del' === act ) {
 			const mid = +el.dataset.mid;
 			if ( 'msg-del' === act ) {
@@ -1687,8 +1850,9 @@
 			+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' )
 			+ ( th.body ? '<p class="ff-preview">' + preview( th.body ) + '</p>' : '' )
 			+ cards( th.attachments ) + ( viewInfo().target ? '' : targetChip( th ) )
+			+ reactsHtml( th.reactions, th.id, 0 )
 			+ ( dueChip( th ) || assigneeStack( th ) ? '<p class="ff-task-line">' + dueChip( th ) + assigneeStack( th ) + '</p>' : '' )
-			+ summary( th, false, 'open' ) + '</div></article>';
+			+ summary( th, false, 'open' ) + '</div><span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ib( 'react', icon.smile, t( 'Add reaction' ), ' data-tid="' + th.id + '" data-mid="0"' ) + '</span></article>';
 		const noteHtml = ( n ) => '<article class="ff-post ff-note-item' + ( n.read ? '' : ' is-unread' ) + '" data-ff="open-note" data-id="' + n.thread + '" data-nid="' + n.id + '" tabindex="0">'
 			+ ( n.actor ? ava( n.actor ) : '<span class="ff-ava" aria-hidden="true">' + icon.bell + '</span>' ) + '<div class="ff-post-body">'
 			+ '<p class="ff-who"><b>' + esc( n.headline ) + '</b> <span>' + esc( when( n.created ) ) + ( n.channel ? ' · #' + esc( chName( n.channel ) ) : '' ) + '</span></p>'
@@ -2043,9 +2207,10 @@
 				+ '<p class="ff-who">' + nameHtml( th.author ) + ' <span>' + esc( when( th.created ) ) + '</span></p>'
 				+ ( th.title ? '<h3 class="ff-title">' + esc( th.title ) + '</h3>' : '' ) + ( th.body ? '<div class="ff-text">' + rich( th.body ) + '</div>' : '' )
 				+ files( th.files ) + cards( th.attachments ) + targetChip( th )
+				+ reactsHtml( th.reactions, th.id, 0 )
 				+ taskControls( th )
 				+ '<div class="ff-root-row">' + ( null === th.status || undefined === th.status ? '' : statusSelect( th ) ) + audiencePill( th ) + doneBox( th ) + '</div>'
-				+ ( null === th.status || ( mine( th.author ) && th.body ) ? '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ( null === th.status ? ib( 'make-task', icon.task, t( 'Make it a task' ) ) : '' ) + ( mine( th.author ) && th.body ? ib( 'thread-edit', icon.pencil, t( 'Edit' ), ' data-tid="' + th.id + '"' ) : '' ) + '</span>' : '' )
+				+ '<span class="ff-actions" role="toolbar" aria-label="' + esc( t( 'Actions' ) ) + '">' + ib( 'react', icon.smile, t( 'Add reaction' ), ' data-tid="' + th.id + '" data-mid="0"' ) + ( null === th.status ? ib( 'make-task', icon.task, t( 'Make it a task' ) ) : '' ) + ( mine( th.author ) && th.body ? ib( 'thread-edit', icon.pencil, t( 'Edit' ), ' data-tid="' + th.id + '"' ) : '' ) + '</span>'
 				+ '</div></div><div class="ff-msgs">' + messagesHtml( th ) + '</div>' + thinkingHtml( th ) + '<div class="ff-reply-slot"></div></div>';
 			watchThinking( th );
 			if ( ui.summaries && ui.summaries[ th.id ] ) {
@@ -2208,7 +2373,7 @@
 		};
 		// What can change while a thread is open: new, edited or deleted messages, the status, the
 		// thread text, refreshed cards.
-		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ), ( th.thinking || [] ).join( ',' ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) ) ).join( '|' );
+		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ), JSON.stringify( th.reactions || [] ), ( th.thinking || [] ).join( ',' ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) + JSON.stringify( m.reactions || [] ) ) ).join( '|' );
 		const pollPane = async () => {
 			const active = document.activeElement;
 			const busy = pane.contains( active ) && ( ( 'TEXTAREA' === active.tagName && active.value ) || active.closest( '.ff-edit, .ff-pop' ) ) || $( '.ff-edit', pane );
@@ -2259,7 +2424,7 @@
 			if ( ! el || ! root.contains( el ) || el.closest( '.ff-compose' ) ) {
 				return;
 			}
-			if ( await messageAction( el, ui.current ? [ ui.current ] : [], ( th ) => {
+			if ( await messageAction( el, ( ui.current ? [ ui.current ] : [] ).concat( ui.list ), ( th ) => {
 				ui.current = th;
 				renderPane( th );
 				refresh();
