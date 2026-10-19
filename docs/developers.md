@@ -960,6 +960,7 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_max_tokens` (filter) | `int $max` (4000), `int $agent` | Maximum length of an answer. |
 | `flurfunk_ai_run_now` (filter) | `bool $now` (true) | false: leave runs to WP-Cron only. |
 | `flurfunk_ai_error` (action) | `WP_Error $error`, `int $thread_id`, `int $agent` | A run failed (the assistant also says so in the thread, in plain words). |
+| `flurfunk_ai_guidelines` (filter) | `string $text` | Editorial guidelines for the assistants. Default: the site's guidelines from the WordPress plugin "AI" (categories site, copy, additional), if it is active. |
 | `flurfunk_ai_summaries_per_hour` (filter) | `int $max` (20) | Private summaries per person and hour. |
 | `flurfunk_ability_channel` (filter) | `bool $ok`, `string $channel` | Narrow the channels Flurfunk's reading abilities return; the AI module uses it while an assistant looks things up. |
 

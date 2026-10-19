@@ -264,6 +264,9 @@ Privacy* suggests a text) and check whether you need a data processing agreement
 Guests can only ask an assistant if its profile allows it; who may ask at all is the capability
 **Ask AI assistants** (`flurfunk_use_ai`, under *Permissions*).
 
+If the WordPress plugin **AI** is active and has editorial guidelines, the assistants follow them
+too; abilities it offers (when its features are switched on) appear as tools or proposals.
+
 Switches for the whole site, at the top of the section: replace email addresses and phone numbers
 before anything is sent (on by default), keep a log of the last 100 answers without content (who,
 where, model, tokens, tools), and offer **Summarize** in threads – a private summary for the person
