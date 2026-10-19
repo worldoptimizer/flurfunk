@@ -432,6 +432,13 @@ add_action(
 				'default'     => false,
 				'requires'    => static fn () => function_exists( 'wp_ai_client_prompt' ),
 				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/ai.php',
+				'capabilities' => array(
+					'flurfunk_use_ai' => array(
+						'label'       => __( 'Ask AI assistants', 'flurfunk' ),
+						'description' => __( 'Mention an AI assistant to get an answer, and get private thread summaries. Guests also need the assistant to allow guests.', 'flurfunk' ),
+						'roles'       => array( 'administrator', 'editor', 'author', 'contributor' ),
+					),
+				),
 			)
 		);
 		register(

@@ -1751,7 +1751,7 @@
 		const summaryButton = ( th ) => {
 			const ch = channelOf( th.channel );
 			const replies = ( th.messages || [] ).filter( ( m ) => 'message' === m.type ).length;
-			return ch && ch.agents && ch.agents.length && replies >= 4 ? '<button type="button" class="ff-link" data-ff="summary" title="' + esc( t( 'A short summary from the AI assistant, only for you' ) ) + '">' + esc( t( 'Summarize' ) ) + '</button>' : '';
+			return ch && ch.summary && replies >= 4 ? '<button type="button" class="ff-link" data-ff="summary" title="' + esc( t( 'A short summary from the AI assistant, only for you' ) ) + '">' + esc( t( 'Summarize' ) ) + '</button>' : '';
 		};
 		const showSummary = async ( th ) => {
 			const body = $( '.ff-pane-body', pane );
