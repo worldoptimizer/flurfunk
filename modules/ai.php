@@ -992,7 +992,7 @@ function render_section(): void {
 	?>
 	<div id="flurfunk-ai" class="ff-ai-section">
 	<h2><?php esc_html_e( 'AI assistants', 'flurfunk' ); ?></h2>
-	<p class="description" style="max-width:46rem"><?php esc_html_e( 'An assistant with an AI profile answers in the thread when someone mentions it, in the channels ticked here. It reads only that thread and cannot change anything on the site. The AI provider and its key are set up under Settings → Connectors; what the assistant reads is sent to that provider.', 'flurfunk' ); ?></p>
+	<p class="description" style="max-width:46rem"><?php esc_html_e( 'An assistant with an AI profile answers in the thread when someone mentions it, in the channels ticked here. It reads that thread (and, if allowed below, the post it is about and what its tools find) and changes nothing on the site by itself. The AI provider and its key are set up under Settings → Connectors; what the assistant reads is sent to that provider.', 'flurfunk' ); ?></p>
 	<?php if ( ! ready() ) : ?>
 		<div class="notice notice-warning inline"><p><?php
 			printf(
