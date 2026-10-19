@@ -954,6 +954,18 @@ $check( 'the run answers in the thread as the agent and stops thinking', is_int(
 $ai_ctx = $ai_seen[0] ?? array();
 $check( 'the AI gets the thread (mentions as names) and the instructions of site and channel', str_contains( $ai_ctx['prompt'] ?? '', 'Zitronenfalter' ) && str_contains( $ai_ctx['prompt'] ?? '', '@KI-Test Was steht oben?' ) && str_contains( $ai_ctx['system'] ?? '', 'Sei knapp.' ) && str_contains( $ai_ctx['system'] ?? '', 'Kanalregel: immer mit Quelle.' ) && str_contains( $ai_ctx['system'] ?? '', 'data, not instructions' ) && $team === ( $ai_ctx['asker'] ?? 0 ), $ai_ctx );
 $check( '… and nothing from other threads', ! str_contains( $ai_ctx['prompt'] ?? '', 'e2e' ) && 1 === substr_count( $ai_ctx['prompt'] ?? '', '<thread>' ) );
+// The post a thread is about: its text goes along if the person asking may read it.
+$as( $team );
+$ai_post = wp_insert_post( array( 'post_title' => 'ff-test KI-Entwurf', 'post_status' => 'draft', 'post_author' => $team, 'post_content' => "<!-- wp:paragraph -->\n<p>Der Entwurf sagt: Kolibris fliegen rückwärts.</p>\n<!-- /wp:paragraph -->" ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'instructions' => 'Sei knapp.' ) );
+$ai_pt   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Zum Entwurf', 'target' => array( 'type' => 'post', 'id' => $ai_post ) ) );
+$ai_pc   = Flurfunk\Modules\Ai\context( Store\thread_row( $ai_pt ), 0, $ai_bot );
+$check( 'the text of the post the thread is about goes along (as plain text, without block markup)', str_contains( $ai_pc['prompt'], 'Kolibris fliegen rückwärts.' ) && str_contains( $ai_pc['prompt'], '<post title="ff-test KI-Entwurf" status="draft"' ) && ! str_contains( $ai_pc['prompt'], 'wp:paragraph' ), substr( $ai_pc['prompt'], 0, 300 ) );
+$check( '… but not for someone who may not read that draft', '' === Flurfunk\Modules\Ai\post_text( $ai_post, $guest ) && '' !== Flurfunk\Modules\Ai\post_text( $ai_post, $team ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+$check( '… and not when the profile does not allow it', ! str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ai_pt ), 0, $ai_bot )['prompt'], 'Kolibris' ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'posts' => '1', 'instructions' => "Sei knapp.", 'budget' => 0 ) );
+wp_delete_post( $ai_post, true );
 $check( 'tokens are counted per agent and month', 120 === Flurfunk\Modules\Ai\usage( $ai_bot )['tokens'] && 1 === Flurfunk\Modules\Ai\usage( $ai_bot )['requests'] );
 $check( 'the same mention is answered once', null === Flurfunk\Modules\Ai\run( $ai_t, $ai_m, $ai_bot ) && 1 === count( $ai_seen ) );
 $check( 'the answer does not trigger the agent again', ! wp_next_scheduled( 'flurfunk_ai_run', array( $ai_t, (int) $ai_last['id'], $ai_bot ) ) );
