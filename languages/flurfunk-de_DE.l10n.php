@@ -426,7 +426,7 @@ return array(
 		'Post' => 'Artikel',
 		'Post %d does not exist or you may not see it.' => 'Beitrag %d gibt es nicht, oder du darfst ihn nicht sehen.',
 		'Posts' => 'Artikel',
-		'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author and the first words; read one with flurfunk/get-post.' => 'Beiträge dieser Website, die die aktuelle Person sehen darf (Entwürfe und geplante nur, wenn sie sie bearbeiten darf), neueste zuerst: die letzten oder die zu Suchwörtern passenden. Liefert ID, Titel, Status, Daten, Autor und die ersten Worte; lesen mit flurfunk/get-post.',
+		'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author, the address of published ones and the first words; read one with flurfunk/get-post.' => 'Beiträge dieser Website, die die aktuelle Person sehen darf (Entwürfe und geplante nur, wenn sie sie bearbeiten darf), neueste zuerst: die letzten oder die zu Suchwörtern passenden. Liefert ID, Titel, Status, Daten, Autor, die Adresse veröffentlichter Beiträge und die ersten Worte; lesen mit flurfunk/get-post.',
 		'Preferred models' => 'Bevorzugte Modelle',
 		'Prepared a suggestion: %s' => 'Einen Vorschlag vorbereitet: %s',
 		'Previous image' => 'Vorheriges Bild',

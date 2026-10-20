@@ -1087,7 +1087,9 @@ Flurfunk\Modules\Ai\run( $fu_t, 0, $ai_bot );
 $fu_m = Store\add_message( $fu_t, array( 'body' => 'Und wie ist es am Montag?' ) );
 $check( 'a follow-up right after its answer, without @, goes to the assistant', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m, $ai_bot ) ) );
 $fu_n = count( $ai_seen );
+add_filter( 'flurfunk_ai_pre_check', '__return_true' ); // The quick check says it is for it (no real AI in tests).
 Flurfunk\Modules\Ai\run( $fu_t, $fu_m, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_check', '__return_true' );
 $fu_ctx = $ai_seen[ $fu_n ] ?? array();
 $check( '… which is told it was not mentioned and may pass', str_contains( $fu_ctx['prompt'] ?? '', 'without mentioning you' ) && $team === ( $fu_ctx['asker'] ?? 0 ) && $ai_bot === $fu_last( $fu_t ), substr( $fu_ctx['prompt'] ?? '', -300 ) );
 $as( $team2 );
@@ -1691,8 +1693,54 @@ remove_filter( 'flurfunk_ai_pre_answer', $gu_fake, 20 );
 $as( $guest );
 $gu_m = Store\add_message( $gu_t, array( 'body' => 'Und was meint ihr dazu?' ) );
 $as( $team );
-Store\ensure_channel( 'ff-test', array( 'access_guests' => $gu_old ), true );
 $check( 'a guest writing on without a mention does not wake the assistant (only explicit mentions do)', ! wp_next_scheduled( 'flurfunk_ai_run', array( $gu_t, $gu_m, $ai_bot ) ) );
+// …but a guest who asked and writes on right after the answer to them follows up, as everyone does.
+$gf_prof = get_user_meta( $ai_bot, 'flurfunk_ai', true );
+update_user_meta( $ai_bot, 'flurfunk_ai', array_merge( (array) $gf_prof, array( 'guests' => true ) ) );
+$as( $guest );
+$gf_t = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Eine Frage vom Gast" ) );
+add_filter( 'flurfunk_ai_pre_answer', $gu_fake, 20 );
+Flurfunk\Modules\Ai\run( $gf_t, 0, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $gu_fake, 20 );
+$gf_m = Store\add_message( $gf_t, array( 'body' => 'Kannst du das direkt korrigieren?' ) );
+$as( $team );
+$check( 'a guest who asked: writing on right after the answer is a follow-up (no new mention needed)', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $gf_t, $gf_m, $ai_bot ) ) );
+wp_clear_scheduled_hook( 'flurfunk_ai_run', array( $gf_t, $gf_m, $ai_bot ) );
+$extra_threads[] = $gf_t;
+// Guests may apply an assistant's proposal (it runs with their rights).
+$gf_av = array_column( json_decode( (string) wp_json_encode( Flurfunk\Providers\available( $guest ) ), true ), null, 'id' )['flurfunk/ai-proposal'] ?? null;
+$check( 'guests who may ask an assistant may also run, undo and dismiss its proposals (with their rights)', $gf_av && $gf_av['actions']['run']['can'] && $gf_av['actions']['undo']['can'], $gf_av );
+update_user_meta( $ai_bot, 'flurfunk_ai', $gf_prof );
+Store\ensure_channel( 'ff-test', array( 'access_guests' => $gu_old ), true );
+// A guest's assistant finds what anyone may read on the site, not other people's drafts.
+$gp_pub   = wp_insert_post( array( 'post_title' => 'Öffentlicher Testartikel Zebrastreifen', 'post_status' => 'publish', 'post_author' => $team, 'post_content' => 'Text.' ) );
+$gp_draft = wp_insert_post( array( 'post_title' => 'Interner Entwurf Zebrastreifen', 'post_status' => 'draft', 'post_author' => $team, 'post_content' => 'Geheim.' ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/find-posts' ) ) {
+	$as( $guest );
+	$gp_found = array_column( (array) wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'Zebrastreifen' ) ), 'id' );
+	$gp_read  = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $gp_pub ) );
+	$gp_no    = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $gp_draft ) );
+	$as( $team );
+	$check( 'a guest\'s assistant finds and reads published posts, but not other people\'s drafts', in_array( $gp_pub, $gp_found, true ) && ! in_array( $gp_draft, $gp_found, true ) && ! is_wp_error( $gp_read ) && is_wp_error( $gp_no ), array( $gp_found, $gp_read ) );
+}
+wp_delete_post( $gp_pub, true );
+wp_delete_post( $gp_draft, true );
+// Several assistants in a channel: one joint quick check picks the one whose role fits.
+$pk_full   = Store\full_thread( $gu_t, $ai_bot );
+$pk_prompt = Flurfunk\Modules\Ai\pick_prompt( Store\thread_row( $gu_t ), array( $ai_bot, $team ), $pk_full );
+$pk_names  = array( 11 => 'Assistenz', 12 => 'Lektorat' );
+$check( 'the joint quick check lists the assistants and asks for one name or NO; its answer is read leniently', str_contains( $pk_prompt, '- ' . Store\person( $ai_bot )['name'] ) && str_contains( $pk_prompt, 'or NO.' ) && 12 === Flurfunk\Modules\Ai\picked( 'Lektorat', $pk_names ) && 12 === Flurfunk\Modules\Ai\picked( '**Lektorat** – Rechtschreibung', $pk_names ) && 0 === Flurfunk\Modules\Ai\picked( 'NO', $pk_names ) && 0 === Flurfunk\Modules\Ai\picked( 'Keiner', $pk_names ), $pk_prompt );
+// After a long run, what other requests wrote meanwhile is read fresh (WP-Cron would write back a stale list).
+global $wpdb;
+$fo_old = get_option( 'flurfunk_ai_meta', array() );
+update_option( 'flurfunk_ai_meta', (array) $fo_old + array( 999998 => array() ), false );
+get_option( 'flurfunk_ai_meta' );
+$wpdb->update( $wpdb->options, array( 'option_value' => maybe_serialize( array( 999999 => array( 'asker' => 1 ) ) ) ), array( 'option_name' => 'flurfunk_ai_meta' ) );
+$fo_stale = get_option( 'flurfunk_ai_meta', array() );
+Flurfunk\Modules\Ai\fresh_options( true );
+$fo_fresh = get_option( 'flurfunk_ai_meta', array() );
+update_option( 'flurfunk_ai_meta', $fo_old, false );
+$check( 'after a run the assistants read options fresh, not from the cache of the request', isset( $fo_fresh[999999] ) && ! isset( $fo_stale[999999] ) );
 $np_opts = get_option( 'flurfunk_ai_settings', null );
 update_option( 'flurfunk_ai_settings', array_merge( (array) $np_opts, array( 'memory' => true ) ) );
 Flurfunk\Modules\Ai\save_notes( 'ff-test', array( array( 'text' => 'Beantworte Rechtschreibfragen auch ohne Erwähnung.', 'at' => time(), 'thread' => $gu_t ) ) );

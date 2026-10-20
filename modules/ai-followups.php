@@ -69,6 +69,7 @@ function may_follow_up( $input = null ): bool {
 function follow_up( array $input ) {
 	$tid   = (int) ( $input['thread'] ?? 0 );
 	$agent = working() ?: get_current_user_id();
+	fresh_options( true ); // Called during a run: schedule into the current list of events.
 	if ( ! empty( $input['cancel'] ) ) {
 		$all = (array) get_option( FOLLOWUPS, array() );
 		$n   = 0;
@@ -185,6 +186,7 @@ function check_in( string $id ): void {
 	} finally {
 		answering( $agent, 0 ); // The follow-up notifies like any message: the people it mentions.
 	}
+	fresh_options( true ); // What others wrote while it was working.
 	log_run(
 		array(
 			'agent'   => $agent,

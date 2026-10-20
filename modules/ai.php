@@ -68,6 +68,26 @@ add_action( 'admin_init', __NAMESPACE__ . '\\privacy_text' );
 add_filter( 'flurfunk_notify_recipients', __NAMESPACE__ . '\\quiet_answer', 10, 3 );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\routes' );
 add_action( 'flurfunk_reaction', __NAMESPACE__ . '\\thumbs_down', 10, 5 );
+foreach ( array( HOOK, AMBIENT, FOLLOWUP_HOOK, ROUTINE_HOOK ) as $flurfunk_ai_hook ) {
+	add_action( $flurfunk_ai_hook, __NAMESPACE__ . '\\fresh_options', PHP_INT_MAX, 0 );
+}
+unset( $flurfunk_ai_hook );
+
+/**
+ * Forget the cached options – after a run inside WP-Cron, and before an assistant schedules
+ * something during a run. A run takes seconds to minutes; WP-Cron writes its list of events back
+ * from the cache loaded at the start, which would drop what other requests scheduled meanwhile (a
+ * mention while another answer was being written).
+ *
+ * @param bool $always Also outside WP-Cron.
+ */
+function fresh_options( bool $always = false ): void {
+	if ( $always || wp_doing_cron() ) {
+		foreach ( array( 'alloptions', 'notoptions', 'cron', META, LOG, MUTED, PROPOSALS, FOLLOWUPS, ROUTINES, MEMORY, CHANNEL_USAGE, USAGE ) as $key ) {
+			wp_cache_delete( $key, 'options' );
+		}
+	}
+}
 
 /* -------------------------------------------------------------------------
  * Profiles
@@ -613,24 +633,76 @@ function ambient( int $thread_id ): void {
 	if ( ! $thread || ! $channel || ! empty( $thread->private_to ) || ! \Flurfunk\Modules\enabled( MODULE ) || ! channel_rule( (string) $channel->slug )['respond'] || channel_spent( (string) $channel->slug ) ) {
 		return;
 	}
-	$author = (int) $thread->author_id;
+	$author     = (int) $thread->author_id;
+	$candidates = array();
 	foreach ( agents() as $agent ) {
 		$p = profile( $agent );
-		if ( ! may_answer( $agent, $author, $channel, $thread ) || muted( $thread_id, $agent ) || ( $p['budget'] && usage( $agent )['tokens'] >= $p['budget'] ) ) {
-			continue;
+		if ( may_answer( $agent, $author, $channel, $thread ) && ! muted( $thread_id, $agent ) && ( ! $p['budget'] || usage( $agent )['tokens'] < $p['budget'] ) ) {
+			$candidates[] = $agent;
 		}
-		if ( 'answer' !== check_message( $thread, 0, $agent, true ) ) {
-			continue;
-		}
-		set_busy( $thread_id, $agent, true );
-		joining( true );
-		try {
-			run( $thread_id, 0, $agent );
-		} finally {
-			joining( false );
-		}
+	}
+	$agent = pick_ambient( $thread, $candidates );
+	if ( ! $agent ) {
 		return;
 	}
+	set_busy( $thread_id, $agent, true );
+	joining( true );
+	try {
+		run( $thread_id, 0, $agent );
+	} finally {
+		joining( false );
+	}
+}
+
+/**
+ * Which of the assistants of a channel should answer a new thread nobody asked (0: none)? One
+ * assistant: its own quick check. Several: one quick check that knows all their roles and picks the
+ * one that fits – not simply the first that could say something.
+ *
+ * @param object $thread     Thread row.
+ * @param int[]  $candidates Assistants that may answer there.
+ */
+function pick_ambient( object $thread, array $candidates ): int {
+	if ( ! $candidates ) {
+		return 0;
+	}
+	$first = $candidates[0];
+	if ( 1 === count( $candidates ) || null !== apply_filters( 'flurfunk_ai_pre_check', null, $thread, 0, $first, true ) ) {
+		foreach ( $candidates as $agent ) {
+			if ( 'answer' === check_message( $thread, 0, $agent, true ) ) {
+				return $agent;
+			}
+		}
+		return 0;
+	}
+	if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+		return 0;
+	}
+	$full = Store\full_thread( (int) $thread->id, $first );
+	if ( is_wp_error( $full ) ) {
+		return 0;
+	}
+	$names = array();
+	foreach ( $candidates as $agent ) {
+		$names[ $agent ] = Store\person( $agent )['name'];
+	}
+	$result = quick_check( pick_prompt( $thread, $candidates, $full ), $first );
+	$picked = is_wp_error( $result ) ? 0 : picked( (string) $result->toText(), $names );
+	$tokens = is_wp_error( $result ) ? 0 : (int) $result->getTokenUsage()->getTotalTokens();
+	add_usage( $picked ?: $first, $tokens );
+	log_run(
+		array(
+			'agent'   => $picked ?: $first,
+			'asker'   => 0,
+			'thread'  => (int) $thread->id,
+			'channel' => channel_slug( $thread ),
+			'model'   => is_wp_error( $result ) ? '' : (string) $result->getModelMetadata()->getId(),
+			'tokens'  => $tokens,
+			'error'   => is_wp_error( $result ) ? $result->get_error_message() : '',
+			'kind'    => $picked ? 'check-answer' : 'check-no',
+		)
+	);
+	return $picked;
 }
 
 /**
@@ -748,15 +820,17 @@ function listen( object $thread, int $message_id, int $author ): array {
 	if ( ! $channel || Access\is_bot( $author ) || ! Access\can_see( $thread, $author ) || ! apply_filters( 'flurfunk_ai_follow_ups', true, (int) $thread->id, $author ) ) {
 		return array();
 	}
-	// Guests reach an assistant by mentioning it; what they write otherwise is context, not a request.
-	if ( 'guest' === Access\kind( $author ) ) {
-		return array();
-	}
 	$queued = array();
 	// Those taking part, and the one whose answer this person writes right after (a follow-up, also
-	// when it does not stay in threads otherwise) – not one muted in this thread.
+	// when it does not stay in threads otherwise) – not one muted in this thread. Guests reach an
+	// assistant by mentioning it or by writing on right after its answer to them; what they write
+	// otherwise is context, not a request.
 	$follow = follows( (int) $thread->id, $message_id, $author );
-	foreach ( array_unique( array_merge( present( (int) $thread->id ), $follow ? array( $follow ) : array() ) ) as $agent ) {
+	$guest  = 'guest' === Access\kind( $author );
+	if ( $guest && ! $follow ) {
+		return array();
+	}
+	foreach ( $guest ? array( $follow ) : array_unique( array_merge( present( (int) $thread->id ), $follow ? array( $follow ) : array() ) ) as $agent ) {
 		if ( muted( (int) $thread->id, $agent ) || ! may_answer( $agent, $author, $channel, $thread ) ) {
 			continue;
 		}
@@ -819,16 +893,7 @@ function check_message( object $thread, int $message_id, int $agent, bool $ambie
 	if ( is_wp_error( $full ) ) {
 		return 'no';
 	}
-	$prompt = check_prompt( $thread, $agent, $full, $ambient );
-	// Room for a short word and whatever a model does before it (newer models think first; a limit
-	// it hits counts as an error). Small models make this a fraction of a cent.
-	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
-	$own     = array_filter( array_map( 'trim', explode( ',', options()['check'] ) ) );
-	$models  = (array) apply_filters( 'flurfunk_ai_check_models', $own ?: array( 'claude-haiku-5-5', 'claude-haiku-4-5', 'gemini-2.5-flash-lite', 'gpt-5-mini' ), $agent );
-	if ( $models ) {
-		$builder = $builder->using_model_preference( ...$models );
-	}
-	$result = $builder->generate_text_result();
+	$result = quick_check( check_prompt( $thread, $agent, $full, $ambient ), $agent );
 	$word   = is_wp_error( $result ) || ! preg_match( '/^\W*(ANSWER|THANKS|NO)\b/i', (string) $result->toText(), $mm ) ? 'no' : strtolower( $mm[1] );
 	$tokens = is_wp_error( $result ) ? 0 : (int) $result->getTokenUsage()->getTotalTokens();
 	add_usage( $agent, $tokens );
@@ -845,6 +910,66 @@ function check_message( object $thread, int $message_id, int $agent, bool $ambie
 		)
 	);
 	return $word;
+}
+
+/**
+ * The question for the joint quick check: the assistants with their roles and the new thread.
+ *
+ * @param object $thread     Thread row.
+ * @param int[]  $candidates Assistants.
+ * @param array  $full       The thread as the first of them sees it.
+ */
+function pick_prompt( object $thread, array $candidates, array $full ): string {
+	$list = array();
+	foreach ( $candidates as $agent ) {
+		$p      = profile( $agent );
+		$about  = '' !== $p['role'] ? $p['role'] : mb_substr( (string) preg_replace( '/\s+/', ' ', $p['instructions'] ), 0, 160 );
+		$list[] = '- ' . Store\person( $agent )['name'] . ( '' !== $about ? ': ' . $about : '' );
+	}
+	$notes = notes_text( channel_slug( $thread ) );
+	$root  = line( (int) $full['author'], '', mb_substr( trim( ( $full['title'] ? $full['title'] . "\n" : '' ) . $full['body'] ), 0, 1200 ) );
+	return sprintf( "Someone just started this new thread in a team chat channel without mentioning anyone. These AI assistants take part in the channel:\n%s\n\nName the ONE assistant whose role fits best – only if the thread asks a question it can clearly answer, or states a concrete need it can meet, or the channel's notes say to answer this kind of message. Otherwise NO – which is most messages: news, plans, announcements, people talking to each other.%s\n\n<thread>\n%s\n</thread>\n\nAnswer with the assistant's name only, or NO.", implode( "\n", $list ), '' !== $notes ? "\n\nThe channel's notes:\n" . $notes : '', $root );
+}
+
+/**
+ * The assistant a joint quick check named (the first name in its answer; 0 for NO).
+ *
+ * @param string             $text  The model's answer.
+ * @param array<int, string> $names Assistant => name.
+ */
+function picked( string $text, array $names ): int {
+	if ( preg_match( '/^\W*NO\b/i', $text ) ) {
+		return 0;
+	}
+	$picked = 0;
+	$at     = PHP_INT_MAX;
+	foreach ( $names as $agent => $name ) {
+		$pos = '' !== $name ? mb_stripos( $text, $name ) : false;
+		if ( false !== $pos && $pos < $at ) {
+			$picked = (int) $agent;
+			$at     = $pos;
+		}
+	}
+	return $picked;
+}
+
+/**
+ * Send a quick check to a small model.
+ *
+ * @param string $prompt The question.
+ * @param int    $agent  Assistant (for the model filter).
+ * @return mixed The AI client's result or a WP_Error.
+ */
+function quick_check( string $prompt, int $agent ) {
+	// Room for a short word and whatever a model does before it (newer models think first; a limit
+	// it hits counts as an error). Small models make this a fraction of a cent.
+	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
+	$own     = array_filter( array_map( 'trim', explode( ',', options()['check'] ) ) );
+	$models  = (array) apply_filters( 'flurfunk_ai_check_models', $own ?: array( 'claude-haiku-5-5', 'claude-haiku-4-5', 'gemini-2.5-flash-lite', 'gpt-5-mini' ), $agent );
+	if ( $models ) {
+		$builder = $builder->using_model_preference( ...$models );
+	}
+	return $builder->generate_text_result();
 }
 
 /**
@@ -1253,6 +1378,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 			return reply( $thread_id, $agent, in_locale( $lang, static fn () => sprintf( __( 'The AI budget for #%s is used up for this month. An administrator can raise it under Settings → Flurfunk → AI assistants.', 'flurfunk' ), $slug ) ) );
 		}
 		$answer = with_limit( $agent, answering( $agent ), static fn () => flurfunk_as( $agent, static fn () => answer( $thread, $message_id, $agent ) ), $slug );
+		fresh_options( true ); // What others wrote while it was answering (usage, meta, other runs).
 		$ch     = Store\channel( (int) $thread->channel_id );
 		log_run(
 			array(
@@ -1753,7 +1879,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 				? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it asks you something or asks for a change, answer it now. If it only thanks you or agrees (thanks, OK, great), reply with only 👍 – it is shown as your reaction on that message. If it is not meant for you (a remark to someone else), reply with only a single dash: -', $asker_name )
 				: sprintf( '%s wrote the last message in this thread, which you take part in, without mentioning you. Answer it if it is meant for you or asks something you are clearly the one to answer – briefly, like a colleague joining in. If it only thanks you or agrees, reply with only 👍 – it is shown as your reaction on that message. Otherwise reply with only a single dash: -', $asker_name ) )
 			: ( joining()
-				? sprintf( '%s started this thread in a channel you take part in, without mentioning you; a quick check found it is something you can help with. Answer in two or three sentences, like a colleague who chips in – no list, and offer more only if it clearly helps. If on reflection it is not for you, reply with only a single dash: -', $asker_name )
+				? sprintf( '%s started this thread in a channel you take part in, without mentioning you; a quick check found it is something you can help with. Answer in two or three sentences, like a colleague who chips in – no list, and offer more only if it clearly helps. If on reflection it is not for you, or you cannot actually help (you do not know it and your tools do not find it), reply with only a single dash: -', $asker_name )
 			: sprintf( '%s mentioned you in the last message of this thread. Answer now. Only if that message asks you nothing – it just thanks you, or mentions you in passing while talking to someone else – reply with a single emoji instead and nothing else: 👍 for thanks or agreement, 👀 for being mentioned in passing. It is shown as your reaction on that message.', $asker_name ) ) ) );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),

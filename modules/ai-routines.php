@@ -142,6 +142,7 @@ function routine( array $input ) {
 	if ( 'list' === $action ) {
 		return array( 'routines' => $list( $here ) );
 	}
+	fresh_options( true ); // Called during a run: schedule into the current list of events.
 	$all = (array) get_option( ROUTINES, array() );
 	if ( 'add' !== $action ) {
 		$id = (string) ( $input['id'] ?? '' );
@@ -235,6 +236,7 @@ function run_routine( string $id ): void {
 	} finally {
 		answering( $agent, 0 );
 	}
+	fresh_options( true ); // What others wrote while it was working.
 	$all = (array) get_option( ROUTINES, array() );
 	if ( isset( $all[ $id ] ) ) {
 		$all[ $id ]['last'] = time();

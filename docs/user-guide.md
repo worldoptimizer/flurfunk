@@ -161,7 +161,8 @@ their role.
   answer, a thanks gets a 👍, talk between people gets nothing. Mentioned only in passing ("@Rita,
   ask @Lektorat later"), it puts a 👀 on the message – after a mention it never stays silent. Too
   chatty? A 👎 on one of its answers mutes it in that thread until someone mentions it again.
-  Guests reach it by mentioning it. Under each answer you see which model wrote it.
+  Guests reach it by mentioning it, or by writing on right after its answer to them. Under each
+  answer you see which model wrote it.
 - **Private conversations:** under **Assistants** in the sidebar each assistant you may ask has its
   own space. Write in the box at the bottom to start a conversation; it answers every message there
   without a mention. Only you see these conversations – not your team, not the site's

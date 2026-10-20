@@ -148,33 +148,40 @@ function register_proposals(): void {
 	flurfunk_register_provider(
 		PROPOSAL_CARD,
 		array(
-			'command'  => 'ai-proposal',
-			'label'    => __( 'Proposal of an AI assistant', 'flurfunk' ),
-			'hidden'   => true,
-			'snapshot' => __NAMESPACE__ . '\\proposal_snapshot',
-			'actions'  => array(
+			'command'    => 'ai-proposal',
+			'label'      => __( 'Proposal of an AI assistant', 'flurfunk' ),
+			'hidden'     => true,
+			// Everyone who may ask an assistant – guests too: a proposal runs with the rights of the
+			// person who clicks, so a guest can apply what was proposed for their own draft.
+			'capability' => \Flurfunk\Caps\GUEST,
+			'can'        => static fn ( int $user_id ): bool => 'team' === Access\kind( $user_id ) || user_can( $user_id, CAP ),
+			'snapshot'   => __NAMESPACE__ . '\\proposal_snapshot',
+			'actions'    => array(
 				'run'     => array(
-					'label'    => __( 'Run', 'flurfunk' ),
+					'label'      => __( 'Run', 'flurfunk' ),
+					'capability' => \Flurfunk\Caps\GUEST,
 					/* translators: %s: person */
-					'done'     => __( '%s ran the proposal', 'flurfunk' ),
-					'style'    => 'primary',
-					'confirm'  => __( 'Run this now, with your rights?', 'flurfunk' ),
-					'callback' => __NAMESPACE__ . '\\run_proposal',
+					'done'       => __( '%s ran the proposal', 'flurfunk' ),
+					'style'      => 'primary',
+					'confirm'    => __( 'Run this now, with your rights?', 'flurfunk' ),
+					'callback'   => __NAMESPACE__ . '\\run_proposal',
 				),
 				'undo'    => array(
-					'label'    => __( 'Undo', 'flurfunk' ),
+					'label'      => __( 'Undo', 'flurfunk' ),
+					'capability' => \Flurfunk\Caps\GUEST,
 					/* translators: %s: person */
-					'done'     => __( '%s undid the changes', 'flurfunk' ),
-					'style'    => 'secondary',
-					'confirm'  => __( 'Undo these changes, with your rights?', 'flurfunk' ),
-					'callback' => __NAMESPACE__ . '\\undo_proposal',
+					'done'       => __( '%s undid the changes', 'flurfunk' ),
+					'style'      => 'secondary',
+					'confirm'    => __( 'Undo these changes, with your rights?', 'flurfunk' ),
+					'callback'   => __NAMESPACE__ . '\\undo_proposal',
 				),
 				'dismiss' => array(
-					'label'    => __( 'Dismiss', 'flurfunk' ),
+					'label'      => __( 'Dismiss', 'flurfunk' ),
+					'capability' => \Flurfunk\Caps\GUEST,
 					/* translators: %s: person */
-					'done'     => __( '%s dismissed the proposal', 'flurfunk' ),
-					'style'    => 'secondary',
-					'callback' => static function ( array $ref, array $card, int $user_id ) {
+					'done'       => __( '%s dismissed the proposal', 'flurfunk' ),
+					'style'      => 'secondary',
+					'callback'   => static function ( array $ref, array $card, int $user_id ) {
 						$p = proposal( (string) ( $ref['id'] ?? '' ) );
 						if ( ! $p || 'open' !== $p['state'] ) {
 							return null;

@@ -313,7 +313,7 @@ function register(): void {
 		'flurfunk/find-posts',
 		array(
 			'label'               => __( 'Find posts', 'flurfunk' ),
-			'description'         => __( 'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author and the first words; read one with flurfunk/get-post.', 'flurfunk' ),
+			'description'         => __( 'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author, the address of published ones and the first words; read one with flurfunk/get-post.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -361,11 +361,21 @@ function register(): void {
 					'no_found_rows'       => true,
 					's'                   => sanitize_text_field( (string) ( $input['search'] ?? '' ) ),
 				);
-				if ( 'team' !== Access\kind( $uid ) ) {
-					$args['post__in'] = Access\owned_post_ids( $uid ) ?: array( 0 );
+				if ( 'team' === Access\kind( $uid ) ) {
+					$posts = get_posts( $args );
+				} else {
+					// Guests: what anyone may read on the site, and their own posts.
+					$own   = get_posts( array( 'post__in' => Access\owned_post_ids( $uid ) ?: array( 0 ) ) + $args );
+					$pub   = array_intersect( $args['post_status'], array( 'publish' ) ) ? get_posts( array( 'post_status' => array( 'publish' ) ) + $args ) : array();
+					$posts = array();
+					foreach ( array_merge( $own, $pub ) as $p ) {
+						$posts[ $p->ID ] = $p;
+					}
+					$key = 'modified' === $args['orderby'] ? 'post_modified' : 'post_date';
+					uasort( $posts, static fn ( $a, $b ) => strcmp( $b->$key, $a->$key ) );
 				}
 				$out = array();
-				foreach ( get_posts( $args ) as $p ) {
+				foreach ( $posts as $p ) {
 					if ( count( $out ) < $limit && \Flurfunk\Providers\visible_post( $p, $uid ) ) {
 						$out[] = array(
 							'id'       => $p->ID,
@@ -374,6 +384,7 @@ function register(): void {
 							'date'     => (string) $p->post_date,
 							'modified' => (string) $p->post_modified,
 							'author'   => (string) get_the_author_meta( 'display_name', (int) $p->post_author ),
+							'url'      => 'publish' === $p->post_status ? (string) get_permalink( $p ) : '',
 							'words'    => str_word_count( plain_text( $p ), 0, 'äöüÄÖÜß' ),
 							'start'    => mb_substr( plain_text( $p ), 0, 160 ),
 						);
@@ -414,7 +425,7 @@ function register(): void {
 				$uid = get_current_user_id();
 				$p   = get_post( (int) ( (array) $input )['id'] );
 				$ok  = $p && in_array( $p->post_type, \Flurfunk\Settings\get()['post_types'], true ) && \Flurfunk\Providers\visible_post( $p, $uid ) && user_can( $uid, 'read_post', $p->ID )
-					&& ( 'team' === Access\kind( $uid ) || in_array( $p->ID, Access\owned_post_ids( $uid ), true ) );
+					&& ( 'team' === Access\kind( $uid ) || 'publish' === $p->post_status || in_array( $p->ID, Access\owned_post_ids( $uid ), true ) );
 				if ( ! $ok ) {
 					return new \WP_Error( 'flurfunk_forbidden', __( 'This post does not exist or you may not see it.', 'flurfunk' ), array( 'status' => 404 ) );
 				}

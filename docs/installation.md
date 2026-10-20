@@ -198,7 +198,7 @@ the `flurfunk_owned_post_ids` filter.
 | Upload files | people with `upload_files`, and assistants |
 | Attach files from the media library | their own files and files they may edit; assistants (through the API) any file not attached to a private post |
 | Add a Flurfunk file to the media library | people with `upload_files`; guests only their own files |
-| Use a card command | team; guests only commands meant for them (like `/post`, their own posts) |
+| Use a card command | team; guests only commands meant for them (like `/post`, their own posts) and the proposals of an assistant they may ask (they run with their rights) |
 | Manage settings, channels, permissions and modules | people with `flurfunk_manage` |
 
 Developers can adjust several of these with filters (`flurfunk_can_edit`, `flurfunk_can_resolve`,
