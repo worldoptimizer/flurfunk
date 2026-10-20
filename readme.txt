@@ -114,6 +114,12 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
+= 0.6.0 (in development) =
+* New: an assistant stays in a thread once it has answered (for two days, on by default): anyone there can write on without mentioning it, as with one shared assistant per thread. A quick check with a small, cheap model decides whether a message is for it – an answer, a 👍 for thanks, or nothing for talk between people; "is thinking" only shows once it answers. Follow-ups of the person who asked go through the same check, which makes them cheaper.
+* New: per channel, a limit that caps every assistant there on top of its own (e.g. so it cannot quote internal drafts in a channel guest authors read), and a monthly token budget shared by the assistants in that channel.
+* New: the AI log shows the quick checks (for it, thanks, not for it) with model and tokens.
+* Fixed: deleting the plugin with "keep data" off now also removes the AI assistants' settings.
+
 = 0.5.0 =
 * New: limits for AI assistants. An assistant can never do more than the person asking, and it never administers the site (users, plugins, themes, settings, unfiltered HTML are off while it works). "May at most act as" sets a role as a ceiling on top – also for what it reads, e.g. no other people's drafts within the limit Author. Proposals it may not make within the limit are not offered; a card runs within the limit too. The assistant says when its limit may hide something.
 * New: AI assistants can write drafts (pack "Drafts", off by default): "make an article of this thread, with the photo" gives a draft – the person asking is its author, images from the conversation go along (into the media library) – and a card under the answer. Follow-ups change the draft until someone else works on it. It never publishes. Abilities flurfunk/create-draft and flurfunk/update-draft.

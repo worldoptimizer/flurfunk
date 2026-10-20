@@ -293,9 +293,16 @@ where, model, tokens, tools), and offer **Summarize** in threads – a private s
 who asks, never posted.
 
 For a help channel (e.g. #ask-ai) an assistant can answer every new thread there without being
-mentioned. Right after an answer, the person who asked can simply write on (a follow-up); once
-someone else writes, the assistant needs a new mention (`flurfunk_ai_follow_ups` switches follow-ups
-off).
+mentioned. Once it has answered in a thread, it stays there for two days: anyone can write on
+without mentioning it, and a quick check with a small, cheap model (Claude Haiku, Gemini Flash Lite
+or GPT mini, whichever your provider offers) decides whether a message is for it – about 300 to 800
+tokens per message, counted in its budget and shown in the log. **Stays in a thread once it has
+answered** switches this off per assistant (then only the asker's follow-ups count);
+`flurfunk_ai_follow_ups` switches all of it off.
+
+**Per channel** (under the assistants): instructions, a limit that caps every assistant there on top
+of its own (e.g. in a channel guest authors read, so it cannot quote internal drafts) and a monthly
+token budget shared by the assistants in that channel.
 
 **Rights.** An assistant never can more than the person asking it, and never anything that
 administers the site: while it works, users, plugins, themes, settings, unfiltered HTML and

@@ -70,7 +70,7 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\routes' );
  * An assistant's AI profile (with defaults).
  *
  * @param int $user_id Assistant.
- * @return array{on:bool, instructions:string, models:string, channels:string[], guests:bool, budget:int, posts:bool, drafts:bool, tools:string[], proposals:string[], auto:string[], role:string, limit:string}
+ * @return array{on:bool, instructions:string, models:string, channels:string[], guests:bool, budget:int, posts:bool, drafts:bool, stays:bool, tools:string[], proposals:string[], auto:string[], role:string, limit:string}
  */
 function profile( int $user_id ): array {
 	$p = get_user_meta( $user_id, PROFILE, true );
@@ -84,6 +84,7 @@ function profile( int $user_id ): array {
 		'budget'       => max( 0, (int) ( $p['budget'] ?? 0 ) ),
 		'posts'        => ! array_key_exists( 'posts', $p ) || ! empty( $p['posts'] ),
 		'drafts'       => ! empty( $p['drafts'] ),
+		'stays'        => ! array_key_exists( 'stays', $p ) || ! empty( $p['stays'] ), // Multiplayer: on by default.
 		'tools'        => array_values( array_map( 'strval', (array) ( $p['tools'] ?? array() ) ) ),
 		'proposals'    => array_values( array_map( 'strval', (array) ( $p['proposals'] ?? array() ) ) ),
 		'auto'         => array_values( array_map( 'strval', (array) ( $p['auto'] ?? array() ) ) ),
@@ -110,6 +111,7 @@ function save_profile( int $user_id, array $in ): array {
 		'budget'       => max( 0, (int) ( $in['budget'] ?? 0 ) ),
 		'posts'        => ! empty( $in['posts'] ),
 		'drafts'       => ! empty( $in['drafts'] ),
+		'stays'        => isset( $in['packs_form'] ) || array_key_exists( 'stays', $in ) ? ! empty( $in['stays'] ) : true, // The form sends it when ticked; elsewhere it defaults to on.
 		'tools'        => array_values( array_intersect( array_keys( readonly_abilities() ), array_map( 'strval', (array) ( $in['tools'] ?? array() ) ) ) ),
 		'proposals'    => array_values( array_intersect( array_keys( writable_abilities() ), array_map( 'strval', (array) ( $in['proposals'] ?? array() ) ) ) ),
 		'role'         => mb_substr( sanitize_text_field( (string) ( $in['role'] ?? '' ) ), 0, 80 ),
@@ -544,11 +546,121 @@ function message_added( $thread, int $message_id ): void {
 		if ( ! empty( $thread->private_to ) && 'assistant' === $thread->target_type ) {
 			$text .= doing_action( 'flurfunk_message_edited' ) ? '' : ' <@' . (int) $thread->target_id . '>'; // A private conversation: every message is for its assistant.
 		} elseif ( ! doing_action( 'flurfunk_message_edited' ) && ! str_contains( $text, '<@' ) ) {
-			$agent = follows( (int) $thread->id, $message_id, (int) $m->author_id );
-			$text .= $agent ? ' <@' . $agent . '>' : '';
+			// Writing on without a mention in a thread an assistant takes part in – a follow-up of the
+			// person who asked, or anyone else (as in Claude Tag, one shared assistant per thread): it
+			// listens, and a quick check decides whether the message is for it.
+			listen( $thread, $message_id, (int) $m->author_id );
 		}
 		queue( $thread, $message_id, (int) $m->author_id, $text );
 	}
+}
+
+/**
+ * The assistants taking part in a thread: those that answered there in the last two days and stay
+ * in threads (their profile's "stays").
+ *
+ * @param int $thread_id Thread.
+ * @return int[]
+ */
+function present( int $thread_id ): array {
+	global $wpdb;
+	$agents = agents();
+	if ( ! $agents ) {
+		return array();
+	}
+	$since = gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'flurfunk_ai_stays_for', 2 * DAY_IN_SECONDS ) );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Flurfunk's own table; the IN list is placeholders.
+	$ids = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT author_id FROM %i WHERE thread_id = %d AND type = 'message' AND created >= %s AND author_id IN (" . implode( ',', array_fill( 0, count( $agents ), '%d' ) ) . ')', array_merge( array( table( 'messages' ), $thread_id, $since ), $agents ) ) );
+	return array_values( array_filter( array_map( 'intval', (array) $ids ), static fn ( int $a ): bool => profile( $a )['stays'] ) );
+}
+
+/**
+ * Queue a listening run for every assistant taking part in the thread (no "is thinking" yet: that
+ * shows once the quick check says the message is for it).
+ *
+ * @param object $thread     Thread row.
+ * @param int    $message_id Message.
+ * @param int    $author     Who wrote it.
+ * @return int[] Agents queued.
+ */
+function listen( object $thread, int $message_id, int $author ): array {
+	$channel = Store\channel( (int) $thread->channel_id );
+	if ( ! $channel || Access\is_bot( $author ) || ! Access\can_see( $thread, $author ) || ! apply_filters( 'flurfunk_ai_follow_ups', true, (int) $thread->id, $author ) ) {
+		return array();
+	}
+	$queued = array();
+	// Those taking part, and the one whose answer this person writes right after (a follow-up, also
+	// when it does not stay in threads otherwise).
+	$follow = follows( (int) $thread->id, $message_id, $author );
+	foreach ( array_unique( array_merge( present( (int) $thread->id ), $follow ? array( $follow ) : array() ) ) as $agent ) {
+		if ( ! may_answer( $agent, $author, $channel, $thread ) ) {
+			continue;
+		}
+		$args = array( (int) $thread->id, $message_id, $agent );
+		if ( ! wp_next_scheduled( HOOK, $args ) ) {
+			wp_schedule_single_event( time(), HOOK, $args );
+		}
+		$queued[] = $agent;
+	}
+	if ( $queued ) {
+		start_soon( (int) $thread->id, $message_id, $queued );
+	}
+	return $queued;
+}
+
+/**
+ * The quick check before an assistant answers a message that does not mention it: is it for it? A
+ * small, cheap model reads the end of the thread and answers ANSWER (a question or request for it),
+ * THANKS (thanks or agreement to it – a 👍 is enough) or NO (not for it). Counted in its budget.
+ *
+ * @param object $thread     Thread row.
+ * @param int    $message_id The message.
+ * @param int    $agent      Assistant.
+ * @return string 'answer', 'thanks' or 'no'.
+ */
+function check_message( object $thread, int $message_id, int $agent ): string {
+	$pre = apply_filters( 'flurfunk_ai_pre_check', null, $thread, $message_id, $agent );
+	if ( null !== $pre ) {
+		return is_string( $pre ) ? $pre : ( $pre ? 'answer' : 'no' );
+	}
+	if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+		return 'no';
+	}
+	$full = Store\full_thread( (int) $thread->id, $agent );
+	if ( is_wp_error( $full ) ) {
+		return 'no';
+	}
+	$lines = array();
+	foreach ( array_slice( array_filter( $full['messages'], static fn ( $m ) => 'message' === $m['type'] ), -8 ) as $m ) {
+		$lines[] = line( (int) $m['author'], '', mb_substr( (string) $m['text'], 0, 400 ) );
+	}
+	$me     = Store\person( $agent )['name'];
+	$role   = profile( $agent )['role'];
+	$prompt = sprintf( "You are %s, an AI assistant%s taking part in this team chat thread. Look at the LAST message only.\n\nANSWER – it asks you something or asks you to do something, or asks the group something you are clearly the one to answer (also a correction of or follow-up to what you said).\nTHANKS – it only thanks you or agrees with you (thanks, great, OK) right after your answer.\nNO – anything else: people talking to each other, plans, thanks to someone else, remarks.\n\n<thread>\n%s\n</thread>\n\nAnswer with one word: ANSWER, THANKS or NO.", $me, '' !== $role ? ' (' . $role . ')' : '', implode( "\n\n", $lines ) );
+	// Room for a short word and whatever a model does before it (newer models think first; a limit
+	// it hits counts as an error). Small models make this a fraction of a cent.
+	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
+	$models  = (array) apply_filters( 'flurfunk_ai_check_models', array( 'claude-haiku-5-5', 'claude-haiku-4-5', 'gemini-2.5-flash-lite', 'gpt-5-mini' ), $agent );
+	if ( $models ) {
+		$builder = $builder->using_model_preference( ...$models );
+	}
+	$result = $builder->generate_text_result();
+	$word   = is_wp_error( $result ) || ! preg_match( '/^\W*(ANSWER|THANKS|NO)\b/i', (string) $result->toText(), $mm ) ? 'no' : strtolower( $mm[1] );
+	$tokens = is_wp_error( $result ) ? 0 : (int) $result->getTokenUsage()->getTotalTokens();
+	add_usage( $agent, $tokens );
+	log_run(
+		array(
+			'agent'   => $agent,
+			'asker'   => (int) ( $full['messages'] ? end( $full['messages'] )['author'] : 0 ),
+			'thread'  => (int) $thread->id,
+			'channel' => channel_slug( $thread ),
+			'model'   => is_wp_error( $result ) ? '' : (string) $result->getModelMetadata()->getId(),
+			'tokens'  => $tokens,
+			'error'   => is_wp_error( $result ) ? $result->get_error_message() : '',
+			'kind'    => 'check-' . $word,
+		)
+	);
+	return $word;
 }
 
 /**
@@ -837,6 +949,23 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		language( $agent, $lang );
 		$p = profile( $agent );
 		$u = usage( $agent );
+		// Joining in unasked (it listens in a thread it takes part in): only if the quick check says
+		// the message is for it – otherwise nothing at all, and no "is thinking" before that.
+		$listening = $question && empty( $thread->private_to ) && ! str_contains( (string) $question->body, '<@' . $agent . '>' );
+		$follow_up = $listening && follows( $thread_id, $message_id, (int) $question->author_id ) === $agent;
+		if ( $listening && ( ( ! $p['stays'] && ! $follow_up ) || ( $p['budget'] && $u['tokens'] >= $p['budget'] ) || channel_spent( channel_slug( $thread ) ) ) ) {
+			return null;
+		}
+		$check = $listening ? check_message( $thread, $message_id, $agent ) : 'answer';
+		if ( 'thanks' === $check ) {
+			return react( $thread_id, $message_id, $agent, '👍' ); // Thanks, OK: a reaction is enough – no answer needed.
+		}
+		if ( 'answer' !== $check ) {
+			return null; // Not for it: nothing at all.
+		}
+		if ( $listening ) {
+			set_busy( $thread_id, $agent, true );
+		}
 		if ( $p['budget'] && $u['tokens'] >= $p['budget'] ) {
 			if ( $u['warned'] ) {
 				return null;
@@ -1339,7 +1468,9 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 	);
 	$prompt = $posts . "<thread>\n" . $head . ( '' !== $body ? "\n\n" . $body : '' ) . "\n</thread>\n\n"
 		. ( '' !== $task ? $task : ( $message_id && empty( $thread->private_to ) && ! str_contains( $said, '<@' . $agent . '>' )
-			? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it asks you something or asks for a change, answer it now. If it only thanks you or agrees (thanks, OK, great), reply with only 👍 – it is shown as your reaction on that message. If it is not meant for you (a remark to someone else), reply with only a single dash: -', $asker_name )
+			? ( follows( (int) $thread->id, $message_id, $asker ) === $agent
+				? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it asks you something or asks for a change, answer it now. If it only thanks you or agrees (thanks, OK, great), reply with only 👍 – it is shown as your reaction on that message. If it is not meant for you (a remark to someone else), reply with only a single dash: -', $asker_name )
+				: sprintf( '%s wrote the last message in this thread, which you take part in, without mentioning you. Answer it if it is meant for you or asks something you are clearly the one to answer – briefly, like a colleague joining in. If it only thanks you or agrees, reply with only 👍 – it is shown as your reaction on that message. Otherwise reply with only a single dash: -', $asker_name ) )
 			: sprintf( '%s mentioned you in the last message of this thread. Answer now. Only if that message asks you nothing – it just thanks you, or mentions you in passing while talking to someone else – reply with a single emoji instead and nothing else: 👍 for thanks or agreement, 👀 for being mentioned in passing. It is shown as your reaction on that message.', $asker_name ) ) );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
@@ -1682,6 +1813,8 @@ function render_section(): void {
 					?></span>
 				</p>
 				<p class="ff-ai-row"><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[guests]" value="1" <?php checked( $p['guests'] ); ?>> <?php esc_html_e( 'Guests may ask it too', 'flurfunk' ); ?></label></p>
+				<p class="ff-ai-row"><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[stays]" value="1" <?php checked( $p['stays'] ); ?>> <?php esc_html_e( 'Stays in a thread once it has answered: anyone there can write on without mentioning it again', 'flurfunk' ); ?></label>
+					<br><span class="description"><?php esc_html_e( 'For two days after its last answer. A quick check with a small model decides whether a message is for it – a few tokens per message, counted in its budget.', 'flurfunk' ); ?></span></p>
 
 				<h4><label for="ff-ai-l-<?php echo (int) $bot->ID; ?>"><?php esc_html_e( 'Rights', 'flurfunk' ); ?></label></h4>
 				<p class="ff-ai-row">
@@ -1792,6 +1925,12 @@ function render_log(): void {
 						echo '' !== (string) $e['error'] ? '<span style="color:#b32d2e">' . esc_html( (string) $e['error'] ) . '</span>' : esc_html( (string) $e['model'] );
 						if ( 'summary' === ( $e['kind'] ?? '' ) ) {
 							echo '<br><small>' . esc_html__( 'Summary', 'flurfunk' ) . '</small>';
+						} elseif ( str_starts_with( (string) ( $e['kind'] ?? '' ), 'check-' ) ) {
+							$words = array(
+								'check-answer' => __( 'Quick check: for it', 'flurfunk' ),
+								'check-thanks' => __( 'Quick check: thanks (reacted)', 'flurfunk' ),
+							);
+							echo '<br><small>' . esc_html( $words[ $e['kind'] ] ?? __( 'Quick check: not for it', 'flurfunk' ) ) . '</small>';
 						}
 						if ( ! empty( $e['tools'] ) ) {
 							/* translators: %s: tool names */

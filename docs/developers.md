@@ -964,6 +964,10 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_summaries_per_hour` (filter) | `int $max` (20) | Private summaries per person and hour. |
 | `flurfunk_ability_channel` (filter) | `bool $ok`, `string $channel` | Narrow the channels Flurfunk's reading abilities return; the AI module uses it while an assistant looks things up. |
 | `flurfunk_ai_follow_ups` (filter) | `bool $on` (true), `int $thread_id`, `int $author` | false: a reply right after an assistant's answer needs a new mention. |
+| `flurfunk_ai_pre_check` (filter) | `null`, `object $thread`, `int $message_id`, `int $agent` | Decide the quick check yourself: `'answer'`, `'thanks'`, `'no'` (or true/false). |
+| `flurfunk_ai_check_models` (filter) | `string[] $models`, `int $agent` | Models for the quick check, first available wins (default: small Claude, Gemini, GPT models). |
+| `flurfunk_ai_check_max_tokens` (filter) | `int $max` (600) | Room for the quick check (newer models think first). |
+| `flurfunk_ai_stays_for` (filter) | `int $seconds` (two days) | How long an assistant stays in a thread after its last answer. |
 | `flurfunk_private_partners` (filter) | `array $list`, `int $user_id` | Who a person may talk to in private: `[ { id, name, role } ]`. The AI module adds the assistants this person may ask. |
 | `flurfunk_reaction` (action) | `object $thread`, `int $message_id` (0 = the thread), `string $emoji`, `int $user_id`, `bool $added` | A reaction was added or taken back. |
 | `flurfunk_reactions_per_minute` (filter) | `int $max` (60), `int $user_id` | Brake for reactions. |

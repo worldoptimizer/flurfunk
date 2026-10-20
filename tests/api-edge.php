@@ -1090,7 +1090,40 @@ $as( $team2 );
 $fu_m2 = Store\add_message( $fu_t, array( 'body' => 'Ich übernehme das.' ) );
 $as( $team );
 $fu_m3 = Store\add_message( $fu_t, array( 'body' => 'Danke dir.' ) );
-$check( '… but not when someone else writes after it, nor after that person\'s message', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m2, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m3, $ai_bot ) ) );
+$check( 'someone else writing on: the assistant taking part listens (a run is queued) but shows no "is thinking" yet', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m2, $ai_bot ) ) && (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $fu_m3, $ai_bot ) ) && ! in_array( $ai_bot, Store\full_thread( $fu_t, $team )['thinking'] ?? array(), true ) );
+// Multiplayer: the quick check decides; not for it means nothing at all.
+add_filter( 'flurfunk_ai_pre_check', '__return_false' );
+add_filter( 'flurfunk_ai_pre_answer', $mp_fake = static fn () => array( 'text' => 'Ich helfe gern.', 'tokens' => 5 ), 20 );
+$mp_r1 = Flurfunk\Modules\Ai\run( $fu_t, $fu_m2, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_check', '__return_false' );
+$check( '… the quick check says it is not for it: nothing, not even a reaction', null === $mp_r1 && $team === $fu_last( $fu_t ) && ! ( Flurfunk\Reactions\for_threads( array( $fu_t ) )[ $fu_t ][ $fu_m2 ] ?? array() ) );
+$as( $team2 );
+$mp_m = Store\add_message( $fu_t, array( 'body' => 'Weiß jemand, wie lang ein Teaser sein darf?' ) );
+$mp_ctx = Flurfunk\Modules\Ai\context( Store\thread_row( $fu_t ), $mp_m, $ai_bot );
+add_filter( 'flurfunk_ai_pre_check', '__return_true' );
+$mp_r2 = Flurfunk\Modules\Ai\run( $fu_t, $mp_m, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_check', '__return_true' );
+remove_filter( 'flurfunk_ai_pre_answer', $mp_fake, 20 );
+$as( $team );
+$check( '… it is: the assistant answers the other person, told it joins in unasked', is_int( $mp_r2 ) && $ai_bot === $fu_last( $fu_t ) && str_contains( $mp_ctx['prompt'], 'which you take part in' ) && $team2 === ( $mp_ctx['asker'] ?? 0 ), substr( $mp_ctx['prompt'], -300 ) );
+$check( '… it takes part in that thread now, not in others', in_array( $ai_bot, Flurfunk\Modules\Ai\present( $fu_t ), true ) && ! in_array( $ai_bot, Flurfunk\Modules\Ai\present( Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Ohne KI' ) ) ), true ) );
+$mp_m2 = Store\add_message( $fu_t, array( 'body' => "<@$team2> kannst du das übernehmen?" ) );
+add_filter( 'flurfunk_ai_stays_for', $mp_past = static fn () => -60 ); // Its time in the thread is over.
+$mp_m3 = Store\add_message( $fu_t, array( 'body' => 'Und sonst?' ) );
+remove_filter( 'flurfunk_ai_stays_for', $mp_past );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'stays' => '' ) );
+$mp_m4 = Store\add_message( $fu_t, array( 'body' => 'Noch jemand?' ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+$mp_t5 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Noch eine Frage" ) );
+add_filter( 'flurfunk_ai_pre_answer', $mp_fake2 = static fn () => array( 'text' => 'Gern geschehen, ausführlich.', 'tokens' => 5 ), 20 );
+Flurfunk\Modules\Ai\run( $mp_t5, 0, $ai_bot );
+$mp_th = Store\add_message( $mp_t5, array( 'body' => 'Danke dir!' ) );
+add_filter( 'flurfunk_ai_pre_check', $mp_thanks = static fn () => 'thanks' );
+$mp_r5 = Flurfunk\Modules\Ai\run( $mp_t5, $mp_th, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_check', $mp_thanks );
+remove_filter( 'flurfunk_ai_pre_answer', $mp_fake2, 20 );
+$check( 'the quick check says "thanks": a 👍 on the message right away, no answer and no big model', null === $mp_r5 && $team === $fu_last( $mp_t5 ) && (bool) array_filter( Flurfunk\Reactions\for_threads( array( $mp_t5 ) )[ $mp_t5 ][ $mp_th ] ?? array(), static fn ( $r ) => in_array( $ai_bot, $r['people'], true ) ) );
+$check( '… it does not listen to a message for someone else, after its time in the thread, or when its profile says so', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m2, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m3, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m4, $ai_bot ) ) );
 $fu_t2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Zweite Frage" ) );
 Flurfunk\Modules\Ai\run( $fu_t2, 0, $ai_bot );
 $fu_m4 = Store\add_message( $fu_t2, array( 'body' => "<@$team2> schau mal" ) );
@@ -1102,6 +1135,8 @@ add_filter( 'flurfunk_ai_pre_answer', $fu_dash = static fn () => array( 'text' =
 $fu_r = Flurfunk\Modules\Ai\run( $fu_t3, $fu_m5, $ai_bot );
 remove_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
 $check( '… and a follow-up that needs no answer gets none', null === $fu_r && $team === $fu_last( $fu_t3 ) && array() === Store\full_thread( $fu_t3, $team )['thinking'] );
+// (Follow-ups go through the quick check first; here it lets them through.)
+add_filter( 'flurfunk_ai_pre_check', '__return_true' );
 // Reacting instead of replying, as in Slack: thanks gets 👍, being mentioned in passing 👀 – never silence after a mention.
 $rx_has = static fn ( int $t, int $m, string $e ) => (bool) array_filter( Flurfunk\Reactions\for_threads( array( $t ) )[ $t ][ $m ] ?? array(), static fn ( $r ) => Flurfunk\Reactions\key( $r['emoji'] ) === Flurfunk\Reactions\key( $e ) && in_array( $ai_bot, $r['people'], true ) );
 $rx_ctx = Flurfunk\Modules\Ai\context( Store\thread_row( $fu_t3 ), $fu_m5, $ai_bot );
@@ -1119,6 +1154,7 @@ $rx_m2 = Store\add_message( $fu_t3, array( 'body' => 'Das war für Jakob.' ) );
 $rx_r4 = Flurfunk\Modules\Ai\run( $fu_t3, $rx_m2, $ai_bot );
 remove_filter( 'flurfunk_ai_pre_answer', $fu_dash, 20 );
 $check( '… and after a mention it never stays silent: a dash becomes 👀; without a mention a dash stays nothing', null === $rx_r3 && $rx_has( $fu_t3, $rx_m, '👀' ) && null === $rx_r4 && ! ( Flurfunk\Reactions\for_threads( array( $fu_t3 ) )[ $fu_t3 ][ $rx_m2 ] ?? array() ) && $team === $fu_last( $fu_t3 ) );
+remove_filter( 'flurfunk_ai_pre_check', '__return_true' );
 add_filter( 'flurfunk_ai_follow_ups', '__return_false' );
 $fu_t4 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Vierte Frage" ) );
 Flurfunk\Modules\Ai\run( $fu_t4, 0, $ai_bot );
