@@ -1611,6 +1611,36 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/remember' 
 }
 null === $mem_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $mem_opts );
 null === $mem_old ? delete_option( 'flurfunk_ai_memory' ) : update_option( 'flurfunk_ai_memory', $mem_old );
+// Check-ins: "remind us on Friday" – the assistant follows up in the thread when it is due.
+WP_CLI::log( 'AI check-ins' );
+$fo_old = get_option( 'flurfunk_ai_followups', null );
+delete_option( 'flurfunk_ai_followups' );
+$as( $team );
+$fo_t = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Bildrechte Gipfel-Foto' ) );
+$check( 'nobody but an assistant at work sets check-ins', ! Flurfunk\Modules\Ai\may_follow_up( array( 'thread' => $fo_t ) ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/follow-up' ) ) {
+	$check( 'every assistant can check back later, and is told when to (with this thread\'s number)', in_array( 'flurfunk/follow-up', array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) ), true ) && str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $fo_t ), 0, $ai_bot )['system'], 'flurfunk/follow-up (thread ' . $fo_t . ',' ) );
+	Flurfunk\Modules\Ai\working( $ai_bot );
+	$fo_soon = wp_date( 'Y-m-d H:i', time() + 2 * DAY_IN_SECONDS );
+	$fo_a = wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'when' => $fo_soon, 'note' => 'Sind die Bildrechte geklärt?' ) );
+	$fo_b = wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'when' => '2001-01-01 10:00', 'note' => 'x' ) );
+	$fo_c = wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'when' => wp_date( 'Y-m-d H:i', time() + 90 * DAY_IN_SECONDS ), 'note' => 'x' ) );
+	Flurfunk\Modules\Ai\working( 0 );
+	$check( 'a check-in is set for a time in the site\'s zone and scheduled; not in the past, not more than 60 days ahead', is_array( $fo_a ) && $fo_soon === ( $fo_a['when'] ?? '' ) && (bool) wp_next_scheduled( 'flurfunk_ai_check_in', array( $fo_a['id'] ) ) && is_wp_error( $fo_b ) && is_wp_error( $fo_c ), array( $fo_a, $fo_b, $fo_c ) );
+	$fo_name = Store\person( $team2 )['name'];
+	add_filter( 'flurfunk_ai_pre_answer', $fo_fake = static fn ( $pre, $ctx ) => array( 'text' => str_contains( $ctx['prompt'], 'Sind die Bildrechte geklärt?' ) ? 'Sind die Bildrechte inzwischen geklärt? @' . strtok( $fo_name, ' ' ) . ', kannst du kurz Bescheid geben?' : 'falsch', 'tokens' => 9 ), 20, 2 );
+	list( $fo_notes ) = $flush( static fn () => Flurfunk\Modules\Ai\check_in( $fo_a['id'] ) );
+	remove_filter( 'flurfunk_ai_pre_answer', $fo_fake, 20 );
+	$fo_last = end( Store\full_thread( $fo_t, $team )['messages'] );
+	$check( 'when it is due, the assistant follows up in the thread with what to check, and the person it names is mentioned and notified', $ai_bot === (int) $fo_last['author'] && str_contains( $fo_last['text'], '<@' . $team2 . '>' ) && 'mention' === ( $fo_notes[ $team2 ] ?? '' ) && ! Flurfunk\Modules\Ai\followups( $fo_t ), array( $fo_last['text'] ?? '', $fo_notes ) );
+	Flurfunk\Modules\Ai\working( $ai_bot );
+	wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'when' => $fo_soon, 'note' => 'a' ) );
+	wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'when' => $fo_soon, 'note' => 'b' ) );
+	$fo_x = wp_get_ability( 'flurfunk/follow-up' )->execute( array( 'thread' => $fo_t, 'cancel' => true ) );
+	Flurfunk\Modules\Ai\working( 0 );
+	$check( '… and "forget it" cancels its check-ins in that thread', 2 === ( $fo_x['cancelled'] ?? 0 ) && ! Flurfunk\Modules\Ai\followups( $fo_t ), $fo_x );
+}
+null === $fo_old ? delete_option( 'flurfunk_ai_followups' ) : update_option( 'flurfunk_ai_followups', $fo_old );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";

@@ -166,6 +166,9 @@ their role.
   administrators. Each conversation is separate: a new one starts fresh, the assistant does not
   remember the others.
 
+- **Check back later:** "@Lektorat, remind us on Friday at 10 whether the photo rights are
+  settled" – at that time it looks at the thread again and follows up there: asks whether it is done
+  and mentions who should answer, or says it is settled. "Forget the reminder" cancels it.
 - **Notes per channel:** if your site keeps them, tell an assistant "remember: teasers at most 200
   characters" – it keeps the note for that channel, every assistant there knows it from then on,
   and "it is 180 now" changes it. Notes stay in their channel; private conversations have none.

@@ -19,6 +19,7 @@ wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
 delete_option( 'flurfunk_rewrite' );
 delete_option( 'flurfunk_welcome' );
 delete_option( 'flurfunk_modules' );
+wp_unschedule_hook( 'flurfunk_ai_check_in' ); // Check-ins AI assistants set themselves.
 
 // Capabilities: Flurfunk's own, and declared ones that no role had before Flurfunk granted them.
 $flurfunk_remove_caps = static function (): void {

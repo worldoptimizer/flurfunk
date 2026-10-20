@@ -300,6 +300,10 @@ tokens per message, counted in its budget and shown in the log. **Stays in a thr
 answered** switches this off per assistant (then only the asker's follow-ups count);
 `flurfunk_ai_follow_ups` switches all of it off.
 
+**Check-ins:** asked to "remind us on Friday whether …", an assistant sets itself a check-in (at
+most five per thread, at most 60 days ahead) and follows up in the thread when it is due, with the
+rights of the person who asked. It does not nag on its own; tasks remind people of due dates anyway.
+
 **Notes per channel** (a switch at the top, off by default): when someone asks an assistant to
 remember something lasting ("teasers at most 200 characters"), it keeps a short note for that
 channel, and every assistant there reads the channel's notes – only on request, never in private
