@@ -1438,6 +1438,15 @@ foreach ( array( 'editor', 'author', 'contributor' ) as $lim_role ) {
 	$lim_users[ $lim_role ] = (int) wp_insert_user( array( 'user_login' => 'ff-test-lim-' . $lim_role . '-' . strtolower( wp_generate_password( 4, false, false ) ), 'user_pass' => wp_generate_password(), 'user_email' => 'ff-test-lim-' . $lim_role . '-' . wp_generate_password( 4, false, false ) . '@invalid.invalid', 'role' => $lim_role ) );
 	( new WP_User( $lim_users[ $lim_role ] ) )->add_cap( Caps\TEAM );
 }
+// Gone again even if a later check crashes the run (they would show up in mention lists).
+register_shutdown_function(
+	static function () use ( $lim_users ) {
+		require_once ABSPATH . 'wp-admin/includes/user.php';
+		foreach ( $lim_users as $u ) {
+			get_userdata( $u ) && wp_delete_user( $u );
+		}
+	}
+);
 $lim_ed  = $lim_users['editor'];
 $lim_au  = $lim_users['author'];
 $lim_co  = $lim_users['contributor'];
