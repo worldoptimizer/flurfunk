@@ -398,6 +398,22 @@ person clicks **Run** – with their own rights – or **Dismiss**.
 An answer only notifies the person who asked; long messages are folded with **Show more**, so
 threads stay calm.
 
+**Example: one person runs a site with assistants.** Flurfunk also works as a hub for a single
+administrator: a channel per area, each with its own assistant that answers every new thread there
+(**Answers unasked** for its channel), and one organising assistant that keeps the overview.
+
+| Channel | Assistant | Packs | What you ask there |
+| --- | --- | --- | --- |
+| #inhalte | Content | Proofreading, Drafts, Changes to posts, Looking things up, Pages and design | "Build me an 'about us' page with two columns", "make the buttons square", "add a line to the footer", "only these two links in the menu" |
+| #technik | Tech | Tech, Looking things up, Code, Comments | "How is the site?", "how do I extend this plugin?", "are there comments waiting?", "a short report every Monday at 8" |
+| #seo | SEO | Proofreading, Changes to posts, SEO and teasers, Numbers and site check | "Which posts have no excerpt?", "keep today's numbers – we start adding excerpts", "did it help?", "every Monday: compare with last week" |
+
+Give the content assistant a stronger model (it writes pages and markup) and the others a cheaper
+one; set a budget per assistant or channel. Everything that changes the site comes as a card you
+apply – and can undo; numbers kept per channel make "did the measure help?" a question with an
+answer. What stays yours: updates, plugins, settings and users – the assistants say so and tell you
+where to click.
+
 ### Limits
 
 New threads and messages are limited to 30 per minute and person (administrators are exempt).

@@ -202,6 +202,12 @@ their role.
   card with before and after for each post (if your administrators allow it). Untick what you do
   not want and click **Apply** – it runs with your rights; **Undo** brings the posts back, as long as
   nobody changed them since. A post someone changed in the meantime is skipped.
+- **For administrators – the site itself:** with the packs for it, an assistant builds a page as a
+  draft ("an 'about us' page with two columns and a button"), proposes changes to the look ("square
+  buttons, dark green links"), to a block theme's header, footer or menu, searches a plugin's code
+  ("how do I extend this?"), checks the content for SEO gaps and keeps the site's numbers with a note
+  – later "did adding excerpts help?" gets an answer with before and after. Every change is a card
+  you apply and can undo.
 - **Rights:** an assistant works with your rights, never more, and never administers the site.
   Your administrators can limit it further (e.g. to what an author may); then it tells you when
   something may be outside its limit instead of claiming it does not exist.
