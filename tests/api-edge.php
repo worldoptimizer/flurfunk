@@ -1906,6 +1906,8 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/start-thre
 	$tk_t    = Store\full_thread( (int) ( $tk_r['id'] ?? 0 ), $team );
 	$check( 'a task with a due date and who is responsible; someone who cannot see the channel or is unknown is reported, not assigned', ! is_wp_error( $tk_r ) && '2031-05-02' === ( $tk_t['due'] ?? '' ) && array( $team2 ) === array_map( 'intval', (array) ( $tk_t['assignees'] ?? array() ) ) && in_array( 'Niemand Unbekannt', (array) ( $tk_r['not_assigned'] ?? array() ), true ) && in_array( Store\person( $guest )['name'], (array) ( $tk_r['not_assigned'] ?? array() ), true ), array( $tk_r, $tk_t['due'] ?? null, $tk_t['assignees'] ?? null ) );
 	$extra_threads[] = (int) ( $tk_r['id'] ?? 0 );
+	$tk_seen = wp_get_ability( 'flurfunk/get-thread' ) ? wp_get_ability( 'flurfunk/get-thread' )->execute( array( 'id' => (int) ( $tk_r['id'] ?? 0 ) ) ) : array();
+	$check( '… and an assistant looking at the task later sees both (a routine reports them right)', '2031-05-02' === ( $tk_seen['due'] ?? '' ) && array( $tk_name ) === ( $tk_seen['responsible'] ?? null ), $tk_seen );
 	[ $tk_ids ] = Flurfunk\Abilities\people_from( array( '@' . strtok( $tk_name, ' ' ), (string) $team ) );
 	$check( '… names as "@First" (when unique) or IDs work too', in_array( $team, $tk_ids, true ), $tk_ids );
 }

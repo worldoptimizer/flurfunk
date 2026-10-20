@@ -148,7 +148,7 @@ function channel_ok( string $slug ): bool {
  * @param array $t Thread as the interface gets it.
  */
 function brief( array $t ): array {
-	return array(
+	$out = array(
 		'id'       => (int) $t['id'],
 		'channel'  => (string) $t['channel'],
 		'title'    => (string) ( $t['title'] ?? '' ),
@@ -159,6 +159,12 @@ function brief( array $t ): array {
 		'activity' => (string) ( $t['activity'] ?? $t['created'] ?? '' ),
 		'link'     => \Flurfunk\Admin\url( 'thread:' . (int) $t['id'] ),
 	);
+	// A task: when it is due and who is responsible.
+	if ( '' !== $out['status'] ) {
+		$out['due']         = (string) ( $t['due'] ?? '' );
+		$out['responsible'] = array_map( static fn ( $u ) => Store\person( (int) $u )['name'], (array) ( $t['assignees'] ?? array() ) );
+	}
+	return $out;
 }
 
 /**
