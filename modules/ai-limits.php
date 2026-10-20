@@ -275,6 +275,34 @@ function with_limit( int $agent, int $user_id, callable $fn, string $channel = '
 }
 
 /**
+ * Reading what only administrators may read – WordPress's own read-only abilities such as the
+ * environment, the site's details or its settings – for an administrator who asks: inside such an
+ * ability the rights that administer the site count as the asker's, because it only reads. Never
+ * for anything that changes something; the limits (role, channel) still apply.
+ *
+ * @param bool|null $set Switch on or off; null reads.
+ */
+function admin_read( ?bool $set = null ): bool {
+	static $on = false;
+	if ( null !== $set ) {
+		$on = $set;
+	}
+	return $on;
+}
+
+/**
+ * May this ability read with the asker's administrator rights (see admin_read())? WordPress's own
+ * read-only abilities (core/…); the filter flurfunk_ai_admin_read decides for others.
+ *
+ * @param string $ability Ability name.
+ */
+function reads_as_admin( string $ability ): bool {
+	$a  = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
+	$ok = $a && str_starts_with( $ability, 'core/' ) && ! empty( $a->get_meta()['annotations']['readonly'] );
+	return (bool) apply_filters( 'flurfunk_ai_admin_read', $ok, $ability );
+}
+
+/**
  * The filter: a check of a limited person that needs a capability their assistant's limit lacks
  * (or a blocked one) becomes "do_not_allow". Only ever takes away.
  *
@@ -298,7 +326,7 @@ function limit_meta_cap( $caps, $cap, $user_id ) {
 			if ( 'do_not_allow' === $c || in_array( $c, $free, true ) ) {
 				continue;
 			}
-			if ( in_array( $c, BLOCKED, true ) || ( null !== $limit['caps'] && empty( $limit['caps'][ $c ] ) ) ) {
+			if ( ( in_array( $c, BLOCKED, true ) && ! admin_read() ) || ( null !== $limit['caps'] && empty( $limit['caps'][ $c ] ) ) ) {
 				return array( 'do_not_allow' );
 			}
 		}

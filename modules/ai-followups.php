@@ -119,10 +119,11 @@ function follow_up( array $input ) {
  * "@Full Name" – or "@First" where only one person has that first name, as in the app – as
  * mentions of people who can see the conversation (longest names first).
  *
- * @param string $text   Text from the AI.
- * @param object $thread Thread row.
+ * @param string     $text   Text from the AI.
+ * @param object     $thread Thread row.
+ * @param int[]|null $only   Only these people (e.g. assistants).
  */
-function names_to_mentions( string $text, object $thread ): string {
+function names_to_mentions( string $text, object $thread, ?array $only = null ): string {
 	if ( ! str_contains( $text, '@' ) ) {
 		return $text;
 	}
@@ -130,7 +131,7 @@ function names_to_mentions( string $text, object $thread ): string {
 	$first = array();
 	foreach ( Store\people() as $p ) {
 		$name = trim( (string) ( $p['name'] ?? '' ) );
-		if ( '' === $name || ! Access\can_see( $thread, (int) $p['id'] ) ) {
+		if ( '' === $name || ( null !== $only && ! in_array( (int) $p['id'], $only, true ) ) || ! Access\can_see( $thread, (int) $p['id'] ) ) {
 			continue;
 		}
 		$names[ $name ] = (int) $p['id'];
@@ -205,7 +206,21 @@ function check_in( string $id ): void {
 	}
 	add_usage( $agent, (int) $answer['tokens'] );
 	add_channel_usage( $slug, (int) $answer['tokens'] );
-	in_locale( $lang, static fn () => reply( (int) $thread->id, $agent, names_to_mentions( trim( (string) $answer['text'] ), $thread ) ) );
+	speaks_for( $agent, $asker ); // An assistant it mentions takes it on for the person who asked.
+	try {
+		$mid = in_locale( $lang, static fn () => reply( (int) $thread->id, $agent, names_to_mentions( trim( (string) $answer['text'] ), $thread ) ) );
+	} finally {
+		speaks_for( $agent, 0 );
+	}
+	if ( is_int( $mid ) ) {
+		remember_meta(
+			$mid,
+			array(
+				'asker' => $asker,
+				'model' => (string) ( $answer['model'] ?? '' ),
+			)
+		);
+	}
 	language( $agent, '' );
 }
 

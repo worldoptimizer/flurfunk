@@ -286,7 +286,15 @@ function run_routine( string $id ): void {
 					remove_filter( 'flurfunk_rate_limit', $free, 99 );
 				}
 			} else {
-				reply( (int) $thread->id, $agent, $text );
+				speaks_for( $agent, (int) $r['owner'] ); // An assistant it mentions takes it on for the owner.
+				try {
+					$mid = reply( (int) $thread->id, $agent, $text );
+				} finally {
+					speaks_for( $agent, 0 );
+				}
+				if ( is_int( $mid ) ) {
+					remember_meta( $mid, array( 'asker' => (int) $r['owner'] ) );
+				}
 			}
 		}
 	);

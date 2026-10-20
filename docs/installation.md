@@ -348,9 +348,16 @@ one it is for answers in two or three sentences, the others stay quiet. Most thr
 but each one is sent to the AI provider for the check (a few hundred tokens), so switch it on where
 questions are expected, e.g. in a proofreading or help channel.
 
+**Handing over.** Assistants in the same channel know each other (name and role). One can hand part
+of a request to another by naming it in its answer; that one answers in the thread for the person
+who asked, with their rights and within its own profile and budget. One step only.
+
 **Rights.** An assistant never can more than the person asking it, and never anything that
 administers the site: while it works, users, plugins, themes, settings, unfiltered HTML and
-Flurfunk's own settings are switched off, whoever asks. Under **Rights → May at most act as** you can
+Flurfunk's own settings are switched off, whoever asks – except for reading: inside WordPress's own
+read-only abilities (`core/…`, such as the site's environment or settings) an administrator's rights
+count, so an assistant can tell an administrator which PHP version runs. The filter
+`flurfunk_ai_admin_read` decides for other read-only abilities. Under **Rights → May at most act as** you can
 set a ceiling on top: one of the site's roles (Editor, Author, Contributor, Subscriber or your own;
 roles that administer the site are not offered). Then it can only do – and read – what that role
 and the person asking may both do: an assistant limited to *Author* does not see other people's

@@ -1912,6 +1912,68 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/start-thre
 	[ $tk_ids ] = Flurfunk\Abilities\people_from( array( '@' . strtok( $tk_name, ' ' ), (string) $team ) );
 	$check( '… names as "@First" (when unique) or IDs work too', in_array( $team, $tk_ids, true ), $tk_ids );
 }
+// Reading what only administrators may read: WordPress's own read-only abilities, for an admin who asks.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'core/get-environment-info' ) ) {
+	$ar_a   = wp_get_ability( 'core/get-environment-info' );
+	$ar_off = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => $ar_a->check_permissions( array() ) );
+	$ar_on  = Flurfunk\Modules\Ai\with_limit(
+		$ai_bot,
+		$team,
+		static function () use ( $ar_a ) {
+			Flurfunk\Modules\Ai\admin_read( true );
+			try {
+				return $ar_a->check_permissions( array() );
+			} finally {
+				Flurfunk\Modules\Ai\admin_read( false );
+			}
+		}
+	);
+	$ar_w = Flurfunk\Modules\Ai\with_limit(
+		$ai_bot,
+		$team,
+		static function () {
+			Flurfunk\Modules\Ai\admin_read( true );
+			try {
+				return current_user_can( 'activate_plugins' ) && Flurfunk\Modules\Ai\reads_as_admin( 'core/get-environment-info' ) && ! Flurfunk\Modules\Ai\reads_as_admin( 'flurfunk/start-thread' );
+			} finally {
+				Flurfunk\Modules\Ai\admin_read( false );
+			}
+		}
+	);
+	$check( 'an assistant working for an administrator reads the site\'s environment through WordPress\'s read-only ability – only inside it', true !== $ar_off && true === $ar_on && $ar_w, array( $ar_off, $ar_on ) );
+}
+// Handing work over: an assistant that mentions another one hands it the request, for the person
+// who asked and with their rights – one step only.
+$ho_b = Flurfunk\Access\create_bot( 'SEO-Test', 'ff-test-ho-' . strtolower( wp_generate_password( 5, false, false ) ) );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+Flurfunk\Modules\Ai\save_profile( $ho_b, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'role' => 'Auszüge und Titel' ) );
+$as( $team );
+$ho_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Schreib den Text und lass dann den Auszug machen." ) );
+$ho_ctx = array();
+add_filter(
+	'flurfunk_ai_pre_answer',
+	$ho_fake = static function ( $pre, $ctx, $agent ) use ( $ai_bot, $ho_b, &$ho_ctx ) {
+		$ho_ctx[ $agent ] = $ctx;
+		return array(
+			'text'   => $agent === $ai_bot ? 'Text ist fertig. @SEO-Test, mach bitte einen Auszug dafür.' : 'Auszug vorgeschlagen. @' . Flurfunk\Store\person( $ai_bot )['name'] . ', bitte noch gegenlesen.',
+			'tokens' => 5,
+		);
+	},
+	20,
+	3
+);
+$ho_a = Flurfunk\Modules\Ai\run( $ho_t, 0, $ai_bot );
+$ho_q = (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ho_t, (int) $ho_a, $ho_b ) );
+$ho_r = Flurfunk\Modules\Ai\run( $ho_t, (int) $ho_a, $ho_b );
+$ho_back = (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $ho_t, (int) $ho_r, $ai_bot ) );
+remove_filter( 'flurfunk_ai_pre_answer', $ho_fake, 20 );
+$ho_meta = (array) Store\full_thread( $ho_t, $team )['ai_meta'];
+$check( 'an assistant naming another one hands it the request: that one answers for the person who asked, told who handed it over', $ho_q && is_int( $ho_r ) && $team === ( $ho_ctx[ $ho_b ]['asker'] ?? 0 ) && str_contains( $ho_ctx[ $ho_b ]['prompt'] ?? '', 'handed you the last message on behalf of' ) && $ai_bot === (int) ( $ho_meta[ $ho_r ]['from'] ?? 0 ), array( $ho_q, $ho_r, $ho_ctx[ $ho_b ]['asker'] ?? null ) );
+$check( '… one step only: the handed-over answer wakes nobody', ! $ho_back );
+$check( '… and the first one is told who else is in the channel and how to hand over', str_contains( $ho_ctx[ $ai_bot ]['system'] ?? '', '@SEO-Test (Auszüge und Titel)' ) && ! str_contains( $ho_ctx[ $ho_b ]['system'] ?? '', 'Other AI assistants in this channel' ) );
+wp_unschedule_hook( 'flurfunk_ai_run' );
+wp_delete_user( $ho_b );
+$extra_threads[] = $ho_t;
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

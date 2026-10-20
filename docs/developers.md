@@ -967,6 +967,7 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_pre_check` (filter) | `null`, `object $thread`, `int $message_id`, `int $agent`, `bool $unasked` | Decide the quick check yourself: `'answer'`, `'thanks'`, `'no'` (or true/false). `$unasked`: a new thread nobody asked, in a channel where assistants answer unasked (message id 0). |
 | `flurfunk_ai_check_models` (filter) | `string[] $models`, `int $agent` | Models for the quick check, first available wins (default: small Claude, Gemini, GPT models). |
 | `flurfunk_ai_check_max_tokens` (filter) | `int $max` (600) | Room for the quick check (newer models think first). |
+| `flurfunk_ai_admin_read` (filter) | `bool $ok`, `string $ability` | Whether a read-only ability may run with the asking administrator's rights (default: WordPress's own `core/…` read-only abilities). Abilities that change something never do. |
 | `flurfunk_ai_stays_for` (filter) | `int $seconds` (two days) | How long an assistant stays in a thread after its last answer. |
 | `flurfunk_private_partners` (filter) | `array $list`, `int $user_id` | Who a person may talk to in private: `[ { id, name, role } ]`. The AI module adds the assistants this person may ask. |
 | `flurfunk_reaction` (action) | `object $thread`, `int $message_id` (0 = the thread), `string $emoji`, `int $user_id`, `bool $added` | A reaction was added or taken back. |

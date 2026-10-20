@@ -188,6 +188,10 @@ their role.
   this thread, with the photo as featured image". It writes a draft with you as its author and
   puts a card with it under its answer; write on ("shorter title, please") and it changes the
   draft, until someone else has worked on it. It never publishes.
+- **Several assistants:** in a channel with more than one, an assistant hands part of the work to
+  another one by naming it ("@SEO, please suggest an excerpt for it") – that one then answers in the
+  thread for you, and under its answer you see who handed it over. Only one step: what an assistant
+  was handed it does not pass on again.
 - **Tasks:** "@Assistenz, make a task: Ben gets the photos by Friday" gives a card with the task,
   who is responsible and when it is due. Someone who cannot see the channel cannot be responsible;
   the card says so.

@@ -759,6 +759,9 @@
 		const q = ( s ) => t( '“%s”', s );
 		const read = [ t( 'the thread' ) ].concat( ( meta.posts || [] ).map( ( title ) => ( title ? t( 'the post %s', q( title ) ) : t( 'a post' ) ) ) );
 		const parts = [ t( 'Read: %s', read.join( ', ' ) ) ];
+		if ( meta.from ) {
+			parts.unshift( t( 'Handed over by %s', person( meta.from ).name ) ); // Another assistant passed the request on.
+		}
 		const looked = ( meta.threads || [] ).map( ( x ) => ( x.id ? q( x.title ) : t( 'a conversation' ) ) );
 		if ( looked.length ) {
 			parts.push( t( 'Looked up: %s', looked.join( ', ' ) ) );

@@ -98,6 +98,7 @@ function all(): array {
 		'the post %s' => __( 'the post %s', 'flurfunk' ),
 		'a post' => __( 'a post', 'flurfunk' ),
 		'Read: %s' => __( 'Read: %s', 'flurfunk' ),
+		'Handed over by %s' => __( 'Handed over by %s', 'flurfunk' ),
 		'a conversation' => __( 'a conversation', 'flurfunk' ),
 		'Looked up: %s' => __( 'Looked up: %s', 'flurfunk' ),
 		'Used: %s' => __( 'Used: %s', 'flurfunk' ),
