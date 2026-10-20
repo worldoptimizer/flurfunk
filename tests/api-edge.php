@@ -2090,6 +2090,26 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Styles\NAME
 		wp_delete_post( $pg_p->ID, true );
 	}
 }
+// Block theme templates: a change to the footer as a card – scripts filtered out, undo back to the theme's own.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Templates\NAME ) && wp_is_block_theme() ) {
+	$as( $team );
+	$tp_list = Flurfunk\Templates\get( array() );
+	$tp_foot = array_values( array_filter( (array) $tp_list, static fn ( $t ) => 'footer' === ( $t['area'] ?? '' ) ) )[0] ?? null;
+	if ( $tp_foot ) {
+		$tp_orig = (string) Flurfunk\Templates\get( array( 'id' => $tp_foot['id'] ) )['content'];
+		$tp_in   = array( 'id' => $tp_foot['id'], 'type' => 'wp_template_part', 'content' => $tp_orig . "\n<!-- wp:paragraph -->\n<p>FF-Test-Fuss</p>\n<!-- /wp:paragraph --><script>alert(1)</script>", 'why' => 'Test' );
+		$tp_ok   = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Templates\NAME, $tp_in ) );
+		$tp_miss = Flurfunk\Templates\validate( array( 'id' => $tp_foot['id'], 'find' => 'Gibt-es-nicht-1234', 'replace' => 'x' ) );
+		$tp_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Fußbereich' ) );
+		$tp_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Templates\NAME, $tp_in, $ai_bot, $tp_t );
+		$tp_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $tp_pid ), array(), $team );
+		$tp_now  = (string) Flurfunk\Templates\get( array( 'id' => $tp_foot['id'] ) )['content'];
+		$tp_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $tp_pid ), array(), $team );
+		$tp_back = (string) Flurfunk\Templates\get( array( 'id' => $tp_foot['id'] ) )['content'];
+		$check( 'a template part (the footer) is changed by a card an administrator applies – without the script – and undo brings back the theme\'s own', true === $tp_ok && is_wp_error( $tp_miss ) && null === $tp_run && str_contains( $tp_now, 'FF-Test-Fuss' ) && ! str_contains( $tp_now, '<script' ) && null === $tp_undo && ! str_contains( $tp_back, 'FF-Test-Fuss' ), array( $tp_run, $tp_undo, $tp_foot['id'] ) );
+		$extra_threads[] = $tp_t;
+	}
+}
 // Every Flurfunk ability describes its input as an object with properties – an empty list would be
 // sent as [] and AI providers refuse the whole request.
 if ( function_exists( 'wp_get_abilities' ) ) {

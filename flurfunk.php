@@ -71,6 +71,7 @@ require_once FLURFUNK_DIR . 'inc/changes.php'; // Changes to existing posts (an 
 require_once FLURFUNK_DIR . 'inc/code.php'; // Reading the code of plugins and themes (abilities, administrators only).
 require_once FLURFUNK_DIR . 'inc/insights.php'; // Site check, numbers and snapshots (abilities).
 require_once FLURFUNK_DIR . 'inc/styles.php'; // The site's look: colors and CSS (abilities; changes as cards).
+require_once FLURFUNK_DIR . 'inc/templates.php'; // Block theme templates and parts (abilities; changes as cards).
 
 require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 

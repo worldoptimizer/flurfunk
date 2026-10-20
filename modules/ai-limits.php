@@ -291,6 +291,21 @@ function admin_read( ?bool $set = null ): bool {
 }
 
 /**
+ * Saving CSS the person applies as a card: WordPress asks for "unfiltered_html" for that (CSS of the
+ * site's look), so it counts while such a card runs – the CSS was checked before (no markup, no
+ * imports, no scripts). Markup an assistant wrote is always filtered.
+ *
+ * @param bool|null $set Switch on or off; null reads.
+ */
+function admin_css( ?bool $set = null ): bool {
+	static $on = false;
+	if ( null !== $set ) {
+		$on = $set;
+	}
+	return $on;
+}
+
+/**
  * May this ability read with the asker's administrator rights (see admin_read())? WordPress's own
  * read-only abilities (core/…) and Flurfunk's reading of plugin and theme code; the filter
  * flurfunk_ai_admin_read decides for others.
@@ -299,7 +314,7 @@ function admin_read( ?bool $set = null ): bool {
  */
 function reads_as_admin( string $ability ): bool {
 	$a  = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
-	$ok = $a && ( str_starts_with( $ability, 'core/' ) || in_array( $ability, array( 'flurfunk/list-code', 'flurfunk/search-code', 'flurfunk/read-code', 'flurfunk/get-styles' ), true ) ) && ! empty( $a->get_meta()['annotations']['readonly'] );
+	$ok = $a && ( str_starts_with( $ability, 'core/' ) || in_array( $ability, array( 'flurfunk/list-code', 'flurfunk/search-code', 'flurfunk/read-code', 'flurfunk/get-styles', 'flurfunk/get-templates' ), true ) ) && ! empty( $a->get_meta()['annotations']['readonly'] );
 	return (bool) apply_filters( 'flurfunk_ai_admin_read', $ok, $ability );
 }
 
@@ -311,7 +326,7 @@ function reads_as_admin( string $ability ): bool {
  * @param string $ability Ability name.
  */
 function runs_as_admin( string $ability ): bool {
-	return (bool) apply_filters( 'flurfunk_ai_admin_cards', \Flurfunk\Styles\NAME === $ability, $ability );
+	return (bool) apply_filters( 'flurfunk_ai_admin_cards', in_array( $ability, array( \Flurfunk\Styles\NAME, \Flurfunk\Templates\NAME ), true ), $ability );
 }
 
 /**
@@ -338,7 +353,10 @@ function limit_meta_cap( $caps, $cap, $user_id ) {
 			if ( 'do_not_allow' === $c || in_array( $c, $free, true ) ) {
 				continue;
 			}
-			if ( ( in_array( $c, BLOCKED, true ) && ! admin_read() ) || ( null !== $limit['caps'] && empty( $limit['caps'][ $c ] ) ) ) {
+			// Administrator rights for reading or a person's card – never unfiltered markup or uploads:
+			// what an assistant wrote is always filtered.
+			$blocked = in_array( $c, BLOCKED, true ) && ( ! admin_read() || ( 'unfiltered_upload' === $c ) || ( 'unfiltered_html' === $c && ! admin_css() ) );
+			if ( $blocked || ( null !== $limit['caps'] && empty( $limit['caps'][ $c ] ) ) ) {
 				return array( 'do_not_allow' );
 			}
 		}

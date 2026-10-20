@@ -79,6 +79,9 @@ function may_propose( string $ability, array $input ) {
 	if ( \Flurfunk\Styles\NAME === $ability ) {
 		return \Flurfunk\Styles\validate( $input );
 	}
+	if ( \Flurfunk\Templates\NAME === $ability ) {
+		return \Flurfunk\Templates\validate( $input );
+	}
 	// Changes to posts: every post exists, every text to correct is found – else the AI hears why.
 	return \Flurfunk\Changes\NAME === $ability ? \Flurfunk\Changes\validate( $input ) : true;
 }
@@ -350,6 +353,17 @@ function build_snapshot( array $p ): array {
 
 		$fields = array(); // The card says it in words; no raw fields.
 
+	} elseif ( \Flurfunk\Templates\NAME === $p['ability'] ) {
+		$tpl   = \Flurfunk\Templates\one( (string) ( $in['id'] ?? '' ), (string) ( $in['type'] ?? '' ) );
+		$kind  = 'action';
+		/* translators: %s: template name, e.g. Footer */
+		$line  = sprintf( __( 'Change the template "%s"', 'flurfunk' ), $tpl ? (string) $tpl->title : (string) ( $in['id'] ?? '' ) );
+		/* translators: 1: old text, 2: new text */
+		$sub   = trim( (string) ( $in['why'] ?? '' ) . ( isset( $in['find'] ) ? ' – ' . sprintf( __( '"%1$s" becomes "%2$s"', 'flurfunk' ), mb_substr( wp_strip_all_tags( (string) $in['find'] ), 0, 80 ), mb_substr( wp_strip_all_tags( (string) ( $in['replace'] ?? '' ) ), 0, 80 ) ) : '' ), ' –' );
+		$run   = __( 'Apply', 'flurfunk' );
+		$extra = isset( $in['content'] ) ? (string) $in['content'] : (string) ( $in['replace'] ?? '' );
+
+		$fields = array();
 	} elseif ( 'flurfunk/reply-comment' === $p['ability'] ) {
 		$c     = get_comment( (int) ( $in['comment'] ?? 0 ) );
 		$kind  = 'reply';
@@ -376,7 +390,7 @@ function build_snapshot( array $p ): array {
 		'subtitle' => $own ? $own['description'] : ( $ability ? $ability->get_description() : '' ),
 		'status'   => $status,
 		'fields'   => $fields,
-		'actions'  => 'open' === $p['state'] && $ability ? array( 'run', 'dismiss' ) : ( 'done' === $p['state'] && \Flurfunk\Styles\NAME === $p['ability'] && undoable( $p ) ? array( 'undo' ) : array() ),
+		'actions'  => 'open' === $p['state'] && $ability ? array( 'run', 'dismiss' ) : ( 'done' === $p['state'] && looks( (string) $p['ability'] ) && undoable( $p ) ? array( 'undo' ) : array() ),
 		'data'     => array(
 			'bare'   => true,
 			'kind'   => $kind,
@@ -520,10 +534,12 @@ function run_proposal( array $ref, array $card, int $user_id, array $choice = ar
 			$user_id,
 			static function () use ( $ability, $input, $admin ) {
 				admin_read( $admin );
+				admin_css( \Flurfunk\Styles\NAME === $ability->get_name() );
 				try {
 					return $ability->execute( $input );
 				} finally {
 					admin_read( false );
+					admin_css( false );
 				}
 			},
 			proposal_channel( $p )
@@ -540,8 +556,8 @@ function run_proposal( array $ref, array $card, int $user_id, array $choice = ar
 			'state'   => 'done',
 			'by'      => $user_id,
 			'at'      => time(),
-			'result'  => $changes || \Flurfunk\Styles\NAME === $p['ability'] ? '' : mb_substr( is_scalar( $result ) ? (string) $result : (string) wp_json_encode( $result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ), 0, 300 ),
-			'outcome' => $changes ? (array) ( $result['posts'] ?? array() ) : ( \Flurfunk\Styles\NAME === $p['ability'] ? (array) $result : null ),
+			'result'  => $changes || looks( (string) $p['ability'] ) ? '' : mb_substr( is_scalar( $result ) ? (string) $result : (string) wp_json_encode( $result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ), 0, 300 ),
+			'outcome' => $changes ? (array) ( $result['posts'] ?? array() ) : ( looks( (string) $p['ability'] ) ? (array) $result : null ),
 		)
 	);
 	return null;
@@ -559,22 +575,24 @@ function run_proposal( array $ref, array $card, int $user_id, array $choice = ar
 function undo_proposal( array $ref, array $card, int $user_id ) {
 	$id = (string) ( $ref['id'] ?? '' );
 	$p  = proposal( $id );
-	if ( ! $p || 'done' !== $p['state'] || ! in_array( $p['ability'], array( \Flurfunk\Changes\NAME, \Flurfunk\Styles\NAME ), true ) || ! undoable( $p ) ) {
+	if ( ! $p || 'done' !== $p['state'] || ! ( \Flurfunk\Changes\NAME === $p['ability'] || looks( (string) $p['ability'] ) ) || ! undoable( $p ) ) {
 		return new \WP_Error( 'flurfunk_action_gone', __( 'This is no longer possible. The card shows the current state.', 'flurfunk' ), array( 'status' => 409 ) );
 	}
 	$me = get_current_user_id();
 	wp_set_current_user( $user_id );
 	try {
-		if ( \Flurfunk\Styles\NAME === $p['ability'] ) {
+		if ( looks( (string) $p['ability'] ) ) {
 			$done = with_limit(
 				(int) $p['agent'],
 				$user_id,
 				static function () use ( $p ) {
 					admin_read( true );
+					admin_css( \Flurfunk\Styles\NAME === $p['ability'] );
 					try {
-						return \Flurfunk\Styles\undo( (array) ( $p['outcome']['undo'] ?? array() ) );
+						return \Flurfunk\Templates\NAME === $p['ability'] ? \Flurfunk\Templates\undo( (array) ( $p['outcome']['undo'] ?? array() ) ) : \Flurfunk\Styles\undo( (array) ( $p['outcome']['undo'] ?? array() ) );
 					} finally {
 						admin_read( false );
+						admin_css( false );
 					}
 				},
 				proposal_channel( $p )
@@ -602,6 +620,15 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 }
 
 /**
+ * Is this a change to the site's look (styles, templates) – run with the clicker's rights, undoable?
+ *
+ * @param string $ability Ability name.
+ */
+function looks( string $ability ): bool {
+	return in_array( $ability, array( \Flurfunk\Styles\NAME, \Flurfunk\Templates\NAME ), true );
+}
+
+/**
  * The channel a proposal was made in (for the channel's limit; '' if private or gone).
  *
  * @param array $p Proposal.
@@ -617,7 +644,7 @@ function proposal_channel( array $p ): string {
  * @param array $p Proposal.
  */
 function undoable( array $p ): bool {
-	if ( \Flurfunk\Styles\NAME === ( $p['ability'] ?? '' ) ) {
+	if ( looks( (string) ( $p['ability'] ?? '' ) ) ) {
 		return ! empty( $p['outcome']['undo'] );
 	}
 	return (bool) array_filter( (array) ( $p['outcome'] ?? array() ), static fn ( $r ) => 'changed' === ( $r['status'] ?? '' ) );
