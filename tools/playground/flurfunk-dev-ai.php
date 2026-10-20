@@ -89,7 +89,7 @@ add_action(
 
 /*
  * Local Playground only: made-up visitor numbers, so the site's numbers and snapshots can be tried
- * without a statistics plugin. They follow the content a little – each post or page with an excerpt
+ * without a statistics plugin (they replace those of Koko Analytics or WP Statistics, if active). They follow the content a little – each post or page with an excerpt
  * brings visits – so a measure (adding excerpts) shows in the numbers. And a route that keeps a
  * snapshot as of some days ago (with fewer visits), to compare "then" and "now" without waiting.
  */
@@ -103,7 +103,7 @@ add_filter(
 			)
 		);
 		$visits = 800 + 90 * $with + ( (int) gmdate( 'z' ) % 7 ) * 12;
-		$m['visits_7d']   = array( 'label' => 'Visits in the last 7 days', 'value' => $visits, 'unit' => '', 'source' => 'Demo statistics (made up)' );
+		$m['pageviews_7d'] = array( 'label' => 'Page views in the last 7 days', 'value' => $visits, 'unit' => '', 'source' => 'Demo statistics (made up)' );
 		$m['visitors_7d'] = array( 'label' => 'Visitors in the last 7 days', 'value' => (int) round( $visits * 0.62 ), 'unit' => '', 'source' => 'Demo statistics (made up)' );
 		$m['search_7d']   = array( 'label' => 'Visits from search engines in the last 7 days', 'value' => (int) round( 120 + 45 * $with ), 'unit' => '', 'source' => 'Demo statistics (made up)' );
 		return $m;
@@ -121,7 +121,7 @@ add_action(
 				'callback'            => static function ( WP_REST_Request $r ) {
 					$numbers = Flurfunk\Insights\metrics();
 					$scale   = (float) ( $r['scale'] ?? 0.7 );
-					foreach ( array( 'visits_7d', 'visitors_7d', 'search_7d' ) as $k ) {
+					foreach ( array( 'pageviews_7d', 'visitors_7d', 'search_7d' ) as $k ) {
 						if ( isset( $numbers[ $k ] ) ) {
 							$numbers[ $k ]['value'] = (int) round( $numbers[ $k ]['value'] * $scale );
 						}

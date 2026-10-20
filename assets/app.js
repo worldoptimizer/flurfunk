@@ -2040,6 +2040,17 @@
 		// A channel reads top to bottom, as in Slack: the oldest thread first, the newest right above the
 		// writing box (so do all threads, a post's conversations and private ones). A thread keeps its place when someone replies; older ones load at the top. Scrolled
 		// up, a button leads back down and counts new threads; the place you read stays put.
+		// At the newest thread, the feed stays there when its size changes – a thread opening beside it
+		// (narrower, so taller), an image loading, the writing box shrinking after sending.
+		let feedAtEnd = true;
+		const feedSize = 'ResizeObserver' in window ? new ResizeObserver( () => {
+			if ( feedAtEnd && viewInfo().stream && ! ui.prepending ) {
+				feed.scrollTop = feed.scrollHeight;
+			}
+		} ) : null;
+		if ( feedSize ) {
+			feedSize.observe( feed );
+		}
 		const renderStream = () => {
 			const old = { top: feed.scrollTop, height: feed.scrollHeight, end: feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40 };
 			if ( ! ui.list.length ) {
@@ -2061,6 +2072,11 @@
 				html += postHtml( th );
 			} );
 			feed.innerHTML = html + ( day ? '</section>' : '' ) + '<div class="ff-jump-dock"><button type="button" class="ff-jump" data-ff="jump-feed" tabindex="-1" aria-hidden="true">' + icon.down + '<span>' + esc( t( 'Latest' ) ) + '</span></button></div>';
+			if ( feedSize ) {
+				feedSize.disconnect(); // The old day groups are gone.
+				feedSize.observe( feed );
+				feed.querySelectorAll( '.ff-day-group' ).forEach( ( g ) => feedSize.observe( g ) );
+			}
 			ui.seen = new Set( ui.list.map( ( th ) => th.id ) );
 			const down = ui.feedEnd || old.end;
 			if ( down ) {
@@ -2084,6 +2100,7 @@
 			jumpState( feed, $( '.ff-jump', feed ), 'unseenFeed' );
 		};
 		feed.addEventListener( 'scroll', () => {
+			feedAtEnd = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
 			if ( viewInfo().stream ) {
 				jumpState( feed, $( '.ff-jump', feed ), 'unseenFeed' );
 			}

@@ -70,6 +70,7 @@ require_once FLURFUNK_DIR . 'inc/drafts.php'; // Drafts from conversations (abil
 require_once FLURFUNK_DIR . 'inc/changes.php'; // Changes to existing posts (an ability AI assistants propose).
 require_once FLURFUNK_DIR . 'inc/code.php'; // Reading the code of plugins and themes (abilities, administrators only).
 require_once FLURFUNK_DIR . 'inc/insights.php'; // Site check, numbers and snapshots (abilities).
+require_once FLURFUNK_DIR . 'inc/stats.php'; // Visits from Koko Analytics or WP Statistics, for the numbers.
 require_once FLURFUNK_DIR . 'inc/styles.php'; // The site's look: colors and CSS (abilities; changes as cards).
 require_once FLURFUNK_DIR . 'inc/templates.php'; // Block theme templates and parts (abilities; changes as cards).
 
