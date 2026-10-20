@@ -166,6 +166,9 @@ their role.
   administrators. Each conversation is separate: a new one starts fresh, the assistant does not
   remember the others.
 
+- **Notes per channel:** if your site keeps them, tell an assistant "remember: teasers at most 200
+  characters" – it keeps the note for that channel, every assistant there knows it from then on,
+  and "it is 180 now" changes it. Notes stay in their channel; private conversations have none.
 - **Drafts:** if your administrators allow it, ask for one – "@Lektorat, make a short article of
   this thread, with the photo as featured image". It writes a draft with you as its author and
   puts a card with it under its answer; write on ("shorter title, please") and it changes the

@@ -1569,6 +1569,48 @@ ksort( $cr_saved );
 $check( 'channel rules from the form: no administering role, no negative budget, no unknown channel', array( 'ff-test' => array( 'limit' => '', 'budget' => 5000 ), 'ff-test-lim' => array( 'limit' => 'contributor', 'budget' => 0 ) ) === $cr_saved, $cr_saved );
 null === $cr_old ? delete_option( 'flurfunk_ai_channel_rules' ) : update_option( 'flurfunk_ai_channel_rules', $cr_old );
 delete_option( 'flurfunk_ai_channel_usage' );
+// Notes per channel: only when the site keeps them, only on request, only in their channel.
+WP_CLI::log( 'AI notes per channel' );
+$mem_opts = get_option( 'flurfunk_ai_settings', null );
+$mem_old  = get_option( 'flurfunk_ai_memory', null );
+delete_option( 'flurfunk_ai_memory' );
+$lim_set( '' );
+$as( $team );
+$mem_t  = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Teaser-Regeln' ) );
+Store\ensure_channel( 'ff-test-mem', array( 'name' => 'Anderer Kanal' ), true );
+$mem_t2 = Store\create_thread( array( 'channel' => 'ff-test-mem', 'body' => 'Anderer Kanal' ) );
+$mem_names = static fn () => array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) );
+$check( 'notes are off until the site switches them on: no tool, no notes', ! in_array( 'flurfunk/remember', $mem_names(), true ) && ! Flurfunk\Modules\Ai\may_remember( array( 'thread' => $mem_t ) ) );
+update_option( 'flurfunk_ai_settings', array_merge( (array) $mem_opts, array( 'memory' => true ) ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/remember' ) ) {
+	$mem_r = wp_get_ability( 'flurfunk/remember' )->execute( array( 'thread' => $mem_t, 'note' => "Teaser bei uns höchstens 200 Zeichen.\n<b>fett</b>" ) );
+	wp_get_ability( 'flurfunk/remember' )->execute( array( 'thread' => $mem_t, 'note' => 'Wir schreiben Euro aus.' ) );
+	$mem_sys  = Flurfunk\Modules\Ai\context( Store\thread_row( $mem_t ), 0, $ai_bot )['system'];
+	$mem_sys2 = Flurfunk\Modules\Ai\context( Store\thread_row( $mem_t2 ), 0, $ai_bot )['system'];
+	$check( 'switched on: the assistant gets the tool and is told when to use it (with this thread\'s number)', in_array( 'flurfunk/remember', $mem_names(), true ) && str_contains( $mem_sys, 'flurfunk/remember (thread ' . $mem_t . ')' ) );
+	$check( 'a note is kept for the channel (plain text) and every assistant there reads it – not in another channel', is_array( $mem_r ) && str_contains( $mem_sys, '1. Teaser bei uns höchstens 200 Zeichen. fett' ) && str_contains( $mem_sys, '2. Wir schreiben Euro aus.' ) && ! str_contains( $mem_sys2, 'Teaser bei uns' ), $mem_r );
+	$mem_x = wp_get_ability( 'flurfunk/remember' )->execute( array( 'thread' => $mem_t, 'remove' => 1, 'note' => 'Teaser bei uns höchstens 250 Zeichen.' ) );
+	$mem_y = wp_get_ability( 'flurfunk/remember' )->execute( array( 'thread' => $mem_t, 'remove' => 9 ) );
+	$check( '… correcting one: remove it by its number and add the new one; a number that is not there is refused', array( 'Wir schreiben Euro aus.', 'Teaser bei uns höchstens 250 Zeichen.' ) === ( $mem_x['notes'] ?? null ) && is_wp_error( $mem_y ), $mem_x );
+	$mem_p = Store\start_private( $team, $ai_bot, array( 'body' => 'Privat merken?' ) );
+	$check( 'never in private conversations: no notes, no remembering', ! is_wp_error( $mem_p ) && ! Flurfunk\Modules\Ai\may_remember( array( 'thread' => (int) $mem_p ) ) && ! str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( (int) $mem_p ), 0, $ai_bot )['system'], 'Notes for this channel' ) );
+	$as( $guest );
+	$check( '… and nobody who cannot see the conversation can add to its channel', ! Flurfunk\Modules\Ai\may_remember( array( 'thread' => $mem_t2 ) ) );
+	$as( $team );
+	$_POST = array( '_wpnonce' => wp_create_nonce( 'flurfunk_ai' ), '_wp_http_referer' => '/', 'ai_options' => array( 'memory' => '1', 'log' => '1', 'redact' => '1', 'summary' => '1' ), 'ai_forget' => array( 'ff-test' => array( '0' ) ) );
+	$_REQUEST = $_POST;
+	add_filter( 'wp_redirect', $mem_stop = static function () { throw new RuntimeException( 'redirect' ); } );
+	try {
+		Flurfunk\Modules\Ai\save();
+	} catch ( RuntimeException $e ) {
+	}
+	remove_filter( 'wp_redirect', $mem_stop );
+	$_POST    = array();
+	$_REQUEST = array();
+	$check( 'administrators remove notes in the settings', array( 'Teaser bei uns höchstens 250 Zeichen.' ) === array_column( Flurfunk\Modules\Ai\notes( 'ff-test' ), 'text' ), Flurfunk\Modules\Ai\notes( 'ff-test' ) );
+}
+null === $mem_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $mem_opts );
+null === $mem_old ? delete_option( 'flurfunk_ai_memory' ) : update_option( 'flurfunk_ai_memory', $mem_old );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";
@@ -2321,7 +2363,7 @@ $check( 'roles are back as before the tests', get_option( $roles_key ) === $role
 
 WP_CLI::log( 'Clean up' );
 global $wpdb;
-$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim')" ) );
+$ids = array_map( 'intval', $wpdb->get_col( "SELECT t.id FROM {$wpdb->prefix}flurfunk_threads t JOIN {$wpdb->prefix}flurfunk_channels c ON c.id = t.channel_id WHERE c.slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim','ff-test-mem')" ) );
 $ids = array_values( array_unique( array_merge( $ids, array_filter( array_map( 'intval', $extra_threads ?? array() ) ) ) ) );
 if ( $test_posts ) {
 	$ids = array_values( array_unique( array_merge( $ids, array_map( 'intval', $wpdb->get_col( "SELECT id FROM {$wpdb->prefix}flurfunk_threads WHERE target_type = 'post' AND target_id IN (" . implode( ',', array_map( 'intval', $test_posts ) ) . ')' ) ) ) ) );
@@ -2333,7 +2375,7 @@ if ( $ids ) {
 	}
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_threads WHERE id IN ($in)" );
 }
-$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim')" );
+$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug IN ('ff-test','ff-test-archived','ff-test-gate','ff-test-gate-imported','ff-test-lim','ff-test-mem')" );
 if ( isset( $had_comments ) && ! $had_comments ) {
 	$wpdb->query( "DELETE FROM {$wpdb->prefix}flurfunk_channels WHERE slug = 'comments'" );
 }

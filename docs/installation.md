@@ -300,6 +300,12 @@ tokens per message, counted in its budget and shown in the log. **Stays in a thr
 answered** switches this off per assistant (then only the asker's follow-ups count);
 `flurfunk_ai_follow_ups` switches all of it off.
 
+**Notes per channel** (a switch at the top, off by default): when someone asks an assistant to
+remember something lasting ("teasers at most 200 characters"), it keeps a short note for that
+channel, and every assistant there reads the channel's notes – only on request, never in private
+conversations, never across channels. The notes are listed per channel below the assistants, where
+you can remove them; they are sent to the AI provider with the requests in that channel.
+
 **Per channel** (under the assistants): instructions, a limit that caps every assistant there on top
 of its own (e.g. in a channel guest authors read, so it cannot quote internal drafts) and a monthly
 token budget shared by the assistants in that channel.
