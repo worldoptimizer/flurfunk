@@ -50,6 +50,7 @@ require_once FLURFUNK_DIR . 'inc/strings.php';
 require_once FLURFUNK_DIR . 'inc/schema.php';
 require_once FLURFUNK_DIR . 'inc/access.php';
 require_once FLURFUNK_DIR . 'inc/caps.php';
+require_once FLURFUNK_DIR . 'inc/people.php'; // Team or guest per person, where it differs from the role.
 require_once FLURFUNK_DIR . 'inc/store.php';
 require_once FLURFUNK_DIR . 'inc/reactions.php';
 require_once FLURFUNK_DIR . 'inc/providers.php';

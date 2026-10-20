@@ -1028,14 +1028,14 @@ current user with Flurfunk's own checks, so an agent only reaches what its accou
 | `flurfunk/list-threads` | yes | Conversations, newest activity first; `channel`, `view` (`all`, `mine`, `tasks`, `mentions`), `search`, `limit` (≤ 50). |
 | `flurfunk/get-thread` | yes | One conversation with its newest 100 messages; mentions as names. |
 | `flurfunk/reply` | no | Replies as the user: `id`, `text`. |
-| `flurfunk/start-thread` | no | Starts a conversation: `channel`, `title`, `text`, `task`. |
+| `flurfunk/start-thread` | no | Starts a conversation: `channel`, `title`, `text`, `task`; for a task also `due` (`YYYY-MM-DD`) and `assignees` (names as shown, `@First` when unique, or user IDs). People who cannot see the channel are not assigned; the result lists them as `not_assigned`. |
 | `flurfunk/find-posts` | yes | Posts the user may see (drafts only if they may edit them): `search`, `status`, `order`, `limit`. |
 | `flurfunk/get-post` | yes | One post's text as plain text: `id`. |
 | `flurfunk/create-draft` | no | A draft (never published), the user is its author: `title`, `text` (paragraphs, `- ` lists, `## ` headings, `*bold*`; no HTML), `excerpt`, `type`, `featured_image`, `images` (IDs; Flurfunk files from conversations the user can see move into the media library). Needs the post type's `create_posts`, for images `upload_files`. |
 | `flurfunk/update-posts` | no | Changes existing posts, up to 20 at once: `posts: [ { id, title, excerpt, replace: [ { find, with } ], add_categories, remove_categories, add_tags, remove_tags, featured_image, unchanged_since } ]`. Replacements only touch text, never markup; `with` is escaped. A post modified since `unchanged_since`, or one whose markup kses would change for this person, is skipped. Returns `posts: [ { id, status: changed\|skipped, message, undo } ]`; `Flurfunk\Changes\undo()` takes those back. |
 | `flurfunk/follow-up` | no | An assistant at work (or an assistant account) sets itself a check-in in a conversation: `thread`, `when` (`YYYY-MM-DD HH:MM`, site time), `note`; or `cancel`. When due (cron hook `flurfunk_ai_check_in`), the assistant follows up in the thread; "@Name" in its text becomes a mention. Pending ones are in the option `flurfunk_ai_followups`. |
 | `flurfunk/routine` | no | An assistant at work (or an assistant account) manages the routines of a conversation's channel: `thread`, `action` (`add`, `list`, `pause`, `resume`, `remove`); for `add` a `name`, the `task`, `days` (`mon` … `sun`), `time` (`HH:MM`, site time) and `post` (`thread` or `channel`); `id` for the others. The person must be team and see the conversation. When due (cron hook `flurfunk_ai_routine`), the assistant does the task with that person's rights and posts the result, or nothing for an answer of `-`. Routines live in the option `flurfunk_ai_routines`, at most ten per channel. |
-| `flurfunk/remember` | no | Adds a note to the channel of a conversation (`thread`, `note`) or removes one by its number (`remove`); needs the site's notes per channel switched on and a conversation in a channel (not private) the user can see. Notes live in the option `flurfunk_ai_memory`. |
+| `flurfunk/remember` | no | Adds a note to the channel of a conversation (`thread`, `note`) or removes one by its number (`remove`); `scope: site` keeps it for all channels instead (key `*` in the option; only from a channel guests cannot read, by the team); needs the site's notes per channel switched on and a conversation in a channel (not private) the user can see. Notes live in the option `flurfunk_ai_memory`. |
 | `flurfunk/update-draft` | no | Changes a draft made with `create-draft` while nobody else has saved it since (`_flurfunk_draft_saved` = its modification time): `id`, `title`, `text`, `excerpt`, `featured_image`, `images`. Needs `edit_post`. |
 
 The action `flurfunk_draft_saved` (`int $post_id`, `array $input`) fires after either; drafts an AI
@@ -1450,6 +1450,7 @@ More complete scripts (a GitHub Action, a daily report) are on the [examples](ex
 | --- | --- |
 | API and permission checks (100+) | `wp eval-file tests/api-edge.php <team-id> <team2-id> <guest-id>` |
 | Browser tests (Playwright) | `cd tests/e2e && npm install && FF_BASE=… FF_TEAM=… FF_TEAM_PASS=… npx playwright test` |
+| A newsroom day with real AI (before a release, local test site only) | `cd tests/e2e && FF_BASE=http://localhost:9601 node newsroom-day.mjs` |
 | Web Push crypto against Node | `tests/push/run.sh` |
 | Formatter | `node tests/format.test.cjs` |
 | Load test (2000 threads, 20000 messages) | `wp eval-file tests/load.php` |
@@ -1457,6 +1458,16 @@ More complete scripts (a GitHub Action, a daily report) are on the [examples](ex
 | Build translations | `python3 tools/l10n.py` (from `tools/translations/*.json` to `languages/*.l10n.php`) |
 | Card gallery of the website | `node tools/docs-cards.mjs` (from `assets/app.js` and `assets/app.css` to `docs/_includes/card-gallery.html` and `docs/assets/cards.css`) |
 | Release zip | `tools/build-zip.sh` |
+
+**The newsroom day** plays a working day with an administrator, an editor, an author, a trainee
+(contributor, team on her profile) and a freelancer (guest) in four channels with two assistants and
+a real AI model: questions without @, proofreading and corrections applied by the trainee, a guest in
+a thread about his post, private questions that must not leak drafts, a conference the assistants
+stay out of, a house rule for all channels, an injected instruction, two requests at once and a
+routine. Each step says what should happen; the report (`test-results/newsroom-day.md`) marks it
+PASS, WARN or FAIL. Answers of a model vary, so it is not part of the test suite – run it before a
+release, on a local site with an AI provider (about 25 minutes and some 300,000 tokens). It creates
+what it needs and puts the assistants' settings back; see the head of the file for its variables.
 
 The e2e tests read `FF_BASE`, `FF_TEAM`, `FF_TEAM_PASS`, `FF_TEAM2`, `FF_TEAM2_PASS`, `FF_GUEST`,
 `FF_GUEST_PASS` and optionally `FF_QUERY`; with `FF_SHOTS=<folder>` the card tests also save

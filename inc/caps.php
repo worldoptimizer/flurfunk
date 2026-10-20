@@ -509,6 +509,22 @@ function render_section(): void {
 		<?php endif; ?>
 	</form>
 	<?php
+	$people = \Flurfunk\People\exceptions();
+	$labels = \Flurfunk\People\labels();
+	?>
+	<p style="max-width:46rem"><?php esc_html_e( 'Single people can differ from their role – e.g. a trainee in the team, a freelancer as a guest: on their profile under "Flurfunk".', 'flurfunk' ); ?>
+	<?php if ( $people ) : ?>
+		<?php esc_html_e( 'Differing now:', 'flurfunk' ); ?>
+		<?php
+		$links = array();
+		foreach ( $people as $id => $kind ) {
+			$links[] = '<a href="' . esc_url( get_edit_user_link( $id ) ) . '">' . esc_html( \Flurfunk\Store\person( $id )['name'] ) . '</a> (' . esc_html( $labels[ $kind ] ) . ')';
+		}
+		echo wp_kses( implode( ', ', $links ), array( 'a' => array( 'href' => true ) ) );
+		?>
+	<?php endif; ?>
+	</p>
+	<?php
 }
 
 add_action(

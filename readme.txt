@@ -116,7 +116,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 = 0.6.0 (in development) =
 * New: an assistant stays in a thread once it has answered (for two days, on by default): anyone there can write on without mentioning it, as with one shared assistant per thread. A quick check with a small, cheap model decides whether a message is for it – an answer, a 👍 for thanks, or nothing for talk between people; "is thinking" only shows once it answers. Follow-ups of the person who asked go through the same check, which makes them cheaper.
-* New: a 👎 on an assistant's answer mutes it in that thread until someone mentions it again (as in Claude Tag). Guests reach an assistant in a thread by mentioning it or by writing on right after its answer to them. Channel notes reach the quick check, so "answer spelling questions without being mentioned" works. The line under an answer names the model that wrote it.
+* New: a 👎 on an assistant's answer mutes it in that thread until someone mentions it again (as in Claude Tag). Guests reach an assistant by mentioning it (see below for threads). Channel notes reach the quick check, so "answer spelling questions without being mentioned" works. The line under an answer names the model that wrote it.
 * New: per channel, a limit that caps every assistant there on top of its own (e.g. so it cannot quote internal drafts in a channel guest authors read), and a monthly token budget shared by the assistants in that channel.
 * New: check-ins on request – "remind us on Friday whether the photo rights are settled": the assistant follows up in the thread at that time, asks whether it is done and mentions who should answer (who is then notified), or says it is settled. At most five per thread, 60 days ahead; it does not nag on its own. Ability flurfunk/follow-up.
 * New: notes per channel (off by default): ask an assistant to remember something ("teasers at most 200 characters") and every assistant in that channel knows it from then on; "it is 180 now" changes it. Only on request, only within the channel, never in private conversations; administrators see and remove the notes per channel. Ability flurfunk/remember.
@@ -127,6 +127,12 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * New: "Models for the quick check" in the AI settings – any model your providers offer (empty: a small one).
 * New: the AI log shows the quick checks (for it, thanks, not for it) with model and tokens.
 * Fixed: deleting the plugin with "keep data" off now also removes the AI assistants' settings.
+* New: team or guest per person, where it differs from the role (as in Slack): on a profile under "Flurfunk → Takes part as" – e.g. a trainee in the team although "Contributor", a freelancer or a subscriber as a guest, or no access. Stored as capabilities on the account; the Permissions section lists who differs.
+* New: notes for all channels – a house rule asked for everyone is kept once and used wherever no guests read along (as Claude Tag's workspace notes); listed and removable in the settings.
+* New: tasks an assistant proposes carry who is responsible and the due date; someone who cannot see the channel is named on the card, not assigned.
+* New: someone opening Flurfunk for the first time starts with everything said before as read.
+* Changed: as in Claude Tag, guests reach an assistant that answers guests by mentioning it or by writing on in a thread it takes part in; a new thread from a guest is not answered unasked. Where guests read along, assistants use no notes for all channels.
+* Changed: the pack "Looking things up" also finds and reads posts.
 * Fixed: a request to an assistant could get lost when it arrived while another answer was being written in WP-Cron (on hosts without PHP-FPM).
 * Fixed: guests who may ask an assistant can apply its proposals (with their own rights) – before, the card said "You cannot do this". Their assistant also finds published posts, not only their own.
 * Changed: with several assistants in a channel that answers unasked, one quick check picks the assistant whose role fits, instead of the first that could say something; an assistant that cannot actually help stays quiet.

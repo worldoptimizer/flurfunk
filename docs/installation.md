@@ -121,7 +121,15 @@ Every user is one of:
 | guest | has `flurfunk_guest` but not `flurfunk_team` | authors and contributors |
 | none | everyone else | subscribers; they do not see Flurfunk at all |
 
-A plugin can change this per user with the `flurfunk_user_kind` filter.
+**Per person.** Someone can differ from their role: on their profile (*Users → Edit*) under
+**Flurfunk → Takes part as**, people who may change user roles choose *As the role says*, *Team*,
+*Guest* or *No access* – e.g. a trainee in the team although their role is *Contributor*, a
+freelancer as a guest, a subscriber as a guest. It is stored as the capabilities `flurfunk_team` and
+`flurfunk_guest` granted or denied on that account, so role editor plugins show the same. The
+Permissions section lists who differs from their role. A plugin can also change this per user with
+the `flurfunk_user_kind` filter.
+
+Someone who opens Flurfunk for the first time starts with everything said before as read.
 
 ### Permissions
 
@@ -325,7 +333,11 @@ cron job calling `wp-cron.php` makes routines and check-ins punctual.
 remember something lasting ("teasers at most 200 characters"), it keeps a short note for that
 channel, and every assistant there reads the channel's notes – only on request, never in private
 conversations, never across channels. The notes are listed per channel below the assistants, where
-you can remove them; they are sent to the AI provider with the requests in that channel.
+you can remove them; they are sent to the AI provider with the requests in that channel. Asked for a
+house rule for everyone, an assistant keeps a note **for all channels** (as Claude Tag's workspace
+notes) – only from a channel without guests; it is read wherever no guests read along. Where guests
+read along, assistants use no notes for all channels, and a channel's own notes only where guests
+see the whole channel.
 
 **Per channel** (under the assistants): instructions, a limit that caps every assistant there on top
 of its own (e.g. in a channel guest authors read, so it cannot quote internal drafts), a monthly

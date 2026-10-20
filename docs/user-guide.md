@@ -161,8 +161,9 @@ their role.
   answer, a thanks gets a 👍, talk between people gets nothing. Mentioned only in passing ("@Rita,
   ask @Lektorat later"), it puts a 👀 on the message – after a mention it never stays silent. Too
   chatty? A 👎 on one of its answers mutes it in that thread until someone mentions it again.
-  Guests reach it by mentioning it, or by writing on right after its answer to them. Under each
-  answer you see which model wrote it.
+  Guests reach it by mentioning it or by writing on in a thread it takes part in (if your site lets
+  guests ask it); a new thread from a guest gets no answer unasked. Under each answer you see which
+  model wrote it.
 - **Private conversations:** under **Assistants** in the sidebar each assistant you may ask has its
   own space. Write in the box at the bottom to start a conversation; it answers every message there
   without a mention. Only you see these conversations – not your team, not the site's
@@ -181,10 +182,15 @@ their role.
 - **Notes per channel:** if your site keeps them, tell an assistant "remember: teasers at most 200
   characters" – it keeps the note for that channel, every assistant there knows it from then on,
   and "it is 180 now" changes it. Notes stay in their channel; private conversations have none.
+  A house rule for everyone ("remember for all channels: times as 14 Uhr") is kept for all
+  channels – asked in a channel without guests; it is used wherever no guests read along.
 - **Drafts:** if your administrators allow it, ask for one – "@Lektorat, make a short article of
   this thread, with the photo as featured image". It writes a draft with you as its author and
   puts a card with it under its answer; write on ("shorter title, please") and it changes the
   draft, until someone else has worked on it. It never publishes.
+- **Tasks:** "@Assistenz, make a task: Ben gets the photos by Friday" gives a card with the task,
+  who is responsible and when it is due. Someone who cannot see the channel cannot be responsible;
+  the card says so.
 - **Corrections:** "@Lektorat, check the three latest articles and suggest the corrections" gives one
   card with before and after for each post (if your administrators allow it). Untick what you do
   not want and click **Apply** – it runs with your rights; **Undo** brings the posts back, as long as

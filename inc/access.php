@@ -37,8 +37,9 @@ const LEVELS = array( 'all', 'own-posts', 'none' );
 function kind( int $user_id = 0 ): string {
 	static $cache = array();
 	$user_id = $user_id ?: get_current_user_id();
-	if ( isset( $cache[ $user_id ] ) ) {
-		return $cache[ $user_id ];
+	$key     = $user_id . ':' . kinds_changed(); // Someone set to team or guest within the request counts at once.
+	if ( isset( $cache[ $key ] ) ) {
+		return $cache[ $key ];
 	}
 	$user = get_userdata( $user_id );
 	$kind = '';
@@ -46,7 +47,18 @@ function kind( int $user_id = 0 ): string {
 		$kind = is_bot( $user_id ) || user_can( $user, \Flurfunk\Caps\TEAM ) ? 'team' : ( user_can( $user, \Flurfunk\Caps\GUEST ) ? 'guest' : '' );
 		$kind = (string) apply_filters( 'flurfunk_user_kind', $kind, $user );
 	}
-	return $cache[ $user_id ] = $kind;
+	return $cache[ $key ] = $kind;
+}
+
+/**
+ * A counter that changes when someone is set to team, guest or no access (for the caches of kind()
+ * and level()).
+ *
+ * @param bool $bump Count up.
+ */
+function kinds_changed( bool $bump = false ): int {
+	static $n = 0;
+	return $bump ? ++$n : $n;
 }
 
 /**
@@ -127,7 +139,7 @@ function level( object $channel, int $user_id ): string {
 	static $cache = array();
 	// The channel's settings are part of the key, so a change within the request counts at once;
 	// so is the scope (an assistant working for this person may see less).
-	$key = implode( ':', array( $channel->id, $user_id, $channel->access_team, $channel->access_guests, (int) $channel->archived, required_cap( $channel ), (int) acting( $user_id ), scope() ) );
+	$key = implode( ':', array( $channel->id, $user_id, $channel->access_team, $channel->access_guests, (int) $channel->archived, required_cap( $channel ), (int) acting( $user_id ), scope(), kinds_changed() ) );
 	if ( isset( $cache[ $key ] ) ) {
 		return $cache[ $key ];
 	}

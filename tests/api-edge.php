@@ -1441,7 +1441,7 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	$check( '… plugins can add a pack; only abilities the site has count', array( 'flurfunk/get-thread' ) === ( $ai_mine['tools'] ?? null ) && $ai_mine['available'] && 'read' === $ai_mine['kind'] && array() === $ai_mine['proposals'], $ai_mine );
 }
 $ai_k1 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'lookup' ), 'tools' => $ai_k0['tools'], 'proposals' => $ai_k0['proposals'] ) );
-$check( '… unticking a pack takes away what it stands for, the other packs stay', ! $ai_k1['posts'] && ! in_array( 'flurfunk/start-thread', $ai_k1['proposals'], true ) && ( ! function_exists( 'wp_get_ability' ) || in_array( 'flurfunk/get-thread', $ai_k1['tools'], true ) ), $ai_k1 );
+$check( '… unticking a pack takes away what it stands for, the other packs stay (reading posts stays: looking things up needs it)', $ai_k1['posts'] && ! in_array( 'flurfunk/start-thread', $ai_k1['proposals'], true ) && ( ! function_exists( 'wp_get_ability' ) || in_array( 'flurfunk/get-thread', $ai_k1['tools'], true ) ), $ai_k1 );
 $ai_k2 = Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'lookup' ), 'tools' => array( 'flurfunk/get-thread' ) ) );
 $check( '… a pack left ticked keeps the single choices made below it', ! function_exists( 'wp_get_ability' ) || ( array( 'flurfunk/get-thread' ) === $ai_k2['tools'] ), $ai_k2['tools'] );
 Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'proofread', 'tasks' ), 'role' => 'liest gegen' ) );
@@ -1693,7 +1693,7 @@ remove_filter( 'flurfunk_ai_pre_answer', $gu_fake, 20 );
 $as( $guest );
 $gu_m = Store\add_message( $gu_t, array( 'body' => 'Und was meint ihr dazu?' ) );
 $as( $team );
-$check( 'a guest writing on without a mention does not wake the assistant (only explicit mentions do)', ! wp_next_scheduled( 'flurfunk_ai_run', array( $gu_t, $gu_m, $ai_bot ) ) );
+$check( 'a guest writing on without a mention does not wake an assistant that does not answer guests', ! wp_next_scheduled( 'flurfunk_ai_run', array( $gu_t, $gu_m, $ai_bot ) ) );
 // …but a guest who asked and writes on right after the answer to them follows up, as everyone does.
 $gf_prof = get_user_meta( $ai_bot, 'flurfunk_ai', true );
 update_user_meta( $ai_bot, 'flurfunk_ai', array_merge( (array) $gf_prof, array( 'guests' => true ) ) );
@@ -1706,6 +1706,12 @@ $gf_m = Store\add_message( $gf_t, array( 'body' => 'Kannst du das direkt korrigi
 $as( $team );
 $check( 'a guest who asked: writing on right after the answer is a follow-up (no new mention needed)', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $gf_t, $gf_m, $ai_bot ) ) );
 wp_clear_scheduled_hook( 'flurfunk_ai_run', array( $gf_t, $gf_m, $ai_bot ) );
+// …and, as in Claude Tag, writing on in a thread the assistant takes part in (the quick check decides).
+$as( $guest );
+$gf_m2 = Store\add_message( $gu_t, array( 'body' => 'Und gilt das auch für Bildunterschriften?' ) );
+$as( $team );
+$check( '… and a guest writing on in a thread the assistant takes part in reaches it too (if it answers guests)', (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $gu_t, $gf_m2, $ai_bot ) ) );
+wp_clear_scheduled_hook( 'flurfunk_ai_run', array( $gu_t, $gf_m2, $ai_bot ) );
 $extra_threads[] = $gf_t;
 // Guests may apply an assistant's proposal (it runs with their rights).
 $gf_av = array_column( json_decode( (string) wp_json_encode( Flurfunk\Providers\available( $guest ) ), true ), null, 'id' )['flurfunk/ai-proposal'] ?? null;
@@ -1826,6 +1832,86 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/routine' )
 	}
 }
 null === $ro_old ? delete_option( 'flurfunk_ai_routines' ) : update_option( 'flurfunk_ai_routines', $ro_old );
+// Team or guest per person (as in Slack), where it differs from the role.
+WP_CLI::log( 'Per person, notes for all channels, tasks with people and dates, first visit' );
+$pp_u = wp_insert_user( array( 'user_login' => 'ff-pp-' . wp_generate_password( 5, false, false ), 'user_pass' => wp_generate_password(), 'role' => 'contributor', 'display_name' => 'Pia Probe' ) );
+$pp_role = Flurfunk\People\choice( $pp_u );
+Flurfunk\People\set_choice( $pp_u, 'team' );
+$pp_team = Flurfunk\People\choice( $pp_u ) . ':' . ( user_can( $pp_u, 'flurfunk_team' ) ? 'team' : 'no' );
+Flurfunk\People\set_choice( $pp_u, 'guest' );
+$pp_guest = Flurfunk\People\choice( $pp_u ) . ':' . ( user_can( $pp_u, 'flurfunk_team' ) ? 'team' : ( user_can( $pp_u, 'flurfunk_guest' ) ? 'guest' : 'no' ) );
+Flurfunk\People\set_choice( $pp_u, 'none' );
+$pp_none = Flurfunk\People\choice( $pp_u ) . ':' . ( user_can( $pp_u, 'flurfunk_team' ) || user_can( $pp_u, 'flurfunk_guest' ) ? 'some' : 'no' );
+$pp_list = Flurfunk\People\exceptions();
+Flurfunk\People\set_choice( $pp_u, '' );
+$pp_back = Flurfunk\People\choice( $pp_u ) . ':' . Flurfunk\People\by_role( get_userdata( $pp_u ) );
+$check( 'one person can be team, guest or nobody, whatever their role; "as the role" goes back', '' === $pp_role && 'team:team' === $pp_team && 'guest:guest' === $pp_guest && 'none:no' === $pp_none && 'none' === ( $pp_list[ $pp_u ] ?? '' ) && ':guest' === $pp_back, array( $pp_role, $pp_team, $pp_guest, $pp_none, $pp_back ) );
+Flurfunk\People\set_choice( $ai_bot, 'none' );
+$check( '… assistants always stay team', '' === Flurfunk\People\choice( $ai_bot ) );
+// The matrix: who sees which channel, by what the person is.
+$mx_g = (string) Store\channel_by_slug( 'ff-test' )->access_guests;
+Store\ensure_channel( 'ff-test', array( 'access_guests' => 'all' ), true );
+Store\ensure_channel( 'ff-test-mem', array( 'name' => 'Intern', 'access_guests' => 'none' ), true );
+$mx = array();
+foreach ( array( '', 'team', 'guest', 'none' ) as $mx_c ) {
+	Flurfunk\People\set_choice( $pp_u, $mx_c );
+	$mx[ $mx_c ?: 'role' ] = Flurfunk\Access\kind( $pp_u ) . ' ' . Flurfunk\Access\level( Store\channel_by_slug( 'ff-test' ), $pp_u ) . '/' . Flurfunk\Access\level( Store\channel_by_slug( 'ff-test-mem' ), $pp_u );
+}
+Flurfunk\People\set_choice( $pp_u, '' );
+Store\ensure_channel( 'ff-test', array( 'access_guests' => $mx_g ), true );
+$check( 'the matrix: a contributor by role is a guest (guest channel yes, internal no); as team both; as guest like the role; no access nothing', array( 'role' => 'guest all/none', 'team' => 'team all/all', 'guest' => 'guest all/none', 'none' => ' none/none' ) === $mx, $mx );
+// The first visit: what was said before starts as read.
+Store\first_visit( $pp_u );
+$pp_c = Store\counts( $pp_u );
+Store\first_visit( $team );
+$check( 'someone new starts with nothing unread; who has read before is left alone', 0 === (int) $pp_c['total'] && get_user_meta( $pp_u, 'flurfunk_started', true ), $pp_c );
+wp_delete_user( $pp_u );
+// Notes for all channels (house rules), never where guests read.
+$sn_opts = get_option( 'flurfunk_ai_settings', null );
+update_option( 'flurfunk_ai_settings', array_merge( (array) $sn_opts, array( 'memory' => true ) ) );
+$sn_mem = get_option( 'flurfunk_ai_memory', null );
+Store\ensure_channel( 'ff-test-mem', array( 'access_guests' => 'none' ), true );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test', 'ff-test-mem' ) ) );
+$as( $team );
+$sn_int = Store\create_thread( array( 'channel' => 'ff-test-mem', 'body' => 'Intern' ) );
+$sn_gst = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Mit Gästen' ) );
+$sn_old = (string) Store\channel_by_slug( 'ff-test' )->access_guests;
+Store\ensure_channel( 'ff-test', array( 'access_guests' => 'all' ), true );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/remember' ) ) {
+	Flurfunk\Modules\Ai\working( $ai_bot );
+	$sn_ok = wp_get_ability( 'flurfunk/remember' )->execute( array( 'thread' => $sn_int, 'note' => 'Uhrzeiten schreiben wir als 14 Uhr.', 'scope' => 'site' ) );
+	$sn_no = Flurfunk\Modules\Ai\may_remember( array( 'thread' => $sn_gst, 'scope' => 'site' ) );
+	Flurfunk\Modules\Ai\working( 0 );
+	Flurfunk\Modules\Ai\save_notes( 'ff-test', array( array( 'text' => 'Gastregel.', 'at' => time(), 'thread' => $sn_gst ) ) );
+	$sn_in  = Flurfunk\Modules\Ai\notes_for( Store\thread_row( $sn_int ) );
+	$sn_out = Flurfunk\Modules\Ai\notes_for( Store\thread_row( $sn_gst ) );
+	Store\ensure_channel( 'ff-test', array( 'access_guests' => 'own-posts' ), true );
+	$sn_own  = Flurfunk\Modules\Ai\notes_for( Store\thread_row( $sn_gst ) );
+	$sn_gp   = Store\create_thread( array( 'channel' => 'ff-test', 'target' => array( 'type' => 'post', 'id' => $guest_post ), 'body' => 'Zum Gastbeitrag' ) );
+	$sn_gpn  = Flurfunk\Modules\Ai\notes_for( Store\thread_row( (int) $sn_gp ) );
+	$extra_threads[] = (int) $sn_gp;
+	$check( 'a house rule for all channels: saved from a channel without guests, read there, never where guests read', ! is_wp_error( $sn_ok ) && 'all channels' === ( $sn_ok['channel'] ?? '' ) && ! $sn_no && str_contains( $sn_in, '14 Uhr' ) && ! str_contains( $sn_out, '14 Uhr' ) && str_contains( $sn_out, 'Gastregel.' ) && str_contains( $sn_own, '14 Uhr' ) && '' === $sn_gpn, array( $sn_ok, $sn_in, $sn_out, $sn_own, $sn_gpn ) );
+	$check( '… and the assistant is told how to keep one', str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $sn_int ), 0, $ai_bot )['system'], 'add scope site' ) && ! str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( (int) $sn_gp ), 0, $ai_bot )['system'], 'add scope site' ) );
+}
+Store\ensure_channel( 'ff-test', array( 'access_guests' => $sn_old ), true );
+null === $sn_mem ? delete_option( 'flurfunk_ai_memory' ) : update_option( 'flurfunk_ai_memory', $sn_mem, false );
+null === $sn_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $sn_opts );
+$extra_threads[] = $sn_int;
+$extra_threads[] = $sn_gst;
+// Tasks an assistant proposes: with who is responsible and when it is due.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/start-thread' ) ) {
+	$as( $team );
+	$tk_name = Store\person( $team2 )['name'];
+	$tk_r    = wp_get_ability( 'flurfunk/start-thread' )->execute( array( 'channel' => 'ff-test-mem', 'text' => 'Fotos besorgen', 'task' => true, 'due' => '2031-05-02', 'assignees' => array( $tk_name, 'Niemand Unbekannt', Store\person( $guest )['name'] ) ) );
+	$tk_t    = Store\full_thread( (int) ( $tk_r['id'] ?? 0 ), $team );
+	$check( 'a task with a due date and who is responsible; someone who cannot see the channel or is unknown is reported, not assigned', ! is_wp_error( $tk_r ) && '2031-05-02' === ( $tk_t['due'] ?? '' ) && array( $team2 ) === array_map( 'intval', (array) ( $tk_t['assignees'] ?? array() ) ) && in_array( 'Niemand Unbekannt', (array) ( $tk_r['not_assigned'] ?? array() ), true ) && in_array( Store\person( $guest )['name'], (array) ( $tk_r['not_assigned'] ?? array() ), true ), array( $tk_r, $tk_t['due'] ?? null, $tk_t['assignees'] ?? null ) );
+	$extra_threads[] = (int) ( $tk_r['id'] ?? 0 );
+	[ $tk_ids ] = Flurfunk\Abilities\people_from( array( '@' . strtok( $tk_name, ' ' ), (string) $team ) );
+	$check( '… names as "@First" (when unique) or IDs work too', in_array( $team, $tk_ids, true ), $tk_ids );
+}
+// Packs that share a setting: switching one off keeps what the other still needs.
+$pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
+$check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";

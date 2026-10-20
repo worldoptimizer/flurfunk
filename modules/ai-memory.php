@@ -17,8 +17,9 @@ use Flurfunk\Store;
 
 defined( 'ABSPATH' ) || exit;
 
-const MEMORY     = 'flurfunk_ai_memory'; // slug => [ { text, at, thread } ].
-const MEMORY_MAX = 30;                   // Notes per channel.
+const MEMORY     = 'flurfunk_ai_memory'; // slug => [ { text, at, thread } ]; SITE_NOTES for all channels.
+const MEMORY_MAX = 30;                   // Notes per channel (and for all channels).
+const SITE_NOTES = '*';                  // Notes for all channels: house rules (as Claude Tag's workspace notes).
 
 add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\\register_memory' );
 
@@ -71,6 +72,53 @@ function notes_text( string $slug ): string {
 }
 
 /**
+ * Can guests read this conversation (a channel guests see, or a guest's private conversation)? There
+ * an assistant uses no notes for all channels, and the channel's own only where guests see all of
+ * it (as Claude Tag, which uses no memory while a guest is present).
+ *
+ * @param object $thread Thread row.
+ */
+function guests_read( object $thread ): bool {
+	if ( ! empty( $thread->private_to ) ) {
+		return 'team' !== Access\kind( (int) $thread->private_to );
+	}
+	$c = Store\channel( (int) $thread->channel_id );
+	if ( ! $c || 'none' === (string) $c->access_guests || \Flurfunk\Caps\TEAM === Access\required_cap( $c ) ) {
+		return false;
+	}
+	// "Own posts": only the threads about a guest's post.
+	return 'all' === (string) $c->access_guests || array() !== Store\audience( $thread );
+}
+
+/**
+ * The notes an assistant reads in a conversation: those for all channels, then the channel's own.
+ *
+ * @param object $thread Thread row.
+ */
+function notes_for( object $thread ): string {
+	if ( ! memory_on() ) {
+		return '';
+	}
+	$guests  = guests_read( $thread );
+	$slug    = channel_slug( $thread );
+	$c       = '' !== $slug ? Store\channel( (int) $thread->channel_id ) : null;
+	$blocks  = array();
+	$site    = $guests ? array() : notes( SITE_NOTES );
+	$channel = '' === $slug || ( $guests && ( ! $c || 'all' !== (string) $c->access_guests ) ) ? array() : notes( $slug );
+	if ( $site ) {
+		$lines = array();
+		foreach ( $site as $i => $n ) {
+			$lines[] = ( $i + 1 ) . '. ' . $n['text'];
+		}
+		$blocks[] = "Notes for all channels (house rules the team asked you to remember; to remove one use scope site and its number):\n" . implode( "\n", $lines );
+	}
+	if ( $channel ) {
+		$blocks[] = notes_text( $slug );
+	}
+	return implode( "\n\n", $blocks );
+}
+
+/**
  * Permission of flurfunk/remember: the person may see the conversation, it is in a channel (not
  * private) and the site keeps notes.
  *
@@ -78,7 +126,11 @@ function notes_text( string $slug ): string {
  */
 function may_remember( $input = null ): bool {
 	$t = Store\thread_row( (int) ( ( (array) $input )['thread'] ?? 0 ) );
-	return memory_on() && is_user_logged_in() && $t && empty( $t->private_to ) && Access\can_see( $t, get_current_user_id() ) && '' !== channel_slug( $t );
+	if ( ! memory_on() || ! is_user_logged_in() || ! $t || ! empty( $t->private_to ) || ! Access\can_see( $t, get_current_user_id() ) || '' === channel_slug( $t ) ) {
+		return false;
+	}
+	// Notes for all channels only from a channel without guests, by the team.
+	return 'site' !== ( ( (array) $input )['scope'] ?? '' ) || ( ! guests_read( $t ) && 'team' === Access\kind() );
 }
 
 /**
@@ -92,6 +144,10 @@ function remember( array $input ) {
 	$slug = $t ? channel_slug( $t ) : '';
 	if ( '' === $slug ) {
 		return new \WP_Error( 'flurfunk_memory', __( 'Notes are kept per channel; this conversation has none.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$here = $slug;
+	if ( 'site' === ( $input['scope'] ?? '' ) ) {
+		$slug = SITE_NOTES;
 	}
 	$notes  = notes( $slug );
 	$remove = (int) ( $input['remove'] ?? 0 );
@@ -113,7 +169,7 @@ function remember( array $input ) {
 	save_notes( $slug, $notes );
 	Store\bump();
 	return array(
-		'channel' => $slug,
+		'channel' => SITE_NOTES === $slug ? 'all channels' : $here,
 		'notes'   => array_map( static fn ( $n ) => $n['text'], notes( $slug ) ),
 	);
 }
@@ -129,7 +185,7 @@ function register_memory(): void {
 		'flurfunk/remember',
 		array(
 			'label'               => __( 'Remember for a channel', 'flurfunk' ),
-			'description'         => __( 'Keeps a short note (a rule, a fact the team wants kept) for the channel of a conversation, or removes one by its number. Every AI assistant in that channel reads the notes.', 'flurfunk' ),
+			'description'         => __( 'Keeps a short note (a rule, a fact the team wants kept) for the channel of a conversation – or, with scope site, for all channels – or removes one by its number. Every AI assistant there reads the notes.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -146,6 +202,12 @@ function register_memory(): void {
 						'type'        => 'integer',
 						'minimum'     => 1,
 						'description' => __( 'Number of a note to remove (to correct one: remove it and add the new one).', 'flurfunk' ),
+					),
+					'scope'  => array(
+						'type'        => 'string',
+						'enum'        => array( 'channel', 'site' ),
+						'default'     => 'channel',
+						'description' => __( 'channel: for this channel; site: a house rule for all channels (only from a channel without guests).', 'flurfunk' ),
 					),
 				),
 				'required'             => array( 'thread' ),

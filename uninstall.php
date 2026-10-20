@@ -53,6 +53,15 @@ if ( is_multisite() ) {
 }
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	delete_option( 'flurfunk_vapid' ); // Kept with the data, so push subscriptions keep working after a reinstall.
+	// Team or guest set for single people (capabilities on their accounts), on every site.
+	foreach ( get_users( array( 'blog_id' => 0, 'fields' => 'ID' ) ) as $flurfunk_uid ) {
+		$flurfunk_user = get_userdata( (int) $flurfunk_uid );
+		foreach ( $flurfunk_user ? array_keys( $flurfunk_user->caps ) : array() as $flurfunk_cap ) {
+			if ( in_array( $flurfunk_cap, array( 'flurfunk_team', 'flurfunk_guest' ), true ) ) {
+				$flurfunk_user->remove_cap( $flurfunk_cap );
+			}
+		}
+	}
 	global $wpdb;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- runs once on uninstall.
 	foreach ( $wpdb->get_col( $wpdb->prepare( 'SELECT post_id FROM %i WHERE meta_key = %s', $wpdb->postmeta, '_flurfunk_file' ) ) as $flurfunk_id ) {
@@ -90,6 +99,7 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 		delete_metadata( 'user', 0, 'flurfunk_prefs_' . $flurfunk_k, '', true );
 	}
 	delete_metadata( 'user', 0, 'flurfunk_rev', '', true );
+	delete_metadata( 'user', 0, 'flurfunk_started', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_bot', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_day', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_last', '', true );

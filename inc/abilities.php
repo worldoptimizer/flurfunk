@@ -56,13 +56,51 @@ function texts(): array {
 			'label'       => __( 'Start a conversation', 'flurfunk' ),
 			'description' => __( 'Starts a conversation in a channel as the current user, optionally as a task.', 'flurfunk' ),
 			'fields'      => array(
-				'channel' => __( 'Channel', 'flurfunk' ),
-				'title'   => __( 'Title', 'flurfunk' ),
-				'text'    => __( 'Text', 'flurfunk' ),
-				'task'    => __( 'As a task', 'flurfunk' ),
+				'channel'   => __( 'Channel', 'flurfunk' ),
+				'title'     => __( 'Title', 'flurfunk' ),
+				'text'      => __( 'Text', 'flurfunk' ),
+				'task'      => __( 'As a task', 'flurfunk' ),
+				'due'       => __( 'Due', 'flurfunk' ),
+				'assignees' => __( 'Responsible', 'flurfunk' ),
 			),
 		),
 	);
+}
+
+/**
+ * People by name ("Ben Becker", "@Ben", or a unique first name) or ID, for tasks an assistant sets up.
+ *
+ * @param array $list Names or IDs.
+ * @return array{0:int[], 1:string[]} Found IDs, names not found.
+ */
+function people_from( array $list ): array {
+	$by_name  = array();
+	$by_first = array();
+	foreach ( Store\people() as $p ) {
+		$name = mb_strtolower( trim( (string) ( $p['name'] ?? '' ) ) );
+		if ( '' === $name ) {
+			continue;
+		}
+		$by_name[ $name ]   = (int) $p['id'];
+		$first              = (string) strtok( $name, ' ' );
+		$by_first[ $first ] = isset( $by_first[ $first ] ) ? 0 : (int) $p['id'];
+	}
+	$ids     = array();
+	$missing = array();
+	foreach ( $list as $item ) {
+		if ( is_int( $item ) || ctype_digit( (string) $item ) ) {
+			$ids[] = (int) $item;
+			continue;
+		}
+		$key = mb_strtolower( trim( ltrim( (string) $item, '@' ) ) );
+		$id  = $by_name[ $key ] ?? ( $by_first[ $key ] ?? 0 );
+		if ( $id ) {
+			$ids[] = $id;
+		} elseif ( '' !== $key ) {
+			$missing[] = (string) $item;
+		}
+	}
+	return array( array_values( array_unique( $ids ) ), $missing );
 }
 
 /**
@@ -514,10 +552,22 @@ function register(): void {
 						'type'  => 'string',
 						'title' => __( 'Text', 'flurfunk' ),
 					),
-					'task'    => array(
+					'task'      => array(
 						'type'    => 'boolean',
 						'default' => false,
 						'title'   => __( 'As a task', 'flurfunk' ),
+					),
+					'due'       => array(
+						'type'        => 'string',
+						'title'       => __( 'Due', 'flurfunk' ),
+						'description' => __( 'Due date of the task, YYYY-MM-DD.', 'flurfunk' ),
+					),
+					'assignees' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'maxItems'    => 10,
+						'title'       => __( 'Responsible', 'flurfunk' ),
+						'description' => __( 'Who is responsible for the task: names as shown in Flurfunk. Only people who can see the channel can be assigned.', 'flurfunk' ),
 					),
 				),
 				'required'             => array( 'channel', 'text' ),
@@ -525,16 +575,25 @@ function register(): void {
 			),
 			'output_schema'       => array( 'type' => 'object' ),
 			'execute_callback'    => static function ( $input = array() ) {
-				$input = (array) $input;
-				$id    = Store\create_thread(
+				$input             = (array) $input;
+				[ $who, $missing ] = people_from( (array) ( $input['assignees'] ?? array() ) );
+				$due               = preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) ( $input['due'] ?? '' ) ) ? (string) $input['due'] : '';
+				$id                = Store\create_thread(
 					array(
-						'channel' => sanitize_key( (string) $input['channel'] ),
-						'title'   => (string) ( $input['title'] ?? '' ),
-						'body'    => (string) $input['text'],
-						'task'    => ! empty( $input['task'] ),
+						'channel'   => sanitize_key( (string) $input['channel'] ),
+						'title'     => (string) ( $input['title'] ?? '' ),
+						'body'      => (string) $input['text'],
+						'task'      => ! empty( $input['task'] ) || '' !== $due || $who,
+						'due'       => $due,
+						'assignees' => $who,
 					)
 				);
-				return is_wp_error( $id ) ? $id : array( 'id' => (int) $id );
+				if ( is_wp_error( $id ) ) {
+					return $id;
+				}
+				$assigned = Store\assignees( (int) $id );
+				$skipped  = array_merge( $missing, array_map( static fn ( $u ) => Store\person( $u )['name'], array_diff( $who, $assigned ) ) );
+				return array( 'id' => (int) $id ) + ( $skipped ? array( 'not_assigned' => $skipped ) : array() );
 			},
 			'permission_callback' => __NAMESPACE__ . '\\may_start',
 			'meta'                => array(

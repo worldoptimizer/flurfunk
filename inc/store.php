@@ -797,6 +797,25 @@ function mark_all_read( int $user_id, string $channel = '' ): int {
 }
 
 /**
+ * Someone opens Flurfunk for the first time: what was said before starts as read, as when someone
+ * joins Slack – not hundreds of old threads as unread. Only once, and never for someone who has
+ * read anything already (an update does not touch existing accounts).
+ *
+ * @param int $user_id User.
+ */
+function first_visit( int $user_id ): void {
+	global $wpdb;
+	if ( ! $user_id || get_user_meta( $user_id, 'flurfunk_started', true ) ) {
+		return;
+	}
+	update_user_meta( $user_id, 'flurfunk_started', time() );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table, once per person.
+	if ( ! $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM %i WHERE user_id = %d LIMIT 1', table( 'reads' ), $user_id ) ) ) {
+		mark_all_read( $user_id );
+	}
+}
+
+/**
  * Revision counter: changes whenever something changes, so cached numbers expire at once.
  * Reading only affects the reader, so it bumps that person's own counter.
  *

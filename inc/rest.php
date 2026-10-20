@@ -209,6 +209,7 @@ function routes(): void {
  */
 function bootstrap(): array {
 	$uid      = get_current_user_id();
+	Store\first_visit( $uid );
 	$s        = \Flurfunk\Settings\get();
 	$channels = array();
 	$people   = Store\people();

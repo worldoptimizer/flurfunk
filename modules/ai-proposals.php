@@ -289,9 +289,28 @@ function build_snapshot( array $p ): array {
 		$what  = trim( (string) ( $in['title'] ?? '' ) ) ?: mb_substr( wp_strip_all_tags( (string) ( $in['text'] ?? '' ) ), 0, 80 );
 		/* translators: %s: title */
 		$line  = sprintf( $task ? __( 'Task: %s', 'flurfunk' ) : __( 'New conversation: %s', 'flurfunk' ), $what );
+		$slug  = sanitize_key( (string) ( $in['channel'] ?? '' ) );
 		/* translators: %s: channel */
-		$sub   = sprintf( __( 'in #%s', 'flurfunk' ), sanitize_key( (string) ( $in['channel'] ?? '' ) ) );
+		$sub   = sprintf( __( 'in #%s', 'flurfunk' ), $slug );
 		$run   = $task ? __( 'Create task', 'flurfunk' ) : __( 'Start conversation', 'flurfunk' );
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) ( $in['due'] ?? '' ) ) ) {
+			/* translators: %s: date */
+			$sub .= ' · ' . sprintf( __( 'due %s', 'flurfunk' ), date_i18n( get_option( 'date_format' ), (int) strtotime( (string) $in['due'] ) ) );
+		}
+		[ $who, $missing ] = \Flurfunk\Abilities\people_from( (array) ( $in['assignees'] ?? array() ) );
+		$room              = \Flurfunk\Store\channel_by_slug( $slug );
+		$names             = array();
+		foreach ( $who as $uid ) {
+			/* translators: %s: person */
+			$names[] = $room && 'all' === Access\level( $room, $uid ) ? \Flurfunk\Store\person( $uid )['name'] : sprintf( __( '%s (cannot see the channel)', 'flurfunk' ), \Flurfunk\Store\person( $uid )['name'] );
+		}
+		foreach ( $missing as $name ) {
+			/* translators: %s: name */
+			$names[] = sprintf( __( '%s (unknown)', 'flurfunk' ), $name );
+		}
+		if ( $names ) {
+			$sub .= ' · ' . implode( ', ', $names );
+		}
 		$extra = trim( (string) ( $in['text'] ?? '' ) );
 	} elseif ( 'flurfunk/reply' === $p['ability'] ) {
 		$kind  = 'reply';
