@@ -119,6 +119,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * New: per channel, a limit that caps every assistant there on top of its own (e.g. so it cannot quote internal drafts in a channel guest authors read), and a monthly token budget shared by the assistants in that channel.
 * New: check-ins on request – "remind us on Friday whether the photo rights are settled": the assistant follows up in the thread at that time, asks whether it is done and mentions who should answer (who is then notified), or says it is settled. At most five per thread, 60 days ahead; it does not nag on its own. Ability flurfunk/follow-up.
 * New: notes per channel (off by default): ask an assistant to remember something ("teasers at most 200 characters") and every assistant in that channel knows it from then on; "it is 180 now" changes it. Only on request, only within the channel, never in private conversations; administrators see and remove the notes per channel. Ability flurfunk/remember.
+* Changed: in a channel guests can read, an assistant looks things up only in that channel, so internal conversations do not end up in front of guests.
 * New: the AI log shows the quick checks (for it, thanks, not for it) with model and tokens.
 * Fixed: deleting the plugin with "keep data" off now also removes the AI assistants' settings.
 

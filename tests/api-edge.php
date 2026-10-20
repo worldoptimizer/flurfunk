@@ -1641,6 +1641,16 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/follow-up'
 	$check( '… and "forget it" cancels its check-ins in that thread', 2 === ( $fo_x['cancelled'] ?? 0 ) && ! Flurfunk\Modules\Ai\followups( $fo_t ), $fo_x );
 }
 null === $fo_old ? delete_option( 'flurfunk_ai_followups' ) : update_option( 'flurfunk_ai_followups', $fo_old );
+// Looking things up from a channel guests read: only in that channel.
+Store\ensure_channel( 'ff-test-mem', array( 'access_guests' => 'none' ), true );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test', 'ff-test-mem' ) ) );
+$lk_internal = Store\create_thread( array( 'channel' => 'ff-test-mem', 'body' => 'Intern' ) );
+$lk_guests   = (string) Store\channel_by_slug( 'ff-test' )->access_guests;
+Store\ensure_channel( 'ff-test', array( 'access_guests' => 'all' ), true );
+$lk_g = Flurfunk\Modules\Ai\lookup_channels( $ai_bot, Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Mit Gästen' ) ) );
+$lk_i = Flurfunk\Modules\Ai\lookup_channels( $ai_bot, $lk_internal );
+Store\ensure_channel( 'ff-test', array( 'access_guests' => $lk_guests ), true );
+$check( 'looking things up: from a channel guests read only in that channel, from an internal one in all its channels', array( 'ff-test' ) === $lk_g && ! array_diff( array( 'ff-test', 'ff-test-mem' ), $lk_i ) && 2 === count( $lk_i ), array( $lk_g, $lk_i ) );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";

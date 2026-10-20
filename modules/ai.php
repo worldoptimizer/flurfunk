@@ -480,6 +480,25 @@ function tools( int $agent ): array {
 }
 
 /**
+ * The channels an assistant may look things up in when it answers in this thread: its channels –
+ * but in a channel guests can read only that channel, so internal conversations do not end up in
+ * front of guests (as in Claude Tag: what is in a channel stays there).
+ *
+ * @param int $agent     Assistant.
+ * @param int $thread_id The thread it answers in.
+ * @return string[] Channel slugs.
+ */
+function lookup_channels( int $agent, int $thread_id ): array {
+	$mine = profile( $agent )['channels'];
+	$here = Store\thread_row( $thread_id );
+	$room = $here && empty( $here->private_to ) ? Store\channel( (int) $here->channel_id ) : null;
+	if ( $room && 'none' !== (string) $room->access_guests ) {
+		return in_array( (string) $room->slug, $mine, true ) ? array( (string) $room->slug ) : array();
+	}
+	return $mine;
+}
+
+/**
  * Is an AI provider set up for text (Settings → Connectors)? No API call.
  */
 function ready(): bool {
@@ -1281,7 +1300,8 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 		// The tools run as the person who asked, so they only find what that person may see – and
 		// in Flurfunk only in channels this assistant takes part in (a channel without AI stays out).
 		$me    = get_current_user_id();
-		$scope = static fn ( $ok, $slug ) => $ok && in_array( (string) $slug, profile( $agent )['channels'], true );
+		$where = lookup_channels( $agent, (int) $context['thread'] );
+		$scope = static fn ( $ok, $slug ) => $ok && in_array( (string) $slug, $where, true );
 		add_filter( 'flurfunk_ability_channel', $scope, 10, 2 );
 		wp_set_current_user( (int) $context['asker'] );
 		working( $agent );
