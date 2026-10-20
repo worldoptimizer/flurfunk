@@ -35,7 +35,7 @@ function writable_abilities(): array {
 	}
 	$out = array();
 	foreach ( wp_get_abilities() as $a ) {
-		if ( empty( $a->get_meta()['annotations']['readonly'] ) && ! in_array( $a->get_name(), array_merge( DRAFT_TOOLS, array( 'flurfunk/remember', 'flurfunk/follow-up', 'flurfunk/routine' ) ), true ) ) {
+		if ( empty( $a->get_meta()['annotations']['readonly'] ) && ! in_array( $a->get_name(), array_merge( DRAFT_TOOLS, array( 'flurfunk/remember', 'flurfunk/follow-up', 'flurfunk/routine', 'flurfunk/snapshot' ) ), true ) ) {
 			$out[ $a->get_name() ] = $a;
 		}
 	}

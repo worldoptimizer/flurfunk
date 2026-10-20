@@ -86,3 +86,54 @@ add_action(
 	},
 	1
 );
+
+/*
+ * Local Playground only: made-up visitor numbers, so the site's numbers and snapshots can be tried
+ * without a statistics plugin. They follow the content a little – each post or page with an excerpt
+ * brings visits – so a measure (adding excerpts) shows in the numbers. And a route that keeps a
+ * snapshot as of some days ago (with fewer visits), to compare "then" and "now" without waiting.
+ */
+add_filter(
+	'flurfunk_metrics',
+	static function ( array $m ): array {
+		$with = count(
+			array_filter(
+				get_posts( array( 'post_type' => array( 'post', 'page' ), 'post_status' => 'publish', 'posts_per_page' => 200 ) ),
+				static fn ( $p ) => '' !== trim( (string) $p->post_excerpt )
+			)
+		);
+		$visits = 800 + 90 * $with + ( (int) gmdate( 'z' ) % 7 ) * 12;
+		$m['visits_7d']   = array( 'label' => 'Visits in the last 7 days', 'value' => $visits, 'unit' => '', 'source' => 'Demo statistics (made up)' );
+		$m['visitors_7d'] = array( 'label' => 'Visitors in the last 7 days', 'value' => (int) round( $visits * 0.62 ), 'unit' => '', 'source' => 'Demo statistics (made up)' );
+		$m['search_7d']   = array( 'label' => 'Visits from search engines in the last 7 days', 'value' => (int) round( 120 + 45 * $with ), 'unit' => '', 'source' => 'Demo statistics (made up)' );
+		return $m;
+	}
+);
+add_action(
+	'rest_api_init',
+	static function (): void {
+		register_rest_route(
+			'flurfunk-dev/v1',
+			'/snapshot',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => static fn () => current_user_can( 'manage_options' ),
+				'callback'            => static function ( WP_REST_Request $r ) {
+					$numbers = Flurfunk\Insights\metrics();
+					$scale   = (float) ( $r['scale'] ?? 0.7 );
+					foreach ( array( 'visits_7d', 'visitors_7d', 'search_7d' ) as $k ) {
+						if ( isset( $numbers[ $k ] ) ) {
+							$numbers[ $k ]['value'] = (int) round( $numbers[ $k ]['value'] * $scale );
+						}
+					}
+					foreach ( array( 'check_no_description' ) as $k ) {
+						if ( isset( $numbers[ $k ] ) && isset( $r['missing'] ) ) {
+							$numbers[ $k ]['value'] = (int) $r['missing'];
+						}
+					}
+					return Flurfunk\Insights\take( sanitize_key( (string) $r['channel'] ), (string) $r['note'], $numbers, time() - (int) $r['days'] * DAY_IN_SECONDS );
+				},
+			)
+		);
+	}
+);

@@ -348,6 +348,12 @@ one it is for answers in two or three sentences, the others stay quiet. Most thr
 but each one is sent to the AI provider for the check (a few hundred tokens), so switch it on where
 questions are expected, e.g. in a proofreading or help channel.
 
+**Numbers and site check** (pack, off by default): an assistant checks the published content for SEO
+gaps, reads the site's numbers and keeps them per channel with a note, to compare later. WordPress
+itself gives content and comment numbers; for visits a statistics plugin has to provide them through
+the filter `flurfunk_metrics` (see the developer guide) – otherwise the assistant says they are
+missing.
+
 **Code** (pack, off by default): for administrators, an assistant searches and reads the code of
 plugins and themes – read-only, inside the plugins and themes folders only, never files that usually
 hold secrets, and values that look like passwords, tokens or keys are hidden. The lines it reads are

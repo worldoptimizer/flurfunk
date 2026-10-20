@@ -53,6 +53,7 @@ if ( is_multisite() ) {
 }
 if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data'] ) {
 	delete_option( 'flurfunk_vapid' ); // Kept with the data, so push subscriptions keep working after a reinstall.
+	delete_option( 'flurfunk_snapshots' ); // Kept numbers per channel.
 	// Team or guest set for single people (capabilities on their accounts), on every site.
 	foreach ( get_users( array( 'blog_id' => 0, 'fields' => 'ID' ) ) as $flurfunk_uid ) {
 		$flurfunk_user = get_userdata( (int) $flurfunk_uid );

@@ -400,6 +400,12 @@ function packs(): array {
 			'proposals' => array_values( array_unique( array_merge( $like( '*alt-text*', $have_w ), $like( '*alt_text*', $have_w ) ) ) ),
 			'needs'     => __( 'Needs the WordPress plugin "AI" with alt texts switched on.', 'flurfunk' ),
 		),
+		'insights'  => array(
+			'label' => __( 'Numbers and site check', 'flurfunk' ),
+			'desc'  => __( 'Check the content for SEO gaps, read the site\'s numbers (statistics plugins add visits) and keep them per channel to see later whether a measure helped', 'flurfunk' ),
+			'kind'  => 'read',
+			'tools' => $pick( array( 'flurfunk/site-check', 'flurfunk/metrics' ), $have_r ),
+		),
 		'code'      => array(
 			'label' => __( 'Code', 'flurfunk' ),
 			'desc'  => __( 'Search and read the code of plugins and themes – how something works, how to extend it (for administrators)', 'flurfunk' ),
@@ -532,6 +538,9 @@ function tools( int $agent ): array {
 	}
 	if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/follow-up' ) ) {
 		$out[] = wp_get_ability( 'flurfunk/follow-up' ); // Check back later, when asked to.
+	}
+	if ( in_array( 'flurfunk/metrics', profile( $agent )['tools'], true ) && function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/snapshot' ) ) {
+		$out[] = wp_get_ability( 'flurfunk/snapshot' ); // Keeping and comparing the numbers, with the numbers.
 	}
 	if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/routine' ) ) {
 		$out[] = wp_get_ability( 'flurfunk/routine' ); // Standing work on a schedule, when asked to.
@@ -1169,6 +1178,12 @@ function step_label( string $ability, array $args, array $result ): string {
 		case 'flurfunk/update-draft':
 			/* translators: %s: draft title */
 			return sprintf( __( 'Changed the draft "%s"', 'flurfunk' ), (string) ( $result['title'] ?? '' ) );
+		case 'flurfunk/site-check':
+			return __( 'Checked the content', 'flurfunk' );
+		case 'flurfunk/metrics':
+			return __( 'Looked at the numbers', 'flurfunk' );
+		case 'flurfunk/snapshot':
+			return 'compare' === ( $args['action'] ?? '' ) ? __( 'Compared the numbers', 'flurfunk' ) : ( 'list' === ( $args['action'] ?? '' ) ? __( 'Looked at the kept numbers', 'flurfunk' ) : __( 'Kept the numbers', 'flurfunk' ) );
 		case 'flurfunk/list-code':
 			return empty( $args['slug'] ) ? __( 'Looked at the plugins and themes', 'flurfunk' ) : sprintf( /* translators: %s: plugin or theme */ __( 'Looked at the files of %s', 'flurfunk' ), (string) $args['slug'] );
 		case 'flurfunk/search-code':
@@ -2001,6 +2016,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 						: sprintf( 'You work with the rights of %1$s, the person asking, but at most with what the role %2$s may on this site (your limit here), and never administer the site (users, plugins, settings). What that limit may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit (%2$s), and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, '"' . limit_label( $agent, channel_slug( $thread ) ) . '"' ) )
 					: '',
 				profile( $agent )['drafts'] && function_exists( 'wp_get_ability' ) && wp_get_ability( DRAFT_TOOLS[0] ) ? 'You can write drafts: flurfunk/create-draft makes one (never published; the person asking is its author), flurfunk/update-draft changes a draft made that way as long as nobody else has worked on it since. Use them when the person asks for a draft, an article, a text for the site or changes to the draft you wrote; do it, do not just announce it. Then say in one sentence what you wrote – a card with the draft appears under your answer. Write the text plainly: paragraphs separated by a blank line, "- " for lists, "## " for subheadings, no HTML. Files in the thread are shown as [File #ID: name]; when the person wants an image in the draft, pass its ID as featured_image (the main picture) or in images. If adding an image is refused, write the draft without it and say why. You can never publish; say so if asked.' : '',
+				in_array( 'flurfunk/metrics', profile( $agent )['tools'], true ) ? sprintf( 'For the site\'s state and SEO: flurfunk/site-check finds gaps in the content, flurfunk/metrics gives the numbers (what a statistics plugin provides, if any – say so if visits are missing). Keep the numbers with flurfunk/snapshot (thread %d, action take, a note what was done or planned) when someone starts a measure or asks to, and compare later (action compare, since: the number from list) to say whether it helped – changes, not guesses; say when a change may have other causes.', (int) $thread->id ) : '',
 				in_array( 'flurfunk/search-code', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'To explain how a plugin or theme works or how to extend it: find it with flurfunk/list-code, search its code with flurfunk/search-code (hook names, functions, classes), read the relevant lines with flurfunk/read-code. Name file and line. To extend something, suggest a small separate plugin or a snippet using its hooks – never changes to its own files, which an update would overwrite. You cannot change files.' : '',
 				in_array( 'flurfunk/list-comments', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'For comments: find them with flurfunk/list-comments. Those waiting for approval appear as cards with buttons to approve, mark as spam or trash under your answer, so do not list them all again – say briefly which look like spam and why (many links, off-topic, generic praise) and which deserve an answer. To answer one, call flurfunk/reply-comment; it becomes a card too.' : '',
 				in_array( 'flurfunk/start-thread', array_map( static fn ( $a ) => $a->get_name(), proposal_abilities( $agent ) ), true ) ? 'For a task, call flurfunk/start-thread with task true, the due date as due (YYYY-MM-DD) and who is responsible as assignees (names as shown in Flurfunk) – never claim a due date or a responsible person you did not put in these fields. Only people who can see that channel can be responsible; if someone cannot, say so.' : '',

@@ -2020,6 +2020,47 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/search-cod
 	);
 	$check( '… only for administrators – also while an assistant reads for one', true !== $cd_no && true === $cd_ag );
 }
+// Insights: a content check, the numbers, and snapshots per channel to compare later.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/site-check' ) ) {
+	$as( $team );
+	$in_p  = wp_insert_post( array( 'post_title' => 'Kurz', 'post_status' => 'publish', 'post_author' => $team, 'post_content' => '<p>Nur ein paar Worte <img src="x.jpg"></p>' ) );
+	$in_ck = wp_get_ability( 'flurfunk/site-check' )->execute( array( 'examples' => 10 ) );
+	$in_ids = static fn ( string $k ) => array_column( (array) ( $in_ck['issues'][ $k ]['examples'] ?? array() ), 'id' );
+	$check( 'the content check finds a post without a description, with a short title, an image without alt text and few words', in_array( $in_p, $in_ids( 'no_description' ), true ) && in_array( $in_p, $in_ids( 'short_title' ), true ) && in_array( $in_p, $in_ids( 'images_without_alt' ), true ) && in_array( $in_p, $in_ids( 'thin' ), true ), array_keys( (array) ( $in_ck['issues'] ?? array() ) ) );
+	add_filter(
+		'flurfunk_metrics',
+		$in_f = static function ( $m ) {
+			$m['visits_7d'] = array( 'label' => 'Visits in the last 7 days', 'value' => 1500, 'source' => 'Test' );
+			return $m;
+		},
+		99
+	);
+	$in_m = wp_get_ability( 'flurfunk/metrics' )->execute( array() );
+	$check( 'the numbers: WordPress\'s own, the check\'s, and those a statistics plugin adds', isset( $in_m['posts_published'], $in_m['comments_pending'], $in_m['check_no_description'] ) && 1500 === ( $in_m['visits_7d']['value'] ?? 0 ), array_keys( (array) $in_m ) );
+	// A snapshot three weeks ago (fewer visits), the excerpt added since, compared now.
+	$in_old = $in_m;
+	$in_old['visits_7d']['value'] = 1000;
+	Flurfunk\Insights\take( 'ff-test', 'Vor den Auszügen', $in_old, time() - 21 * DAY_IN_SECONDS );
+	wp_update_post( array( 'ID' => $in_p, 'post_excerpt' => 'Ein Auszug.' ) );
+	$in_t  = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Kennzahlen' ) );
+	$in_c  = wp_get_ability( 'flurfunk/snapshot' )->execute( array( 'thread' => $in_t, 'action' => 'compare' ) );
+	$in_tk = wp_get_ability( 'flurfunk/snapshot' )->execute( array( 'thread' => $in_t, 'action' => 'take', 'note' => 'Nach den Auszügen' ) );
+	$in_l  = wp_get_ability( 'flurfunk/snapshot' )->execute( array( 'thread' => $in_t, 'action' => 'list' ) );
+	remove_filter( 'flurfunk_metrics', $in_f, 99 );
+	$check( 'snapshots per channel: compared with three weeks ago, visits +50 % and one description gap less; kept with a note; listed', 50.0 === ( $in_c['changes']['visits_7d']['percent'] ?? null ) && -1 === ( $in_c['changes']['check_no_description']['change'] ?? null ) && 'Vor den Auszügen' === ( $in_c['since']['note'] ?? '' ) && 2 === count( $in_l['snapshots'] ?? array() ) && 'Nach den Auszügen' === ( $in_tk['taken']['note'] ?? '' ), $in_c );
+	$as( $guest );
+	$in_no = wp_get_ability( 'flurfunk/snapshot' )->check_permissions( array( 'thread' => $in_t ) );
+	$as( $team );
+	$check( '… only the team keeps them, in a channel they can see', true !== $in_no );
+	Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ), 'packs_form' => '1', 'packs' => array( 'insights' ) ) );
+	$check( '… and the pack "Numbers and site check" brings the snapshot along', in_array( 'flurfunk/snapshot', array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) ), true ) );
+	Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+	$all = (array) get_option( 'flurfunk_snapshots', array() );
+	unset( $all['ff-test'] );
+	update_option( 'flurfunk_snapshots', $all, false );
+	wp_delete_post( $in_p, true );
+	$extra_threads[] = $in_t;
+}
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

@@ -69,6 +69,7 @@ require_once FLURFUNK_DIR . 'inc/abilities.php'; // WordPress abilities (6.9+); 
 require_once FLURFUNK_DIR . 'inc/drafts.php'; // Drafts from conversations (abilities, too).
 require_once FLURFUNK_DIR . 'inc/changes.php'; // Changes to existing posts (an ability AI assistants propose).
 require_once FLURFUNK_DIR . 'inc/code.php'; // Reading the code of plugins and themes (abilities, administrators only).
+require_once FLURFUNK_DIR . 'inc/insights.php'; // Site check, numbers and snapshots (abilities).
 
 require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 
