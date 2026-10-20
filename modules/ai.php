@@ -246,6 +246,7 @@ function options(): array {
 		'log'     => ! array_key_exists( 'log', $o ) || ! empty( $o['log'] ),
 		'summary' => ! array_key_exists( 'summary', $o ) || ! empty( $o['summary'] ),
 		'memory'  => ! empty( $o['memory'] ), // Notes per channel: off until switched on.
+		'check'   => (string) ( $o['check'] ?? '' ), // Models for the quick check ('' = small ones of each provider).
 	);
 }
 
@@ -744,7 +745,8 @@ function check_message( object $thread, int $message_id, int $agent ): string {
 	// Room for a short word and whatever a model does before it (newer models think first; a limit
 	// it hits counts as an error). Small models make this a fraction of a cent.
 	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
-	$models  = (array) apply_filters( 'flurfunk_ai_check_models', array( 'claude-haiku-5-5', 'claude-haiku-4-5', 'gemini-2.5-flash-lite', 'gpt-5-mini' ), $agent );
+	$own     = array_filter( array_map( 'trim', explode( ',', options()['check'] ) ) );
+	$models  = (array) apply_filters( 'flurfunk_ai_check_models', $own ?: array( 'claude-haiku-5-5', 'claude-haiku-4-5', 'gemini-2.5-flash-lite', 'gpt-5-mini' ), $agent );
 	if ( $models ) {
 		$builder = $builder->using_model_preference( ...$models );
 	}
@@ -1853,7 +1855,9 @@ function render_section(): void {
 			<label><input type="checkbox" name="ai_options[redact]" value="1" <?php checked( $o['redact'] ); ?>> <?php esc_html_e( 'Replace email addresses and phone numbers before anything is sent to the AI provider', 'flurfunk' ); ?></label><br>
 			<label><input type="checkbox" name="ai_options[log]" value="1" <?php checked( $o['log'] ); ?>> <?php esc_html_e( 'Keep a log of the last 100 answers (who asked, where, model, tokens – no content)', 'flurfunk' ); ?></label><br>
 			<label><input type="checkbox" name="ai_options[summary]" value="1" <?php checked( $o['summary'] ); ?>> <?php esc_html_e( 'Offer "Summarize" in threads (a private summary, only for the person who asks)', 'flurfunk' ); ?></label><br>
-			<label><input type="checkbox" name="ai_options[memory]" value="1" <?php checked( $o['memory'] ); ?>> <?php esc_html_e( 'Notes per channel: an assistant remembers what someone asks it to remember there (shown and removable per channel below; never in private conversations)', 'flurfunk' ); ?></label>
+			<label><input type="checkbox" name="ai_options[memory]" value="1" <?php checked( $o['memory'] ); ?>> <?php esc_html_e( 'Notes per channel: an assistant remembers what someone asks it to remember there (shown and removable per channel below; never in private conversations)', 'flurfunk' ); ?></label><br>
+			<label><?php esc_html_e( 'Models for the quick check', 'flurfunk' ); ?> <input class="regular-text" name="ai_options[check]" value="<?php echo esc_attr( $o['check'] ); ?>" placeholder="<?php esc_attr_e( 'empty: a small model of your provider (Haiku, Flash Lite, GPT mini)', 'flurfunk' ); ?>"></label>
+			<br><span class="description"><?php esc_html_e( 'The quick check decides whether a message without a mention is for an assistant. A small, fast model is enough; the first available one is used.', 'flurfunk' ); ?></span>
 		</p>
 		<?php
 		foreach ( $bots as $bot ) :
@@ -2053,6 +2057,7 @@ function render_log(): void {
 							$words = array(
 								'check-answer' => __( 'Quick check: for it', 'flurfunk' ),
 								'check-thanks' => __( 'Quick check: thanks (reacted)', 'flurfunk' ),
+								'check-in'     => __( 'Checked back as asked', 'flurfunk' ),
 							);
 							echo '<br><small>' . esc_html( $words[ $e['kind'] ] ?? __( 'Quick check: not for it', 'flurfunk' ) ) . '</small>';
 						}
@@ -2122,6 +2127,7 @@ function save(): void {
 			'log'     => ! empty( $o['log'] ),
 			'summary' => ! empty( $o['summary'] ),
 			'memory'  => ! empty( $o['memory'] ),
+			'check'   => implode( ', ', array_filter( array_map( static fn ( $m ) => preg_replace( '/[^A-Za-z0-9._:\/-]/', '', trim( $m ) ), explode( ',', (string) ( $o['check'] ?? '' ) ) ) ) ),
 		),
 		false
 	);

@@ -1625,7 +1625,7 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/remember' 
 	$as( $guest );
 	$check( '… and nobody who cannot see the conversation can add to its channel', ! Flurfunk\Modules\Ai\may_remember( array( 'thread' => $mem_t2 ) ) );
 	$as( $team );
-	$_POST = array( '_wpnonce' => wp_create_nonce( 'flurfunk_ai' ), '_wp_http_referer' => '/', 'ai_options' => array( 'memory' => '1', 'log' => '1', 'redact' => '1', 'summary' => '1' ), 'ai_forget' => array( 'ff-test' => array( '0' ) ) );
+	$_POST = array( '_wpnonce' => wp_create_nonce( 'flurfunk_ai' ), '_wp_http_referer' => '/', 'ai_options' => array( 'memory' => '1', 'log' => '1', 'redact' => '1', 'summary' => '1', 'check' => 'claude-haiku-5-5, llama 3;drop' ), 'ai_forget' => array( 'ff-test' => array( '0' ) ) );
 	$_REQUEST = $_POST;
 	add_filter( 'wp_redirect', $mem_stop = static function () { throw new RuntimeException( 'redirect' ); } );
 	try {
@@ -1635,6 +1635,7 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/remember' 
 	remove_filter( 'wp_redirect', $mem_stop );
 	$_POST    = array();
 	$_REQUEST = array();
+	$check( 'the models for the quick check are kept as clean model IDs', 'claude-haiku-5-5, llama3drop' === Flurfunk\Modules\Ai\options()['check'], Flurfunk\Modules\Ai\options()['check'] );
 	$check( 'administrators remove notes in the settings', array( 'Teaser bei uns höchstens 250 Zeichen.' ) === array_column( Flurfunk\Modules\Ai\notes( 'ff-test' ), 'text' ), Flurfunk\Modules\Ai\notes( 'ff-test' ) );
 }
 null === $mem_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $mem_opts );

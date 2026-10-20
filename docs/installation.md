@@ -298,7 +298,11 @@ without mentioning it, and a quick check with a small, cheap model (Claude Haiku
 or GPT mini, whichever your provider offers) decides whether a message is for it – about 300 to 800
 tokens per message, counted in its budget and shown in the log. **Stays in a thread once it has
 answered** switches this off per assistant (then only the asker's follow-ups count);
-`flurfunk_ai_follow_ups` switches all of it off.
+`flurfunk_ai_follow_ups` switches all of it off. **Models for the quick check** (at the top) takes
+your own choice – e.g. a Llama model if a provider plugin offers one; empty means a small model of
+your provider. For the answers themselves each assistant has its preferred models: in our tests
+Claude Sonnet wrote clearly better corrections and teasers than Haiku (about 10,000 to 25,000
+tokens per answer with tools, against 3,000 to 7,000), while Haiku is plenty for the quick check.
 
 **What stays in a channel:** in a channel guests can read, an assistant looks things up only in
 that channel – internal conversations do not end up in front of guests. Together with a channel
