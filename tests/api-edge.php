@@ -1284,7 +1284,9 @@ Flurfunk\Modules\Ai\run( $ai_t, $ai_m5, $ai_bot );
 $ai_em = $ai_lastm( $ai_t );
 $check( 'a provider error is said in the thread', $ai_bot === (int) $ai_em['author'] && str_contains( $ai_em['text'], 'Anbieter nicht erreichbar' ), $ai_em );
 remove_filter( 'flurfunk_ai_pre_answer', $ai_err );
-// A private summary: only for the person who asks, nothing is posted.
+// A private summary: only for the person who asks, nothing is posted. (A fresh count of the hourly
+// brake, so runs one after the other do not hit it.)
+delete_transient( 'flurfunk_ai_sum_' . $team . '_' . gmdate( 'YmdH' ) );
 add_filter( 'flurfunk_ai_pre_answer', $ai_fake, 10, 2 );
 $ai_seen   = array();
 $ai_before = count( Store\full_thread( $ai_t, $team )['messages'] );
