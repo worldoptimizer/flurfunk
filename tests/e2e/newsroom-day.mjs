@@ -190,6 +190,8 @@ const fest = await wp( jana, 'posts', { title: 'Stadtfest am Wochenende', status
 const fotos = await wp( paul, 'posts', { title: 'Gipfel-Fotos', status: 'draft', content: '<!-- wp:paragraph -->\n<p>Zwölf Bilder vom Gipfel, zwei davon von dpa.</p>\n<!-- /wp:paragraph -->' } );
 
 /* ---------------------------------------------------------------- the day */
+let janaThread;
+let taskId = 0;
 await step( 'Who sees what: the trainee (team on her profile) sees #redaktion, the freelancer (guest) does not', async () => {
 	const j = ( await api( jana, 'bootstrap' ) ).channels.map( ( c ) => c.id );
 	const p = ( await api( paul, 'bootstrap' ) ).channels.map( ( c ) => c.id );
@@ -228,15 +230,15 @@ await step( 'An organisational ask without @ goes to the organising assistant: a
 		await confirm.click();
 	}
 	await sleep( 4000 );
-	const task = ( await api( ben, 'threads?channel=redaktion&limit=20' ) ).find( ( x ) => x.id !== t.id && /Foto/i.test( ( x.title || '' ) + ' ' + ( x.body || '' ) ) && x.due );
+	const task = ( await api( ben, 'threads?channel=redaktion&limit=20&order=new' ) ).find( ( x ) => x.id !== t.id && /Foto/i.test( ( x.title || '' ) + ' ' + ( x.body || '' ) ) && x.due );
 	const full = task ? await api( ben, 'threads/' + task.id ) : {};
+	taskId = task ? task.id : 0;
 	const ok = ASSISTENZ === r.msgs[ 0 ].author && /Ben/.test( sub ) && full.due && ( full.assignees || [] ).includes( users.ben );
 	return { ok: ok ? true : 'warn', note: said( r ) + ' · card: ' + clip( ( c.snapshot?.data?.line || '' ) + ' / ' + sub, 200 ) + ' · task: ' + ( task ? `due ${ full.due }, responsible ${ ( full.assignees || [] ).join( ',' ) }` : 'not found' ) };
 } );
-let janaThread;
 await step( 'The trainee asks through the interface (@ suggestion, Enter): proofreading of her draft', async () => {
-	await app( jana, 'volontariat' );
-	const known = ( await api( jana, 'threads?channel=volontariat&limit=50' ) ).map( ( x ) => x.id );
+	await app( jana, 'channel:volontariat' );
+	const known = ( await api( jana, 'threads?channel=volontariat&limit=50&order=new' ) ).map( ( x ) => x.id );
 	const box = jana.locator( '.ff-compose-slot textarea' ).first();
 	await box.click();
 	await box.type( 'Hallo! @Lek' );
@@ -244,7 +246,7 @@ await step( 'The trainee asks through the interface (@ suggestion, Enter): proof
 	await box.type( ' kannst du meinen Entwurf "Stadtfest am Wochenende" gegenlesen?' );
 	await box.press( 'Enter' );
 	await sleep( 3000 );
-	const list = await api( jana, 'threads?channel=volontariat&limit=10' );
+	const list = await api( jana, 'threads?channel=volontariat&limit=10&order=new' );
 	janaThread = ( list.find( ( x ) => ! known.includes( x.id ) && /Stadtfest am Wochenende/.test( x.body ) ) || {} ).id;
 	const r = janaThread ? await watch( jana, janaThread, 0, { timeout: 150000 } ) : { msgs: [] };
 	return { ok: r.msgs.length && /fur|für|10\.000|Begrü/.test( r.msgs[ 0 ].text ), note: said( r ) };
@@ -328,13 +330,13 @@ await step( 'A routine due in a few minutes posts (or stays quiet with nothing o
 	const t = await api( rita, 'threads', { channel: 'redaktion', body: `<@${ ASSISTENZ }> kannst du jeden werktag um ${ at } uhr in einem neuen thread zusammenfassen, welche aufgaben in #redaktion offen sind?` } );
 	routineThread = t.id;
 	const r = await watch( rita, t.id, 0, { timeout: 120000 } );
-	const known = ( await api( rita, 'threads?channel=redaktion&limit=80' ) ).map( ( x ) => x.id );
+	const known = ( await api( rita, 'threads?channel=redaktion&limit=80&order=new' ) ).map( ( x ) => x.id );
 	let found = [];
 	const until = Date.now() + 8 * 60000;
 	while ( ! found.length && Date.now() < until ) {
 		await tick( rita );
 		await sleep( 10000 );
-		found = ( await api( rita, 'threads?channel=redaktion&limit=80' ) ).filter( ( x ) => ! known.includes( x.id ) && ASSISTENZ === x.author );
+		found = ( await api( rita, 'threads?channel=redaktion&limit=80&order=new' ) ).filter( ( x ) => ! known.includes( x.id ) && ASSISTENZ === x.author );
 	}
 	const id = await lastId( rita, t.id );
 	await api( rita, 'threads/' + t.id + '/messages', { body: `<@${ ASSISTENZ }> danke, die routine kannst du wieder löschen` } );
@@ -373,7 +375,10 @@ await max.evaluate( ( [ entries, ids ] ) => {
 }, [ before, AGENTS ] );
 await max.locator( '#flurfunk-ai form [type=submit]' ).last().click();
 await max.waitForLoadState( 'domcontentloaded' );
-// The day's posts go again (repeated runs would find several drafts with the same title).
+// The day's task is done, its posts go again (repeated runs would find several with the same title).
+if ( taskId ) {
+	await api( ben, 'threads/' + taskId + '/status', { status: 'done' } );
+}
 for ( const [ p, post ] of [ [ ben, kita ], [ jana, fest ], [ paul, fotos ], [ ben, lb ] ] ) {
 	if ( post && post.id ) {
 		await wp( p, 'posts/' + post.id + '?force=true', null, 'DELETE' );
