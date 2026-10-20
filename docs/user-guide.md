@@ -188,6 +188,9 @@ their role.
   this thread, with the photo as featured image". It writes a draft with you as its author and
   puts a card with it under its answer; write on ("shorter title, please") and it changes the
   draft, until someone else has worked on it. It never publishes.
+- **Comments:** if your site allows it, "@Assistenz, are there comments waiting?" shows them as
+  comment cards under the answer – approve, spam or trash with one click – with a word on which look
+  like spam. "Answer Lea that part two comes next week" gives a card that replies with your name.
 - **Several assistants:** in a channel with more than one, an assistant hands part of the work to
   another one by naming it ("@SEO, please suggest an excerpt for it") – that one then answers in the
   thread for you, and under its answer you see who handed it over. Only one step: what an assistant

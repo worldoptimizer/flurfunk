@@ -1974,6 +1974,25 @@ $check( '… and the first one is told who else is in the channel and how to han
 wp_unschedule_hook( 'flurfunk_ai_run' );
 wp_delete_user( $ho_b );
 $extra_threads[] = $ho_t;
+// Comments for assistants: find those waiting (no email or IP), answer one (approving it).
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/list-comments' ) ) {
+	$as( $team );
+	$cm_post = wp_insert_post( array( 'post_title' => 'Kommentar-Test', 'post_status' => 'publish', 'post_author' => $team, 'post_content' => 'Text.' ) );
+	$cm_id   = wp_insert_comment( array( 'comment_post_ID' => $cm_post, 'comment_author' => 'Leserin Lea', 'comment_author_email' => 'lea@example.test', 'comment_author_IP' => '10.0.0.7', 'comment_content' => 'Toller Artikel! Wann kommt Teil zwei?', 'comment_approved' => 0 ) );
+	$cm_find = wp_get_ability( 'flurfunk/list-comments' )->execute( array( 'post' => $cm_post ) );
+	$cm_row  = (array) ( $cm_find[0] ?? array() );
+	$check( 'an assistant finds comments waiting for approval – the public name and text, never email or IP', $cm_id === ( $cm_row['id'] ?? 0 ) && 'Leserin Lea' === ( $cm_row['author'] ?? '' ) && 'hold' === ( $cm_row['status'] ?? '' ) && ! str_contains( wp_json_encode( $cm_find ), 'lea@example' ) && ! str_contains( wp_json_encode( $cm_find ), '10.0.0.7' ), $cm_find );
+	$as( $guest );
+	$cm_no = wp_get_ability( 'flurfunk/list-comments' )->check_permissions( array() );
+	$as( $team );
+	$check( '… only people who may moderate comments', true !== $cm_no );
+	$cm_r = wp_get_ability( 'flurfunk/reply-comment' )->execute( array( 'comment' => $cm_id, 'text' => 'Danke! Teil zwei kommt nächste Woche.' ) );
+	$cm_c = get_comment( (int) ( $cm_r['id'] ?? 0 ) );
+	$check( 'answering a comment approves it and replies as the person who clicked', '1' === (string) get_comment( $cm_id )->comment_approved && $cm_c && $cm_id === (int) $cm_c->comment_parent && $team === (int) $cm_c->user_id, $cm_r );
+	$cm_pk = Flurfunk\Modules\Ai\packs()['comments'] ?? array();
+	$check( '… and the pack "Comments" brings both (finding as a tool, replying as a card)', ! empty( $cm_pk['available'] ) && array( 'flurfunk/list-comments' ) === $cm_pk['tools'] && array( 'flurfunk/reply-comment' ) === $cm_pk['proposals'], $cm_pk );
+	wp_delete_post( $cm_post, true );
+}
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

@@ -312,6 +312,14 @@ function build_snapshot( array $p ): array {
 			$sub .= ' · ' . implode( ', ', $names );
 		}
 		$extra = trim( (string) ( $in['text'] ?? '' ) );
+	} elseif ( 'flurfunk/reply-comment' === $p['ability'] ) {
+		$c     = get_comment( (int) ( $in['comment'] ?? 0 ) );
+		$kind  = 'reply';
+		/* translators: 1: commenter, 2: post title */
+		$line  = $c ? sprintf( __( 'Reply to %1$s on "%2$s"', 'flurfunk' ), '' !== trim( (string) $c->comment_author ) ? $c->comment_author : __( 'Anonymous', 'flurfunk' ), html_entity_decode( get_the_title( (int) $c->comment_post_ID ), ENT_QUOTES, 'UTF-8' ) ) : __( 'Reply to a comment', 'flurfunk' );
+		$sub   = mb_substr( wp_strip_all_tags( (string) ( $in['text'] ?? '' ) ), 0, 200 );
+		$run   = __( 'Send reply', 'flurfunk' );
+		$extra = '';
 	} elseif ( 'flurfunk/reply' === $p['ability'] ) {
 		$kind  = 'reply';
 		$line  = __( 'Reply in a conversation', 'flurfunk' );

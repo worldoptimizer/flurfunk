@@ -377,6 +377,14 @@ function packs(): array {
 			'kind'      => 'propose',
 			'proposals' => $pick( array( 'flurfunk/start-thread' ), $have_w ),
 		),
+		'comments'  => array(
+			'label'     => __( 'Comments', 'flurfunk' ),
+			'desc'      => __( 'Find comments waiting for approval – they appear as cards to approve or mark as spam – and suggest replies', 'flurfunk' ),
+			'kind'      => 'propose',
+			'tools'     => $pick( array( 'flurfunk/list-comments' ), $have_r ),
+			'proposals' => $pick( array( 'flurfunk/reply-comment' ), $have_w ),
+			'needs'     => __( 'Needs the module "Comment cards".', 'flurfunk' ),
+		),
 		'seo'       => array(
 			'label'     => __( 'SEO and teasers', 'flurfunk' ),
 			'desc'      => __( 'Suggest titles, excerpts and descriptions', 'flurfunk' ),
@@ -1155,6 +1163,8 @@ function step_label( string $ability, array $args, array $result ): string {
 		case 'flurfunk/update-draft':
 			/* translators: %s: draft title */
 			return sprintf( __( 'Changed the draft "%s"', 'flurfunk' ), (string) ( $result['title'] ?? '' ) );
+		case 'flurfunk/list-comments':
+			return __( 'Looked through the comments', 'flurfunk' );
 		case 'flurfunk/remember':
 			return 'site' === ( $args['scope'] ?? '' ) ? __( 'Noted it for all channels', 'flurfunk' ) : __( 'Noted it for the channel', 'flurfunk' );
 		case 'flurfunk/follow-up':
@@ -1460,6 +1470,24 @@ function run( int $thread_id, int $message_id, int $agent ) {
 		} finally {
 			speaks_for( $agent, 0 );
 		}
+		if ( is_int( $mid ) && ! empty( $answer['held'] ) && \Flurfunk\Modules\enabled( 'flurfunk/comments' ) ) {
+			// Comments waiting for approval it found: as cards with the buttons to approve, mark as spam
+			// or trash them, for the person asking.
+			Store\save_attachments(
+				$thread,
+				$mid,
+				array_map(
+					static fn ( int $id ) => array(
+						'provider' => 'flurfunk/comment',
+						'ref'      => array( 'id' => $id ),
+					),
+					array_map( 'intval', (array) $answer['held'] )
+				),
+				answering( $agent ),
+				true
+			);
+			Store\bump();
+		}
 		if ( is_int( $mid ) && ! empty( $answer['drafts'] ) ) {
 			// The drafts it wrote, as post cards – attached for the person asking (their draft; the
 			// assistant's own account may not see drafts).
@@ -1655,6 +1683,7 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 	$names    = array_map( static fn ( $a ) => $a->get_name(), $propose );
 	$looked = array();
 	$drafts = array(); // Drafts it wrote or changed.
+	$notes  = array(); // Comments waiting for approval it found: cards with buttons under the answer.
 	$ran    = array(); // Other tools it used (a thread it opened is in $looked, a post it read in $posts).
 	$posts  = (array) ( $context['posts'] ?? array() );
 	for ( $round = 0; $round < MAX_ROUNDS; $round++ ) {
@@ -1696,6 +1725,7 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 				'tools'  => $used,
 				'ideas'  => $ideas,
 				'drafts' => array_values( array_unique( $drafts ) ),
+				'held'   => array_slice( array_values( array_unique( $notes ) ), 0, 10 ),
 				'looked' => $looked,
 				'ran'    => array_values( array_unique( $ran ) ),
 			);
@@ -1746,6 +1776,13 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 					}
 					$done     = (array) $response->getResponse();
 					busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => step_label( $ability, (array) $call->getArgs(), $done ) ) );
+					if ( 'flurfunk/list-comments' === $ability ) {
+						foreach ( $done as $c ) {
+							if ( is_array( $c ) && 'hold' === ( $c['status'] ?? '' ) ) {
+								$notes[] = (int) $c['id'];
+							}
+						}
+					}
 					if ( in_array( $ability, DRAFT_TOOLS, true ) && ! empty( $done['id'] ) && empty( $done['error'] ) ) {
 						$drafts[] = (int) $done['id'];
 						update_post_meta( (int) $done['id'], \Flurfunk\Drafts\AGENT, $agent );
@@ -1950,6 +1987,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 						: sprintf( 'You work with the rights of %1$s, the person asking, but at most with what the role %2$s may on this site (your limit here), and never administer the site (users, plugins, settings). What that limit may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit (%2$s), and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, '"' . limit_label( $agent, channel_slug( $thread ) ) . '"' ) )
 					: '',
 				profile( $agent )['drafts'] && function_exists( 'wp_get_ability' ) && wp_get_ability( DRAFT_TOOLS[0] ) ? 'You can write drafts: flurfunk/create-draft makes one (never published; the person asking is its author), flurfunk/update-draft changes a draft made that way as long as nobody else has worked on it since. Use them when the person asks for a draft, an article, a text for the site or changes to the draft you wrote; do it, do not just announce it. Then say in one sentence what you wrote – a card with the draft appears under your answer. Write the text plainly: paragraphs separated by a blank line, "- " for lists, "## " for subheadings, no HTML. Files in the thread are shown as [File #ID: name]; when the person wants an image in the draft, pass its ID as featured_image (the main picture) or in images. If adding an image is refused, write the draft without it and say why. You can never publish; say so if asked.' : '',
+				in_array( 'flurfunk/list-comments', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'For comments: find them with flurfunk/list-comments. Those waiting for approval appear as cards with buttons to approve, mark as spam or trash under your answer, so do not list them all again – say briefly which look like spam and why (many links, off-topic, generic praise) and which deserve an answer. To answer one, call flurfunk/reply-comment; it becomes a card too.' : '',
 				in_array( 'flurfunk/start-thread', array_map( static fn ( $a ) => $a->get_name(), proposal_abilities( $agent ) ), true ) ? 'For a task, call flurfunk/start-thread with task true, the due date as due (YYYY-MM-DD) and who is responsible as assignees (names as shown in Flurfunk) – never claim a due date or a responsible person you did not put in these fields. Only people who can see that channel can be responsible; if someone cannot, say so.' : '',
 				in_array( \Flurfunk\Changes\NAME, array_map( static fn ( $a ) => $a->get_name(), proposal_abilities( $agent ) ), true ) ? 'To change existing posts (correct mistakes, set a title, excerpt, categories, tags or featured image), call flurfunk/update-posts once with all posts – it becomes one card with before and after, and a person applies it. Read the post first. For corrections in the text use replace: find = the exact wording as the post shows it (a short snippet that is unique, within one paragraph), with = the corrected wording. Change only what was asked for or what is clearly wrong; never invent facts. If a text is not found, quote it exactly and try again.' : '',
 				memory_on() && '' !== channel_slug( $thread ) ? sprintf( 'When someone asks you to remember, note or keep something lasting for this channel (a rule, a fact, a decision), save it with flurfunk/remember (thread %d) – one short sentence in the team\'s language, never personal details about people.%s To correct or drop a note, remove it by its number (and add the new one). Then say in one short sentence what you noted and where it applies. Do not save things nobody asked you to keep.', (int) $thread->id, guests_read( $thread ) ? '' : ' If it is meant for every channel (a house rule: "generally", "everywhere", "for all of us"), add scope site.' ) : '',
