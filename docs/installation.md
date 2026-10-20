@@ -348,6 +348,11 @@ one it is for answers in two or three sentences, the others stay quiet. Most thr
 but each one is sent to the AI provider for the check (a few hundred tokens), so switch it on where
 questions are expected, e.g. in a proofreading or help channel.
 
+**Code** (pack, off by default): for administrators, an assistant searches and reads the code of
+plugins and themes – read-only, inside the plugins and themes folders only, never files that usually
+hold secrets, and values that look like passwords, tokens or keys are hidden. The lines it reads are
+sent to the AI provider like everything else it looks up.
+
 **Handing over.** Assistants in the same channel know each other (name and role). One can hand part
 of a request to another by naming it in its answer; that one answers in the thread for the person
 who asked, with their rights and within its own profile and budget. One step only.

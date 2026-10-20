@@ -292,13 +292,14 @@ function admin_read( ?bool $set = null ): bool {
 
 /**
  * May this ability read with the asker's administrator rights (see admin_read())? WordPress's own
- * read-only abilities (core/…); the filter flurfunk_ai_admin_read decides for others.
+ * read-only abilities (core/…) and Flurfunk's reading of plugin and theme code; the filter
+ * flurfunk_ai_admin_read decides for others.
  *
  * @param string $ability Ability name.
  */
 function reads_as_admin( string $ability ): bool {
 	$a  = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
-	$ok = $a && str_starts_with( $ability, 'core/' ) && ! empty( $a->get_meta()['annotations']['readonly'] );
+	$ok = $a && ( str_starts_with( $ability, 'core/' ) || in_array( $ability, array( 'flurfunk/list-code', 'flurfunk/search-code', 'flurfunk/read-code' ), true ) ) && ! empty( $a->get_meta()['annotations']['readonly'] );
 	return (bool) apply_filters( 'flurfunk_ai_admin_read', $ok, $ability );
 }
 

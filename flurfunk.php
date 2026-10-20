@@ -68,6 +68,7 @@ require_once FLURFUNK_DIR . 'inc/data.php';
 require_once FLURFUNK_DIR . 'inc/abilities.php'; // WordPress abilities (6.9+); without the API the hooks never fire.
 require_once FLURFUNK_DIR . 'inc/drafts.php'; // Drafts from conversations (abilities, too).
 require_once FLURFUNK_DIR . 'inc/changes.php'; // Changes to existing posts (an ability AI assistants propose).
+require_once FLURFUNK_DIR . 'inc/code.php'; // Reading the code of plugins and themes (abilities, administrators only).
 
 require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 

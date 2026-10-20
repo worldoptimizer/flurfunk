@@ -1993,6 +1993,33 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/list-comme
 	$check( '… and the pack "Comments" brings both (finding as a tool, replying as a card)', ! empty( $cm_pk['available'] ) && array( 'flurfunk/list-comments' ) === $cm_pk['tools'] && array( 'flurfunk/reply-comment' ) === $cm_pk['proposals'], $cm_pk );
 	wp_delete_post( $cm_post, true );
 }
+// Reading code of plugins and themes (administrators): find, search, read – never outside, never secrets.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/search-code' ) ) {
+	$as( $team );
+	$cd_list = wp_get_ability( 'flurfunk/list-code' )->execute( array() );
+	$cd_hit  = wp_get_ability( 'flurfunk/search-code' )->execute( array( 'slug' => 'flurfunk', 'query' => 'flurfunk_ai_admin_read' ) );
+	$cd_file = (string) ( $cd_hit['hits'][0]['file'] ?? '' );
+	$cd_read = wp_get_ability( 'flurfunk/read-code' )->execute( array( 'slug' => 'flurfunk', 'file' => $cd_file, 'from' => (int) ( $cd_hit['hits'][0]['line'] ?? 1 ), 'to' => (int) ( $cd_hit['hits'][0]['line'] ?? 1 ) + 2 ) );
+	$cd_out  = wp_get_ability( 'flurfunk/read-code' )->execute( array( 'slug' => 'flurfunk', 'file' => '../../../wp-config.php' ) );
+	$check( 'an administrator\'s assistant lists plugins, searches a plugin\'s code and reads the lines; nothing outside its folder', in_array( 'flurfunk', array_column( (array) $cd_list, 'slug' ), true ) && $cd_file && str_contains( (string) ( $cd_read['text'] ?? '' ), 'flurfunk_ai_admin_read' ) && is_wp_error( $cd_out ), array( $cd_hit['hits'][0] ?? null, $cd_out ) );
+	$check( '… what looks like a secret is hidden, files that hold secrets are never read', 'define( \'API_KEY\', \'[hidden]\' );' === Flurfunk\Code\hide( "define( 'API_KEY', 'sk-abcdef123456' );" ) && "'password' => '[hidden]'" === Flurfunk\Code\hide( "'password' => 'hunter2hunter2'" ) && ! Flurfunk\Code\readable( ABSPATH . 'wp-config.php', realpath( WP_PLUGIN_DIR ) ) );
+	$as( $guest );
+	$cd_no = wp_get_ability( 'flurfunk/search-code' )->check_permissions( array( 'slug' => 'flurfunk', 'query' => 'x' ) );
+	$as( $team );
+	$cd_ag = Flurfunk\Modules\Ai\with_limit(
+		$ai_bot,
+		$team,
+		static function () {
+			Flurfunk\Modules\Ai\admin_read( Flurfunk\Modules\Ai\reads_as_admin( 'flurfunk/search-code' ) );
+			try {
+				return wp_get_ability( 'flurfunk/search-code' )->check_permissions( array( 'slug' => 'flurfunk', 'query' => 'x' ) );
+			} finally {
+				Flurfunk\Modules\Ai\admin_read( false );
+			}
+		}
+	);
+	$check( '… only for administrators – also while an assistant reads for one', true !== $cd_no && true === $cd_ag );
+}
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );
