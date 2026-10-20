@@ -1451,6 +1451,7 @@ More complete scripts (a GitHub Action, a daily report) are on the [examples](ex
 | API and permission checks (100+) | `wp eval-file tests/api-edge.php <team-id> <team2-id> <guest-id>` |
 | Browser tests (Playwright) | `cd tests/e2e && npm install && FF_BASE=… FF_TEAM=… FF_TEAM_PASS=… npx playwright test` |
 | A newsroom day with real AI (before a release, local test site only) | `cd tests/e2e && FF_BASE=http://localhost:9601 node newsroom-day.mjs` |
+| One owner running the site with AI assistants as a hub (local test site only) | `cd tests/e2e && FF_BASE=http://localhost:9601 node admin-hub.mjs` |
 | Web Push crypto against Node | `tests/push/run.sh` |
 | Formatter | `node tests/format.test.cjs` |
 | Load test (2000 threads, 20000 messages) | `wp eval-file tests/load.php` |

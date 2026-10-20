@@ -119,6 +119,7 @@ list( $s, $t ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'body' 
 $check( 'mentions keep only people who can see the thread', array( $team2 ) === $t['mentions'], $t['mentions'] );
 list( $s, $t2 ) = $req( 'POST', 'threads', array( 'channel' => 'ff-test', 'target' => array( 'type' => 'post', 'id' => $guest_post ), 'body' => "Frage an <@$guest>" ) );
 $check( 'guest is mentionable in a thread about their own post', array( $guest ) === $t2['mentions'], $t2['mentions'] );
+$check( 'the channel of someone\'s last new thread is remembered and preselected next time', 'ff-test' === get_user_meta( $team, 'flurfunk_last_channel', true ) );
 $check( 'team sees who else can read it', in_array( get_userdata( $guest )->display_name, $t2['audience'], true ), $t2['audience'] );
 
 WP_CLI::log( 'Guest rights' );

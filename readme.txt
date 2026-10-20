@@ -131,6 +131,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * New: notes for all channels – a house rule asked for everyone is kept once and used wherever no guests read along (as Claude Tag's workspace notes); listed and removable in the settings.
 * New: tasks an assistant proposes carry who is responsible and the due date; someone who cannot see the channel is named on the card, not assigned.
 * New: someone opening Flurfunk for the first time starts with everything said before as read.
+* Changed: where no channel is open, a new thread starts in the channel of the person's last new thread (not the first in the list).
 * Changed: as in Claude Tag, guests reach an assistant that answers guests by mentioning it or by writing on in a thread it takes part in; a new thread from a guest is not answered unasked. Where guests read along, assistants use no notes for all channels.
 * Changed: the pack "Looking things up" also finds and reads posts.
 * Fixed: a request to an assistant could get lost when it arrived while another answer was being written in WP-Cron (on hosts without PHP-FPM).

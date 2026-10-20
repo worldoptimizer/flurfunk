@@ -100,6 +100,7 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 	}
 	delete_metadata( 'user', 0, 'flurfunk_rev', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_started', '', true );
+	delete_metadata( 'user', 0, 'flurfunk_last_channel', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_bot', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_day', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_last', '', true );

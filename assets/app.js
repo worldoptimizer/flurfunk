@@ -89,6 +89,9 @@
 		return ch && ch.members ? boot.people.filter( ( p ) => ch.members.includes( p.id ) ) : boot.people;
 	};
 	const channelOf = ( slug ) => boot.channels.find( ( c ) => c.id === slug );
+	// Where a new thread goes when no channel is open: the one of the person's last new thread (the
+	// first in the list would be an accident waiting to happen, e.g. a channel guests read).
+	const lastChannel = () => ( boot && boot.me && boot.me.channel ) || 'general';
 	const chName = ( slug ) => ( channelOf( slug ) || { name: slug } ).name || slug;
 
 	const locale = () => ( boot && boot.locale ) || document.documentElement.lang || 'en';
@@ -2148,7 +2151,7 @@
 				return;
 			}
 			const startable = boot.channels.filter( ( c ) => 'all' === c.level || ( 'own-posts' === c.level && v.target ) || 'own-posts' === c.level );
-			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>';
+			const chSel = v.channel ? '' : '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + startable.map( ( c ) => '<option value="' + esc( c.id ) + '"' + ( c.id === lastChannel() ? ' selected' : '' ) + '>#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select>';
 			const guest = 'guest' === boot.me.kind;
 			if ( ! startable.length || ( guest && ! boot.targets.length && ! v.target ) ) {
 				slot.innerHTML = '<p class="ff-note">' + esc( guest ? t( 'You can start conversations about your own posts. As soon as you have one, you can start here.' ) : t( 'You cannot start threads here.' ) ) + '</p>';
@@ -2168,6 +2171,7 @@
 					const assignees = form.elements.assignees.value ? form.elements.assignees.value.split( ',' ).map( Number ) : [];
 					const task = form.elements.task.checked;
 					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: v.channel || form.elements.channel.value, target: tg, task, due: task ? form.elements.due.value : '', assignees: task ? assignees : [] } ) } );
+					boot.me.channel = th.channel || boot.me.channel;
 					form.elements.task.checked = false;
 					form.elements.due.value = '';
 					form.elements.assignees.value = '';
@@ -2854,9 +2858,10 @@
 				label: t( 'New conversation about this post' ),
 				placeholder: t( 'What is it about? (@name, / for cards)' ),
 				submitLabel: t( 'Start' ),
-				extra: '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + chans.map( ( c ) => '<option value="' + esc( c.id ) + '">#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select><label class="ff-check"><input type="checkbox" name="task" checked> ' + esc( t( 'Task' ) ) + '</label>',
+				extra: '<select name="channel" aria-label="' + esc( t( 'Channel' ) ) + '">' + chans.map( ( c ) => '<option value="' + esc( c.id ) + '"' + ( c.id === lastChannel() ? ' selected' : '' ) + '>#' + esc( c.name || c.id ) + '</option>' ).join( '' ) + '</select><label class="ff-check"><input type="checkbox" name="task" checked> ' + esc( t( 'Task' ) ) + '</label>',
 				onSubmit: async ( payload, form ) => {
 					const th = await api( 'threads', { method: 'POST', body: Object.assign( payload, { channel: form.elements.channel.value, target, task: form.elements.task.checked } ) } );
+					boot.me.channel = th.channel || boot.me.channel;
 					open.add( th.id );
 					draw();
 				},

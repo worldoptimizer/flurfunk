@@ -255,7 +255,9 @@ await step( 'She writes on without @ ("can you fix it?"): a card with the correc
 	const id = await lastId( jana, janaThread );
 	await api( jana, 'threads/' + janaThread + '/messages', { body: 'super danke, kannst du das direkt in meinem entwurf korrigieren?' } );
 	const r = await watch( jana, janaThread, id, { timeout: 180000 } );
-	if ( ! cardOf( r ) ) {
+	// The card may have come with the first answer already ("it is under my last answer").
+	const open = ( r.view?.messages || [] ).flatMap( ( m ) => m.attachments || [] ).filter( ( c ) => /ai-proposal/.test( c.provider ) && 'open' === c.snapshot?.data?.state );
+	if ( ! r.msgs.length || ! open.length ) {
 		return { ok: false, note: said( r ) || 'no answer' };
 	}
 	await app( jana, 'thread:' + janaThread );

@@ -232,6 +232,7 @@ function bootstrap(): array {
 			'manage'   => Access\can_manage( $uid ),
 			'moderate' => Access\can_moderate( $uid ),
 			'upload'   => current_user_can( 'upload_files' ),
+			'channel'  => (string) get_user_meta( $uid, 'flurfunk_last_channel', true ), // The channel of their last new thread.
 		),
 		'people'    => $people,
 		'channels'  => $channels,
@@ -359,6 +360,9 @@ function create_thread( WP_REST_Request $r ) {
 			'ref_key'     => $ref,
 		)
 	);
+	if ( ! is_wp_error( $id ) && '' !== (string) ( $p['channel'] ?? '' ) ) {
+		update_user_meta( get_current_user_id(), 'flurfunk_last_channel', sanitize_key( (string) $p['channel'] ) ); // Preselected next time.
+	}
 	return is_wp_error( $id ) ? $id : decorate( Store\full_thread( $id, get_current_user_id() ) );
 }
 
