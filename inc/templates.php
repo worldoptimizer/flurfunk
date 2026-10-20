@@ -104,6 +104,35 @@ function changed( array $input, ?\WP_Block_Template $t ) {
 }
 
 /**
+ * What a change does to the visible text, in one line for the card: what is added, removed or
+ * becomes what – the markup around it is shown below the card.
+ *
+ * @param array $input { find, replace, content }.
+ */
+function summary( array $input ): string {
+	if ( isset( $input['content'] ) && '' !== trim( (string) $input['content'] ) ) {
+		return __( 'New markup for the whole template', 'flurfunk' );
+	}
+	$text = static fn ( $s ) => trim( preg_replace( '/\s+/u', ' ', wp_strip_all_tags( (string) $s ) ) );
+	$old  = $text( $input['find'] ?? '' );
+	$new  = $text( $input['replace'] ?? '' );
+	$cut  = static fn ( $s ) => mb_substr( $s, 0, 80 );
+	if ( $old === $new ) {
+		return __( 'Only the markup changes, not the text', 'flurfunk' );
+	}
+	if ( '' === $new ) {
+		/* translators: %s: text that is removed */
+		return sprintf( __( 'Removes "%s"', 'flurfunk' ), $cut( $old ) );
+	}
+	if ( '' === $old || str_contains( $new, $old ) ) {
+		/* translators: %s: text that is added */
+		return sprintf( __( 'Adds "%s"', 'flurfunk' ), $cut( trim( '' === $old ? $new : str_replace( $old, ' ', $new ) ) ) );
+	}
+	/* translators: 1: old text, 2: new text */
+	return sprintf( __( '"%1$s" becomes "%2$s"', 'flurfunk' ), $cut( $old ), $cut( $new ) );
+}
+
+/**
  * Check a proposed change before it becomes a card.
  *
  * @param array $input Ability input.

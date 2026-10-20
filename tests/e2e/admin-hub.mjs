@@ -2,7 +2,7 @@
 // per area (#inhalte, #technik, #seo), each with its own assistant that answers every new thread
 // there, and an organising assistant that keeps the overview. It shows how far that goes today:
 // steps marked WARN are known limits (an assistant never administers the site; it can only use the
-// abilities the site has; assistants do not hand work to each other).
+// abilities the site has).
 //
 // Like newsroom-day.mjs: real AI, a LOCAL test site only, not part of the test suite.
 //
@@ -11,6 +11,8 @@
 //   FF_BASE, FF_ADMIN, FF_ADMIN_PASS   site and administrator (default http://localhost:9601, admin / password)
 //   FF_HUB_MODEL                       model of the content assistant (default claude-sonnet-5-5)
 //   FF_HUB_REPORT                      report file (default test-results/admin-hub.md)
+//   FF_HUB_ONLY                        only the steps whose title matches (a regular expression), e.g.
+//                                      "footer|look" – to try one step again without the whole run
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +20,7 @@ import path from 'node:path';
 const BASE = process.env.FF_BASE || 'http://localhost:9601';
 const MODEL = process.env.FF_HUB_MODEL || 'claude-sonnet-5-5';
 const REPORT = process.env.FF_HUB_REPORT || 'test-results/admin-hub.md';
+const ONLY = process.env.FF_HUB_ONLY ? new RegExp( process.env.FF_HUB_ONLY, 'i' ) : null;
 const started = Date.now();
 const steps = [];
 const sleep = ( ms ) => new Promise( ( r ) => setTimeout( r, ms ) );
@@ -67,6 +70,9 @@ async function watch( tid, after, { timeout = 150000, quiet = 0 } = {} ) {
 const said = ( r ) => r.msgs.map( ( m ) => NAMES[ m.author ] + ': ' + clip( m.text, 400 ) ).join( ' | ' );
 const cardOf = ( r ) => r.msgs.flatMap( ( m ) => m.attachments || [] ).find( ( c ) => /ai-proposal|draft/.test( c.provider ) );
 async function step( title, fn ) {
+	if ( ONLY && ! ONLY.test( title ) ) {
+		return;
+	}
 	const t0 = Date.now();
 	let res;
 	try {
@@ -184,6 +190,11 @@ await step( 'Inhalte: a draft from a few bullet points, as a card', async () => 
 	return { ok: r.msgs.length && ( drafts || [] ).length, note: said( r ) + ' · drafts: ' + ( drafts || [] ).map( ( d ) => d.title.raw ).join( ', ' ) };
 } );
 await step( 'Inhalte: proofread the latest posts, corrections as one card the owner applies', async () => {
+	// A fresh post with a few slips, so there is always something to correct (removed at the end).
+	const typo = await wp( 'posts', { title: 'Neues vom Vorstand', status: 'publish', content: '<!-- wp:paragraph --><p>Der Vorstand hat sich am Dienstag getroffen und beschlossen, das das Sommerfest dieses Jahr im Stadtpark statt findet. Alle Mitgleider sind herzlich eingeladen.</p><!-- /wp:paragraph -->' } );
+	if ( typo?.id ) {
+		created.push( typo.id );
+	}
 	const r = await ask( 'inhalte', 'Lies bitte die drei neuesten veröffentlichten Beiträge gegen und schlag die Korrekturen direkt als Karte vor.', 0, { timeout: 200000 } );
 	const c = cardOf( r );
 	if ( ! c ) {
@@ -219,7 +230,8 @@ await step( 'Assistants hand work to each other: Inhalte writes, then hands the 
 	for ( const d of drafts || [] ) {
 		created.push( d.id );
 	}
-	return { ok: fromSeo.length && INHALTE === meta.from, note: said( r ) + ' || ' + fromSeo.map( ( m ) => 'SEO-KI: ' + clip( m.text, 300 ) ).join( ' ' ) + ' · handed over by: ' + ( NAMES[ meta.from ] || '–' ) };
+	const later = fromSeo.filter( ( m ) => ! r.msgs.some( ( x ) => x.id === m.id ) );
+	return { ok: fromSeo.length && INHALTE === meta.from, note: said( r ) + ( later.length ? ' || ' + later.map( ( m ) => 'SEO-KI: ' + clip( m.text, 300 ) ).join( ' ' ) : '' ) + ' · handed over by: ' + ( NAMES[ meta.from ] || '–' ) };
 } );
 await step( 'A page with a layout: "about us" with two columns and a button, as a draft', async () => {
 	const r = await ask( 'inhalte', 'Bau mir bitte eine Seite "Über uns": links zwei Absätze über den Verein (gegründet 1987, 240 Mitglieder, Stadtteilarbeit in der Südstadt), rechts Kontakt (Geschäftsstelle, Marktstraße 4), darunter ein Button "Mitglied werden". Als Entwurf.', 0, { timeout: 240000 } );
@@ -354,7 +366,10 @@ await max.evaluate( ( [ entries, ids ] ) => {
 await max.locator( '#flurfunk-ai form [type=submit]' ).last().click();
 await max.waitForLoadState( 'domcontentloaded' );
 for ( const id of created ) {
-	await wp( 'posts/' + id + '?force=true', null, 'DELETE' );
+	const gone = await wp( 'posts/' + id + '?force=true', null, 'DELETE' );
+	if ( gone?.code ) {
+		await wp( 'pages/' + id + '?force=true', null, 'DELETE' ); // The "about us" page.
+	}
 }
 const passed = steps.filter( ( s ) => 'PASS' === s.mark ).length;
 const warned = steps.filter( ( s ) => 'WARN' === s.mark ).length;

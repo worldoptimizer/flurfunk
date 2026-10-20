@@ -347,7 +347,7 @@ function build_snapshot( array $p ): array {
 		}
 		$kind  = 'action';
 		$line  = __( 'Change the site\'s look', 'flurfunk' );
-		$sub   = trim( (string) ( $in['why'] ?? '' ) . ( $what ? ' – ' . implode( '; ', $what ) : '' ), ' –' );
+		$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), implode( '; ', $what ) ) ) );
 		$run   = __( 'Apply', 'flurfunk' );
 		$extra = isset( $in['css'] ) ? (string) $in['css'] : '';
 
@@ -358,8 +358,7 @@ function build_snapshot( array $p ): array {
 		$kind  = 'action';
 		/* translators: %s: template name, e.g. Footer */
 		$line  = sprintf( __( 'Change the template "%s"', 'flurfunk' ), $tpl ? (string) $tpl->title : (string) ( $in['id'] ?? '' ) );
-		/* translators: 1: old text, 2: new text */
-		$sub   = trim( (string) ( $in['why'] ?? '' ) . ( isset( $in['find'] ) ? ' – ' . sprintf( __( '"%1$s" becomes "%2$s"', 'flurfunk' ), mb_substr( wp_strip_all_tags( (string) $in['find'] ), 0, 80 ), mb_substr( wp_strip_all_tags( (string) ( $in['replace'] ?? '' ) ), 0, 80 ) ) : '' ), ' –' );
+		$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), \Flurfunk\Templates\summary( $in ) ) ) );
 		$run   = __( 'Apply', 'flurfunk' );
 		$extra = isset( $in['content'] ) ? (string) $in['content'] : (string) ( $in['replace'] ?? '' );
 

@@ -968,7 +968,8 @@ instructions. The call goes through `wp_ai_client_prompt()` with `using_system_i
 | `flurfunk_ai_check_models` (filter) | `string[] $models`, `int $agent` | Models for the quick check, first available wins (default: small Claude, Gemini, GPT models). |
 | `flurfunk_ai_check_max_tokens` (filter) | `int $max` (600) | Room for the quick check (newer models think first). |
 | `flurfunk_ai_admin_read` (filter) | `bool $ok`, `string $ability` | Whether a read-only ability may run with the asking administrator's rights (default: WordPress's own `core/…` read-only abilities). Abilities that change something never do. |
-| `flurfunk_ai_admin_cards` (filter) | `bool $ok`, `string $ability` | Whether a card of this ability runs with the clicking person's administrator rights (default: `flurfunk/update-styles`). The assistant only proposes; a limit still applies. |
+| `flurfunk_ai_admin_cards` (filter) | `bool $ok`, `string $ability` | Whether a card of this ability runs with the clicking person's administrator rights (default: `flurfunk/update-styles` and `flurfunk/update-template`). The assistant only proposes; a limit still applies. |
+| `flurfunk_ai_rounds` (filter) | `int $rounds`, `int $agent` | How many rounds of looking things up an assistant gets for one answer (default 4; 8 when it reads code or a theme's templates; at least 2). |
 | `flurfunk_metrics` (filter) | `array $metrics` | Add numbers for the assistants and snapshots, e.g. from a statistics plugin: `key => [ 'label' => 'Visits in the last 7 days', 'value' => 1234, 'unit' => '', 'source' => 'My statistics' ]`. |
 | `flurfunk_description_keys` (filter) | `string[] $keys` | Post meta keys in which SEO plugins keep a description; the site check counts a post with one as described. |
 | `flurfunk_ai_stays_for` (filter) | `int $seconds` (two days) | How long an assistant stays in a thread after its last answer. |

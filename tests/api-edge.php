@@ -2109,6 +2109,14 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Templates\N
 		$check( 'a template part (the footer) is changed by a card an administrator applies – without the script – and undo brings back the theme\'s own', true === $tp_ok && is_wp_error( $tp_miss ) && null === $tp_run && str_contains( $tp_now, 'FF-Test-Fuss' ) && ! str_contains( $tp_now, '<script' ) && null === $tp_undo && ! str_contains( $tp_back, 'FF-Test-Fuss' ), array( $tp_run, $tp_undo, $tp_foot['id'] ) );
 		$extra_threads[] = $tp_t;
 	}
+	// The card says what happens to the visible text, not the block comments around it.
+	$tp_sum = array(
+		Flurfunk\Templates\summary( array( 'find' => '<!-- /wp:group -->', 'replace' => '<!-- /wp:group --><!-- wp:paragraph --><p>© 2026 Verein</p><!-- /wp:paragraph -->' ) ),
+		Flurfunk\Templates\summary( array( 'find' => '<p>Alt</p>', 'replace' => '<p>Neu</p>' ) ),
+		Flurfunk\Templates\summary( array( 'find' => '<p>Weg</p>', 'replace' => '' ) ),
+		Flurfunk\Templates\summary( array( 'find' => '<p class="a">Gleich</p>', 'replace' => '<p class="b">Gleich</p>' ) ),
+	);
+	$check( 'a template card names what is added, removed or changed in the visible text', array( sprintf( __( 'Adds "%s"', 'flurfunk' ), '© 2026 Verein' ), sprintf( __( '"%1$s" becomes "%2$s"', 'flurfunk' ), 'Alt', 'Neu' ), sprintf( __( 'Removes "%s"', 'flurfunk' ), 'Weg' ), __( 'Only the markup changes, not the text', 'flurfunk' ) ) === $tp_sum, $tp_sum );
 }
 // Every Flurfunk ability describes its input as an object with properties – an empty list would be
 // sent as [] and AI providers refuse the whole request.
@@ -2122,7 +2130,7 @@ if ( function_exists( 'wp_get_abilities' ) ) {
 	}
 	$check( 'no Flurfunk ability has an empty list of properties (providers would refuse every request)', array() === $sc_bad, $sc_bad );
 }
-$check( 'reading code gets more rounds of looking things up than other questions', 8 === Flurfunk\Modules\Ai\rounds( 0 ) || 4 === Flurfunk\Modules\Ai\rounds( 0 ) );
+$check( 'reading code or templates gets more rounds of looking things up than other questions', in_array( Flurfunk\Modules\Ai\rounds( 0 ), array( 4, 8 ), true ) );
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

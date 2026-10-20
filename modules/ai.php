@@ -1845,13 +1845,14 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 
 /**
  * How many rounds of looking things up an assistant gets for one answer: more for reading code
- * (list, search, read, read again).
+ * (list, search, read, read again) or a theme's templates.
  *
  * @param int $agent Assistant.
  */
 function rounds( int $agent ): int {
-	$code = (bool) array_intersect( array( 'flurfunk/search-code', 'flurfunk/read-code' ), profile( $agent )['tools'] );
-	return max( 2, (int) apply_filters( 'flurfunk_ai_rounds', $code ? 8 : MAX_ROUNDS, $agent ) );
+	// Reading code or a theme's templates takes a few steps: list, open, then propose.
+	$deep = (bool) array_intersect( array( 'flurfunk/search-code', 'flurfunk/read-code', 'flurfunk/get-templates' ), profile( $agent )['tools'] );
+	return max( 2, (int) apply_filters( 'flurfunk_ai_rounds', $deep ? 8 : MAX_ROUNDS, $agent ) );
 }
 
 /**
