@@ -1594,7 +1594,7 @@ $_POST = array();
 $_REQUEST = array();
 $cr_saved = (array) get_option( 'flurfunk_ai_channel_rules' );
 ksort( $cr_saved );
-$check( 'channel rules from the form: no administering role, no negative budget, no unknown channel', array( 'ff-test' => array( 'limit' => '', 'budget' => 5000 ), 'ff-test-lim' => array( 'limit' => 'contributor', 'budget' => 0 ) ) === $cr_saved, $cr_saved );
+$check( 'channel rules from the form: no administering role, no negative budget, no unknown channel', array( 'ff-test' => array( 'limit' => '', 'budget' => 5000, 'respond' => false ), 'ff-test-lim' => array( 'limit' => 'contributor', 'budget' => 0, 'respond' => false ) ) === $cr_saved, $cr_saved );
 null === $cr_old ? delete_option( 'flurfunk_ai_channel_rules' ) : update_option( 'flurfunk_ai_channel_rules', $cr_old );
 delete_option( 'flurfunk_ai_channel_usage' );
 // Notes per channel: only when the site keeps them, only on request, only in their channel.
@@ -1700,6 +1700,84 @@ $np_prompt = Flurfunk\Modules\Ai\check_prompt( Store\thread_row( $gu_t ), $ai_bo
 Flurfunk\Modules\Ai\save_notes( 'ff-test', array() );
 null === $np_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $np_opts );
 $check( 'the quick check reads the channel\'s notes (they can say when to answer unasked)', str_contains( $np_prompt, 'Beantworte Rechtschreibfragen auch ohne Erwähnung.' ) && str_contains( $np_prompt, 'ANSWER, THANKS or NO' ) );
+// The checklist while it works (as in Claude Tag).
+WP_CLI::log( 'AI checklist, unasked answers, routines' );
+Flurfunk\Modules\Ai\save_profile( $ai_bot, array( 'on' => '1', 'channels' => array( 'ff-test' ) ) );
+$as( $team );
+$cl_t = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Checkliste' ) );
+Flurfunk\Modules\Ai\set_busy( $cl_t, $ai_bot, true, 'look' );
+Flurfunk\Modules\Ai\busy_done( $cl_t, $ai_bot, Flurfunk\Modules\Ai\step_label( 'flurfunk/find-posts', array( 'search' => 'Kita' ), array( array( 'id' => 1 ) ) ) );
+Flurfunk\Modules\Ai\busy_done( $cl_t, $ai_bot, Flurfunk\Modules\Ai\step_label( 'flurfunk/update-draft', array(), array( 'error' => 'x' ) ) );
+Flurfunk\Modules\Ai\set_busy( $cl_t, $ai_bot, true, 'write' );
+$cl_v = Store\full_thread( $cl_t, $team );
+$cl_done = (array) ( (array) ( $cl_v['thinking_done'] ?? array() ) )[ $ai_bot ] ?? array();
+$check( 'while it works, a checklist of what it did so far, kept when the step changes', 2 === count( $cl_done ) && str_contains( $cl_done[0], 'Kita' ) && str_contains( $cl_done[1], ': ' ), $cl_done );
+Flurfunk\Modules\Ai\set_busy( $cl_t, $ai_bot, false );
+$check( '… and gone with the answer', ! ( (array) ( Store\full_thread( $cl_t, $team )['thinking_done'] ?? array() ) ) );
+// Answering unasked in a channel that allows it: a new thread nobody asked goes to the quick check.
+$am_old = get_option( 'flurfunk_ai_channel_rules', null );
+update_option( 'flurfunk_ai_channel_rules', array( 'ff-test' => array( 'respond' => true ) ) );
+$am_t1 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Weiß jemand, wie lang ein Teaser sein darf?' ) );
+$am_t2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$team2> schau mal" ) );
+$check( 'a channel where assistants answer unasked: a new thread nobody asked is queued for the quick check, one that asks someone is not', (bool) wp_next_scheduled( 'flurfunk_ai_ambient', array( $am_t1 ) ) && ! wp_next_scheduled( 'flurfunk_ai_ambient', array( $am_t2 ) ) );
+add_filter( 'flurfunk_ai_pre_answer', $am_fake = static fn ( $pre, $ctx ) => array( 'text' => str_contains( $ctx['prompt'], 'without mentioning you; a quick check found' ) ? 'Höchstens 200 Zeichen.' : 'falsch', 'tokens' => 5 ), 20, 2 );
+add_filter( 'flurfunk_ai_pre_check', $am_no = static fn ( $pre, $t, $m, $a, $amb ) => $amb ? 'no' : $pre, 20, 5 );
+Flurfunk\Modules\Ai\ambient( $am_t1 );
+remove_filter( 'flurfunk_ai_pre_check', $am_no, 20 );
+$am_none = $fu_last( $am_t1 );
+add_filter( 'flurfunk_ai_pre_check', $am_yes = static fn ( $pre, $t, $m, $a, $amb ) => $amb ? 'answer' : $pre, 20, 5 );
+Flurfunk\Modules\Ai\ambient( $am_t1 );
+remove_filter( 'flurfunk_ai_pre_check', $am_yes, 20 );
+remove_filter( 'flurfunk_ai_pre_answer', $am_fake, 20 );
+$am_msgs = array_values( array_filter( Store\full_thread( $am_t1, $team )['messages'], static fn ( $m ) => 'message' === $m['type'] ) );
+$check( '… the check says no: nothing; it says yes: the assistant answers, told it chips in unasked', 0 === $am_none && 1 === count( $am_msgs ) && 'Höchstens 200 Zeichen.' === $am_msgs[0]['text'] && $ai_bot === (int) $am_msgs[0]['author'], array( $am_none, $am_msgs ) );
+$am_p = Flurfunk\Modules\Ai\check_prompt( Store\thread_row( $am_t1 ), $ai_bot, Store\full_thread( $am_t1, $ai_bot ), true );
+$check( '… its quick check is the stricter one for unasked answers (most messages get nothing)', str_contains( $am_p, 'without mentioning you' ) && str_contains( $am_p, 'Weiß jemand, wie lang ein Teaser sein darf?' ) && str_contains( $am_p, 'ANSWER or NO' ) );
+update_option( 'flurfunk_ai_channel_rules', array() );
+$am_t3 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Noch eine Frage?' ) );
+$check( '… without the switch (the default), new threads go nowhere', ! wp_next_scheduled( 'flurfunk_ai_ambient', array( $am_t3 ) ) );
+null === $am_old ? delete_option( 'flurfunk_ai_channel_rules' ) : update_option( 'flurfunk_ai_channel_rules', $am_old );
+// Routines: standing work on a schedule.
+$ro_old = get_option( 'flurfunk_ai_routines', null );
+delete_option( 'flurfunk_ai_routines' );
+$ro_t = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Wochenrückblick einrichten' ) );
+$check( 'nobody but an assistant at work sets up routines', ! Flurfunk\Modules\Ai\may_routine( array( 'thread' => $ro_t ) ) );
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/routine' ) ) {
+	$check( 'every assistant can set up routines, and is told when (with this thread\'s number)', in_array( 'flurfunk/routine', array_map( static fn ( $a ) => $a->get_name(), Flurfunk\Modules\Ai\tools( $ai_bot ) ), true ) && str_contains( Flurfunk\Modules\Ai\context( Store\thread_row( $ro_t ), 0, $ai_bot )['system'], 'flurfunk/routine (thread ' . $ro_t . ',' ) );
+	Flurfunk\Modules\Ai\working( $ai_bot );
+	$ro_ab = wp_get_ability( 'flurfunk/routine' );
+	$ro_a  = $ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'add', 'name' => 'Freitagsrückblick', 'task' => 'Fasse zusammen, was im Kanal noch offen ist.', 'days' => array( 'fri' ), 'time' => '15:00', 'post' => 'channel' ) );
+	$ro_b  = $ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'add', 'task' => 'x', 'days' => array(), 'time' => '25:00' ) );
+	$ro_id = (string) ( $ro_a['routines'][0]['id'] ?? '' );
+	$ro_r  = Flurfunk\Modules\Ai\routines()[ $ro_id ] ?? array();
+	$ro_dt = ( new DateTimeImmutable( '@' . (int) ( $ro_r['next'] ?? 0 ) ) )->setTimezone( wp_timezone() );
+	$check( 'a routine is set up for the next Friday 15:00 in the site\'s time and scheduled; a broken one is refused', $ro_id && 'Fri' === $ro_dt->format( 'D' ) && '15:00' === $ro_dt->format( 'H:i' ) && $ro_r['next'] > time() && (bool) wp_next_scheduled( 'flurfunk_ai_routine', array( $ro_id ) ) && is_wp_error( $ro_b ), array( $ro_a, $ro_dt->format( 'D H:i' ) ) );
+	$ro_l = $ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'list' ) );
+	$ro_p = $ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'pause', 'id' => $ro_id ) );
+	$check( 'listing shows it ("Fri 15:00"); pausing stops its schedule', 1 === count( $ro_l['routines'] ?? array() ) && str_contains( (string) ( $ro_l['routines'][0]['when'] ?? '' ), '15:00' ) && true === ( $ro_p['routines'][0]['paused'] ?? null ) && ! wp_next_scheduled( 'flurfunk_ai_routine', array( $ro_id ) ), $ro_l );
+	$ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'resume', 'id' => $ro_id ) );
+	Flurfunk\Modules\Ai\working( 0 );
+	// When due: a new thread in the channel with the result (or nothing, with nothing to report).
+	add_filter( 'flurfunk_ai_pre_answer', $ro_fake = static fn ( $pre, $ctx ) => array( 'text' => str_contains( $ctx['prompt'], 'Freitagsrückblick' ) ? 'Offen: Bildrechte Gipfel-Foto, Teaser Newsletter.' : 'falsch', 'tokens' => 7 ), 20, 2 );
+	$ro_before = count( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 100 ) ) );
+	Flurfunk\Modules\Ai\run_routine( $ro_id );
+	remove_filter( 'flurfunk_ai_pre_answer', $ro_fake, 20 );
+	$ro_new = array_values( array_filter( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 100 ) ), static fn ( $t ) => str_starts_with( (string) $t['title'], 'Freitagsrückblick – ' ) ) );
+	$check( 'when due, the result is a new thread in the channel by the assistant, and the routine is scheduled again', $ro_new && $ai_bot === (int) $ro_new[0]['author'] && str_contains( (string) $ro_new[0]['body'], 'Bildrechte' ) && (bool) wp_next_scheduled( 'flurfunk_ai_routine', array( $ro_id ) ) && Flurfunk\Modules\Ai\routines()[ $ro_id ]['last'] > 0, $ro_new[0] ?? null );
+	add_filter( 'flurfunk_ai_pre_answer', $ro_dash = static fn () => array( 'text' => '–', 'tokens' => 3 ), 20 );
+	$ro_n = count( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 100 ) ) );
+	Flurfunk\Modules\Ai\run_routine( $ro_id );
+	remove_filter( 'flurfunk_ai_pre_answer', $ro_dash, 20 );
+	$check( '… with nothing worth reporting it stays quiet', count( Store\list_threads( $team, array( 'channel' => 'ff-test', 'limit' => 100 ) ) ) === $ro_n );
+	Flurfunk\Modules\Ai\working( $ai_bot );
+	$ro_x = $ro_ab->execute( array( 'thread' => $ro_t, 'action' => 'remove', 'id' => $ro_id ) );
+	Flurfunk\Modules\Ai\working( 0 );
+	$check( '… and "stop the Friday round-up" removes it', array() === ( $ro_x['routines'] ?? null ) && ! wp_next_scheduled( 'flurfunk_ai_routine', array( $ro_id ) ) );
+	foreach ( $ro_new as $ro_th ) {
+		$extra_threads[] = (int) $ro_th['id'];
+	}
+}
+null === $ro_old ? delete_option( 'flurfunk_ai_routines' ) : update_option( 'flurfunk_ai_routines', $ro_old );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";

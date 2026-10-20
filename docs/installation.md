@@ -312,6 +312,15 @@ limit (see below) that keeps internal drafts out too.
 most five per thread, at most 60 days ahead) and follows up in the thread when it is due, with the
 rights of the person who asked. It does not nag on its own; tasks remind people of due dates anyway.
 
+**Routines:** asked for something regular ("every Friday at 15:00 sum up what is open here"), an
+assistant sets up a routine for the channel: days, a time in the site's time zone, the task, and
+whether to report in that thread or as a new thread in the channel. When it is due (WP-Cron), it
+does the task with the rights of the person who set it up – who must still see the conversation,
+otherwise the routine pauses – within the assistant's and the channel's budget; with nothing to
+report it posts nothing. At most ten per channel. The routines are listed per channel below the
+assistants, where you can remove them. On a site with little traffic, WP-Cron runs late; a real
+cron job calling `wp-cron.php` makes routines and check-ins punctual.
+
 **Notes per channel** (a switch at the top, off by default): when someone asks an assistant to
 remember something lasting ("teasers at most 200 characters"), it keeps a short note for that
 channel, and every assistant there reads the channel's notes – only on request, never in private
@@ -319,8 +328,13 @@ conversations, never across channels. The notes are listed per channel below the
 you can remove them; they are sent to the AI provider with the requests in that channel.
 
 **Per channel** (under the assistants): instructions, a limit that caps every assistant there on top
-of its own (e.g. in a channel guest authors read, so it cannot quote internal drafts) and a monthly
-token budget shared by the assistants in that channel.
+of its own (e.g. in a channel guest authors read, so it cannot quote internal drafts), a monthly
+token budget shared by the assistants in that channel, and **Assistants answer new threads here
+unasked** (off by default). With it on, every new thread there that mentions nobody – started by
+the team, not by guests – goes through the quick check for the assistants of that channel; the first
+one it is for answers in two or three sentences, the others stay quiet. Most threads get nothing,
+but each one is sent to the AI provider for the check (a few hundred tokens), so switch it on where
+questions are expected, e.g. in a proofreading or help channel.
 
 **Rights.** An assistant never can more than the person asking it, and never anything that
 administers the site: while it works, users, plugins, themes, settings, unfiltered HTML and

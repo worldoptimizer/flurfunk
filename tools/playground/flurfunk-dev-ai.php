@@ -11,6 +11,19 @@
 
 defined( 'ABSPATH' ) || exit;
 
+/*
+ * The plugin folder is mounted from the working copy: WordPress must never update it, since an
+ * update deletes the folder first. (When Playground's file system loses a plugin's files, WordPress
+ * can even offer another plugin's update under Flurfunk's name.)
+ */
+add_filter(
+	'upgrader_pre_install',
+	static fn ( $ok, $extra ) => str_contains( (string) ( $extra['plugin'] ?? '' ), 'flurfunk/' ) ? new WP_Error( 'flurfunk_dev_mount', 'Flurfunk is mounted from the working copy and is not updated here.' ) : $ok,
+	1,
+	2
+);
+add_filter( 'auto_update_plugin', static fn ( $update, $item ) => str_contains( (string) ( $item->plugin ?? '' ), 'flurfunk/' ) ? false : $update, 99, 2 );
+
 if ( ! defined( 'FLURFUNK_DEV_AI_PROXY' ) || ! FLURFUNK_DEV_AI_PROXY ) {
 	return;
 }

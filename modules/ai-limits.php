@@ -151,18 +151,21 @@ function limit_caps( int $agent, string $channel = '' ): ?array {
 }
 
 /**
- * What a channel sets for AI assistants: a limit (a role, '' = none) and a monthly token budget
- * shared by all assistants there (0 = none).
+ * What a channel sets for AI assistants: a limit (a role, '' = none), a monthly token budget
+ * shared by all assistants there (0 = none), and whether they answer new threads unasked when the
+ * quick check finds one is for them (off by default: every new thread there then goes to the AI
+ * provider for the check).
  *
  * @param string $slug Channel.
- * @return array{limit:string, budget:int}
+ * @return array{limit:string, budget:int, respond:bool}
  */
 function channel_rule( string $slug ): array {
 	$r = ( (array) get_option( CHANNEL_RULES, array() ) )[ $slug ] ?? array();
 	$l = (string) ( $r['limit'] ?? '' );
 	return array(
-		'limit'  => isset( limit_roles()[ $l ] ) ? $l : '',
-		'budget' => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+		'limit'   => isset( limit_roles()[ $l ] ) ? $l : '',
+		'budget'  => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+		'respond' => ! empty( $r['respond'] ),
 	);
 }
 

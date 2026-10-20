@@ -145,8 +145,8 @@ what each assistant does there and what it reads. In the `@` list assistants are
 their role.
 
 - **Ask:** mention the assistant in a thread, e.g. `@Proofreading Is the teaser clear?`. While it
-  works, the thread shows what it is doing (reading the thread, looking things up, writing). The
-  answer comes in the thread, and only you are notified.
+  works, the thread shows what it is doing and ticks off what it has done so far (Read "Pool opens
+  in May"). The answer comes in the thread, and only you are notified.
 - **What it was based on:** under each AI answer a line says what it read (the thread, the post it is
   about), which conversations it opened and which tools it used.
 - **Suggestions:** an assistant never changes anything by itself. When it suggests something – a
@@ -171,6 +171,12 @@ their role.
 - **Check back later:** "@Lektorat, remind us on Friday at 10 whether the photo rights are
   settled" – at that time it looks at the thread again and follows up there: asks whether it is done
   and mentions who should answer, or says it is settled. "Forget the reminder" cancels it.
+- **Routines:** "@Lektorat, every Friday at 15:00 sum up in a new thread what is still open in
+  this channel" – it sets up a routine and confirms the schedule. When it is due, the assistant does
+  the task with the rights of the person who set it up and posts the result (in that thread or as a
+  new thread in the channel); with nothing to report it stays quiet. "List the routines", "pause
+  the Friday round-up" and "stop it" work the same way. Your administrators see and remove
+  routines per channel.
 - **Notes per channel:** if your site keeps them, tell an assistant "remember: teasers at most 200
   characters" – it keeps the note for that channel, every assistant there knows it from then on,
   and "it is 180 now" changes it. Notes stay in their channel; private conversations have none.
@@ -185,6 +191,11 @@ their role.
 - **Rights:** an assistant works with your rights, never more, and never administers the site.
   Your administrators can limit it further (e.g. to what an author may); then it tells you when
   something may be outside its limit instead of claiming it does not exist.
+
+**Channels where assistants answer unasked:** your administrators can switch this on per channel.
+Then a new thread there that mentions nobody goes through a quick check, and if an assistant can
+clearly help (a spelling question in the proofreading channel), it answers in two or three
+sentences, like a colleague who chips in. Most threads get nothing. A 👎 mutes it in that thread.
 
 What an assistant reads goes to the AI provider your site has chosen; your administrators decide
 which assistants exist, where they take part and who may ask them.

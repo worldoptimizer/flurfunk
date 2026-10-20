@@ -2249,7 +2249,9 @@
 		};
 		// AI assistants working on the thread: a line under the messages, and a quicker look until they are done.
 		const stepText = ( step ) => ( 'look' === step ? t( 'is looking things up' ) : 'write' === step ? t( 'is writing the answer' ) : t( 'is reading the thread' ) );
-		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<div class="ff-thinking" role="status">' + th.thinking.map( ( id ) => '<div class="ff-thinking-msg">' + ava( id ) + '<div class="ff-thinking-body"><p><b>' + esc( person( id ).name ) + '</b> <span>' + esc( stepText( ( th.thinking_steps || {} )[ id ] ) ) + '</span></p><span class="ff-skel"></span><span class="ff-skel is-short"></span></div></div>' ).join( '' ) + '</div>' : '' );
+		// What it has done so far, ticked off as it goes (as Claude Tag's checklist).
+		const checklist = ( list ) => ( list && list.length ? '<ul class="ff-steps">' + list.map( ( l ) => '<li>' + icon.check + '<span>' + esc( l ) + '</span></li>' ).join( '' ) + '</ul>' : '' );
+		const thinkingHtml = ( th ) => ( th.thinking && th.thinking.length ? '<div class="ff-thinking" role="status">' + th.thinking.map( ( id ) => '<div class="ff-thinking-msg">' + ava( id ) + '<div class="ff-thinking-body"><p><b>' + esc( person( id ).name ) + '</b> <span>' + esc( stepText( ( th.thinking_steps || {} )[ id ] ) ) + '</span></p>' + checklist( ( th.thinking_done || {} )[ id ] ) + '<span class="ff-skel"></span><span class="ff-skel is-short"></span></div></div>' ).join( '' ) + '</div>' : '' );
 		let thinkingTimer = 0;
 		// After a reply: the line under the messages may appear (the reply mentioned an assistant).
 		const paintThinking = ( th ) => {
@@ -2445,7 +2447,7 @@
 		};
 		// What can change while a thread is open: new, edited or deleted messages, the status, the
 		// thread text, refreshed cards.
-		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ), JSON.stringify( th.reactions || [] ), ( th.thinking || [] ).join( ',' ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) + JSON.stringify( m.reactions || [] ) ) ).join( '|' );
+		const signature = ( th ) => [ th.status, th.body, th.title, JSON.stringify( th.attachments ), JSON.stringify( th.reactions || [] ), ( th.thinking || [] ).join( ',' ), JSON.stringify( th.thinking_done || {} ), JSON.stringify( th.thinking_steps || {} ) ].concat( th.messages.map( ( m ) => m.id + ':' + m.type + ':' + ( m.edited || '' ) + ':' + JSON.stringify( m.attachments || [] ) + JSON.stringify( m.reactions || [] ) ) ).join( '|' );
 		const pollPane = async () => {
 			const active = document.activeElement;
 			const busy = pane.contains( active ) && ( ( 'TEXTAREA' === active.tagName && active.value ) || active.closest( '.ff-edit, .ff-pop' ) ) || $( '.ff-edit', pane );

@@ -36,6 +36,7 @@ const META     = 'flurfunk_ai_meta';
 const META_MAX = 2000;
 const BUSY     = 'flurfunk_ai_busy_';
 const MUTED    = 'flurfunk_ai_muted'; // thread => [ assistants muted there ].
+const AMBIENT  = 'flurfunk_ai_ambient'; // Cron hook: a new thread in a channel where assistants answer unasked.
 const CAP      = 'flurfunk_use_ai';
 // How much of a thread goes to the AI: the newest messages, and at most this many characters.
 const MAX_MESSAGES = 60;
@@ -51,12 +52,14 @@ require_once __DIR__ . '/ai-proposals.php';
 require_once __DIR__ . '/ai-limits.php';
 require_once __DIR__ . '/ai-memory.php';
 require_once __DIR__ . '/ai-followups.php';
+require_once __DIR__ . '/ai-routines.php';
 
 add_action( 'flurfunk_thread_created', __NAMESPACE__ . '\\thread_created' );
 add_filter( 'flurfunk_private_partners', __NAMESPACE__ . '\\private_partners', 10, 2 );
 add_action( 'flurfunk_message_added', __NAMESPACE__ . '\\message_added', 10, 2 );
 add_action( 'flurfunk_message_edited', __NAMESPACE__ . '\\message_added', 10, 2 ); // A mention added later still counts; answered ones are not answered again.
 add_action( HOOK, __NAMESPACE__ . '\\run', 10, 3 );
+add_action( AMBIENT, __NAMESPACE__ . '\\ambient' );
 add_filter( 'flurfunk_thread_view', __NAMESPACE__ . '\\thread_view', 10, 3 );
 add_filter( 'flurfunk_channel_view', __NAMESPACE__ . '\\channel_view', 10, 2 );
 add_action( 'flurfunk_settings_sections', __NAMESPACE__ . '\\render_section' );
@@ -479,6 +482,9 @@ function tools( int $agent ): array {
 	if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/follow-up' ) ) {
 		$out[] = wp_get_ability( 'flurfunk/follow-up' ); // Check back later, when asked to.
 	}
+	if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/routine' ) ) {
+		$out[] = wp_get_ability( 'flurfunk/routine' ); // Standing work on a schedule, when asked to.
+	}
 	return $out;
 }
 
@@ -551,6 +557,7 @@ function thread_created( $thread ): void {
 	}
 	$text    = (string) $thread->body . ( empty( $thread->private_to ) || 'assistant' !== $thread->target_type ? '' : ' <@' . (int) $thread->target_id . '>' );
 	$channel = Store\channel( (int) $thread->channel_id );
+	$asked   = str_contains( $text, '<@' );
 	// Channels where an agent answers every new thread: as if it had been mentioned (once).
 	foreach ( $channel ? agents() : array() as $agent ) {
 		if ( in_array( (string) $channel->slug, profile( $agent )['auto'], true ) && ! str_contains( $text, '<@' . $agent . '>' ) ) {
@@ -558,6 +565,72 @@ function thread_created( $thread ): void {
 		}
 	}
 	queue( $thread, 0, (int) $thread->author_id, $text );
+	// A channel where assistants answer unasked (as Claude Tag's "Respond automatically"): a new
+	// thread that asks nobody goes to the quick check; the first assistant it is for answers.
+	if ( $channel && ! $asked && ! str_contains( $text, '<@' ) && empty( $thread->private_to ) && channel_rule( (string) $channel->slug )['respond'] && 'team' === Access\kind( (int) $thread->author_id ) ) {
+		if ( ! wp_next_scheduled( AMBIENT, array( (int) $thread->id ) ) ) {
+			wp_schedule_single_event( time(), AMBIENT, array( (int) $thread->id ) );
+		}
+		if ( apply_filters( 'flurfunk_ai_run_now', true ) ) {
+			$tid = (int) $thread->id;
+			register_shutdown_function(
+				static function () use ( $tid ): void {
+					if ( ! function_exists( 'fastcgi_finish_request' ) ) {
+						spawn_cron();
+						return;
+					}
+					fastcgi_finish_request();
+					wp_unschedule_event( (int) wp_next_scheduled( AMBIENT, array( $tid ) ), AMBIENT, array( $tid ) );
+					ambient( $tid );
+				}
+			);
+		}
+	}
+}
+
+/**
+ * Is an assistant joining in unasked right now (for its instructions)?
+ *
+ * @param bool|null $set Set.
+ */
+function joining( ?bool $set = null ): bool {
+	static $on = false;
+	if ( null !== $set ) {
+		$on = $set;
+	}
+	return $on;
+}
+
+/**
+ * A new thread nobody asked an assistant about, in a channel where they answer unasked: the quick
+ * check for each assistant there, in turn; the first it is for answers, the others stay quiet.
+ *
+ * @param int $thread_id Thread.
+ */
+function ambient( int $thread_id ): void {
+	$thread  = Store\thread_row( $thread_id );
+	$channel = $thread ? Store\channel( (int) $thread->channel_id ) : null;
+	if ( ! $thread || ! $channel || ! empty( $thread->private_to ) || ! \Flurfunk\Modules\enabled( MODULE ) || ! channel_rule( (string) $channel->slug )['respond'] || channel_spent( (string) $channel->slug ) ) {
+		return;
+	}
+	$author = (int) $thread->author_id;
+	foreach ( agents() as $agent ) {
+		$p = profile( $agent );
+		if ( ! may_answer( $agent, $author, $channel, $thread ) || muted( $thread_id, $agent ) || ( $p['budget'] && usage( $agent )['tokens'] >= $p['budget'] ) ) {
+			continue;
+		}
+		if ( 'answer' !== check_message( $thread, 0, $agent, true ) ) {
+			continue;
+		}
+		set_busy( $thread_id, $agent, true );
+		joining( true );
+		try {
+			run( $thread_id, 0, $agent );
+		} finally {
+			joining( false );
+		}
+		return;
+	}
 }
 
 /**
@@ -703,11 +776,12 @@ function listen( object $thread, int $message_id, int $author ): array {
  * The quick check's question: the end of the thread, the assistant's name and role, the channel's
  * notes (they may say when to answer unasked).
  *
- * @param object $thread Thread row.
- * @param int    $agent  Assistant.
- * @param array  $full   The thread as the assistant sees it.
+ * @param object $thread  Thread row.
+ * @param int    $agent   Assistant.
+ * @param array  $full    The thread as the assistant sees it.
+ * @param bool   $ambient A new thread nobody asked it about (not one it takes part in).
  */
-function check_prompt( object $thread, int $agent, array $full ): string {
+function check_prompt( object $thread, int $agent, array $full, bool $ambient = false ): string {
 	$lines = array();
 	foreach ( array_slice( array_filter( $full['messages'], static fn ( $m ) => 'message' === $m['type'] ), -8 ) as $m ) {
 		$lines[] = line( (int) $m['author'], '', mb_substr( (string) $m['text'], 0, 400 ) );
@@ -715,6 +789,10 @@ function check_prompt( object $thread, int $agent, array $full ): string {
 	$me     = Store\person( $agent )['name'];
 	$role   = profile( $agent )['role'];
 	$notes  = notes_text( channel_slug( $thread ) );
+	if ( $ambient ) {
+		$root = line( (int) $full['author'], '', mb_substr( trim( ( $full['title'] ? $full['title'] . "\n" : '' ) . $full['body'] ), 0, 1200 ) );
+		return sprintf( "You are %s, an AI assistant%s in a team chat channel. Someone just started this new thread without mentioning you.\n\nANSWER – only if it asks a question you can clearly answer, or states a concrete need you can meet, or the channel's notes say to answer this kind of message.\nNO – everything else, which is most messages: news, plans, announcements, people talking to each other.%s\n\n<thread>\n%s\n</thread>\n\nAnswer with one word: ANSWER or NO.", $me, '' !== $role ? ' (' . $role . ')' : '', '' !== $notes ? "\n\nThe channel's notes:\n" . $notes : '', $root );
+	}
 	$prompt = sprintf( "You are %s, an AI assistant%s taking part in this team chat thread. Look at the LAST message only.\n\nANSWER – it asks you something or asks you to do something, or asks the group something you are clearly the one to answer (also a correction of or follow-up to what you said).\nTHANKS – it only thanks you or agrees with you (thanks, great, OK) right after your answer.\nNO – anything else: people talking to each other, plans, thanks to someone else, remarks.%s\n\n<thread>\n%s\n</thread>\n\nAnswer with one word: ANSWER, THANKS or NO.", $me, '' !== $role ? ' (' . $role . ')' : '', '' !== $notes ? "\n\nThe channel's notes (they may say when to answer unasked):\n" . $notes : '', implode( "\n\n", $lines ) );
 	return $prompt;
 }
@@ -729,8 +807,8 @@ function check_prompt( object $thread, int $agent, array $full ): string {
  * @param int    $agent      Assistant.
  * @return string 'answer', 'thanks' or 'no'.
  */
-function check_message( object $thread, int $message_id, int $agent ): string {
-	$pre = apply_filters( 'flurfunk_ai_pre_check', null, $thread, $message_id, $agent );
+function check_message( object $thread, int $message_id, int $agent, bool $ambient = false ): string {
+	$pre = apply_filters( 'flurfunk_ai_pre_check', null, $thread, $message_id, $agent, $ambient );
 	if ( null !== $pre ) {
 		return is_string( $pre ) ? $pre : ( $pre ? 'answer' : 'no' );
 	}
@@ -741,7 +819,7 @@ function check_message( object $thread, int $message_id, int $agent ): string {
 	if ( is_wp_error( $full ) ) {
 		return 'no';
 	}
-	$prompt = check_prompt( $thread, $agent, $full );
+	$prompt = check_prompt( $thread, $agent, $full, $ambient );
 	// Room for a short word and whatever a model does before it (newer models think first; a limit
 	// it hits counts as an error). Small models make this a fraction of a cent.
 	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
@@ -871,12 +949,77 @@ function set_busy( int $thread_id, int $agent, bool $on, string $step = 'read' )
 		$busy[ $agent ] = array(
 			't'    => time(),
 			'step' => $step,
+			'done' => (array) ( $busy[ $agent ]['done'] ?? array() ), // The checklist so far.
 		);
 	} else {
 		unset( $busy[ $agent ] );
 	}
 	$busy ? set_transient( BUSY . $thread_id, $busy, 10 * MINUTE_IN_SECONDS ) : delete_transient( BUSY . $thread_id );
 	Store\bump();
+}
+
+/**
+ * Tick off a step on an assistant's checklist (shown under "is thinking" while it works).
+ *
+ * @param int    $thread_id Thread.
+ * @param int    $agent     Assistant.
+ * @param string $label     What it did, in the conversation's language.
+ */
+function busy_done( int $thread_id, int $agent, string $label ): void {
+	$busy = (array) get_transient( BUSY . $thread_id );
+	if ( ! isset( $busy[ $agent ] ) || '' === trim( $label ) ) {
+		return;
+	}
+	$busy[ $agent ]['done']   = array_slice( array_merge( (array) ( $busy[ $agent ]['done'] ?? array() ), array( mb_substr( $label, 0, 120 ) ) ), -8 );
+	$busy[ $agent ]['t']      = time();
+	set_transient( BUSY . $thread_id, $busy, 10 * MINUTE_IN_SECONDS );
+	Store\bump();
+}
+
+/**
+ * A checklist line for a tool an assistant used.
+ *
+ * @param string $ability Ability name.
+ * @param array  $args    Its input.
+ * @param array  $result  Its result (decoded).
+ */
+function step_label( string $ability, array $args, array $result ): string {
+	if ( ! empty( $result['error'] ) ) {
+		$a = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
+		/* translators: %s: what it tried */
+		return sprintf( __( 'Not possible: %s', 'flurfunk' ), $a ? $a->get_label() : $ability );
+	}
+	$title = static function ( int $id ): string {
+		return $id && get_post( $id ) ? html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' ) : '';
+	};
+	switch ( $ability ) {
+		case 'flurfunk/find-posts':
+			/* translators: %s: search words */
+			return '' !== (string) ( $args['search'] ?? '' ) ? sprintf( __( 'Searched posts for "%s"', 'flurfunk' ), (string) $args['search'] ) : __( 'Looked at the latest posts', 'flurfunk' );
+		case 'flurfunk/get-post':
+			/* translators: %s: post title */
+			return sprintf( __( 'Read "%s"', 'flurfunk' ), $title( (int) ( $args['id'] ?? 0 ) ) ?: __( 'a post', 'flurfunk' ) );
+		case 'flurfunk/list-threads':
+			return __( 'Looked through conversations', 'flurfunk' );
+		case 'flurfunk/get-thread':
+			$t = Store\thread_row( (int) ( $args['id'] ?? 0 ) );
+			/* translators: %s: conversation */
+			return sprintf( __( 'Read the conversation "%s"', 'flurfunk' ), $t ? mb_substr( (string) ( '' !== (string) $t->title ? $t->title : wp_strip_all_tags( (string) $t->body ) ), 0, 50 ) : '…' );
+		case 'flurfunk/create-draft':
+			/* translators: %s: draft title */
+			return sprintf( __( 'Wrote the draft "%s"', 'flurfunk' ), (string) ( $result['title'] ?? '' ) );
+		case 'flurfunk/update-draft':
+			/* translators: %s: draft title */
+			return sprintf( __( 'Changed the draft "%s"', 'flurfunk' ), (string) ( $result['title'] ?? '' ) );
+		case 'flurfunk/remember':
+			return __( 'Noted it for the channel', 'flurfunk' );
+		case 'flurfunk/follow-up':
+			return ! empty( $args['cancel'] ) ? __( 'Cancelled the check-ins', 'flurfunk' ) : __( 'Set a check-in', 'flurfunk' );
+		case 'flurfunk/routine':
+			return __( 'Set up the routine', 'flurfunk' );
+	}
+	$a = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
+	return $a ? $a->get_label() : $ability;
 }
 
 /**
@@ -887,6 +1030,22 @@ function set_busy( int $thread_id, int $agent, bool $on, string $step = 'read' )
  */
 function busy( int $thread_id ): array {
 	return array_map( 'intval', array_keys( busy_steps( $thread_id ) ) );
+}
+
+/**
+ * What each assistant at work has done so far (its checklist).
+ *
+ * @param int $thread_id Thread.
+ * @return array<int, string[]> Agent => steps.
+ */
+function busy_checklists( int $thread_id ): array {
+	$out = array();
+	foreach ( (array) get_transient( BUSY . $thread_id ) as $agent => $b ) {
+		if ( is_array( $b ) && ! empty( $b['done'] ) && (int) ( $b['t'] ?? 0 ) > time() - 10 * MINUTE_IN_SECONDS ) {
+			$out[ (int) $agent ] = array_values( array_map( 'strval', (array) $b['done'] ) );
+		}
+	}
+	return $out;
 }
 
 /**
@@ -916,6 +1075,7 @@ function thread_view( array $view, object $thread, int $user_id = 0 ): array {
 	$steps                  = busy_steps( (int) $thread->id );
 	$view['thinking']       = array_keys( $steps );
 	$view['thinking_steps'] = (object) $steps;
+	$view['thinking_done']  = (object) busy_checklists( (int) $thread->id );
 	// What each AI answer was based on, for the line under it (titles only what the viewer may see).
 	$meta = array();
 	$all  = (array) get_option( META, array() );
@@ -1398,6 +1558,9 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 					$allowed = may_propose( $ability, (array) $call->getArgs() );
 					if ( true === $allowed ) {
 						$ideas[] = add_proposal( $ability, (array) $call->getArgs(), $agent, (int) $context['thread'] );
+						$a_obj   = wp_get_ability( $ability );
+						/* translators: %s: what is proposed */
+						busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => sprintf( __( 'Prepared a suggestion: %s', 'flurfunk' ), \Flurfunk\Changes\NAME === $ability ? __( 'Change posts', 'flurfunk' ) : ( $a_obj ? $a_obj->get_label() : $ability ) ) ) );
 						$reply   = array( 'status' => 'proposed', 'note' => 'Not done yet: it appears as a card under your answer, and a person decides whether to run it.' );
 					} else {
 						$reply = array( 'status' => 'not_allowed', 'note' => sprintf( 'Not proposed: the person asking may not do this, or your limit (%s) does not allow it. Say so plainly, without a card; an administrator can change your limit under Settings → Flurfunk → AI assistants.', limit_label( $agent, (string) ( $context['channel'] ?? '' ) ) ) );
@@ -1414,6 +1577,7 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 					}
 					$response = $resolver->execute_ability( $call );
 					$done     = (array) $response->getResponse();
+					busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => step_label( $ability, (array) $call->getArgs(), $done ) ) );
 					if ( in_array( $ability, DRAFT_TOOLS, true ) && ! empty( $done['id'] ) && empty( $done['error'] ) ) {
 						$drafts[] = (int) $done['id'];
 						update_post_meta( (int) $done['id'], \Flurfunk\Drafts\AGENT, $agent );
@@ -1576,6 +1740,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 				! empty( $thread->private_to ) ? sprintf( 'This is a private conversation with %s: nobody else sees it, and you answer every message in it.', Store\person( (int) $thread->private_to )['name'] ) : ( $channel ? sprintf( 'Channel: #%s%s', $channel->slug, '' !== (string) $channel->topic ? ' – ' . $channel->topic : '' ) : '' ),
 				sprintf( 'Today is %1$s, it is %2$s (the site\'s time).', wp_date( 'l, j F Y' ), wp_date( 'H:i' ) ),
 				sprintf( 'When someone asks you to remind them, follow up or check back later ("remind us on Friday whether …"), set a check-in with flurfunk/follow-up (thread %d, when: YYYY-MM-DD HH:MM in the site\'s time, note: what to check). Without a time, pick a sensible one during working hours. Then say in one sentence when you will check back. Only when asked.', (int) $thread->id ),
+				sprintf( 'When someone asks for something to happen regularly ("every Friday at 15:00 post a summary of what is open here"), set up a routine with flurfunk/routine (thread %d, action add: a short name, the task, days, time HH:MM in the site\'s time, post: "thread" to report in this conversation or "channel" to start a new thread in the channel each time). The same tool lists, pauses, resumes and removes routines. Then confirm in one sentence with the schedule. Only when asked.', (int) $thread->id ),
 				'' !== $rules ? "Editorial guidelines of the site (follow them when you suggest wording):\n" . $rules : '',
 				profile( $agent )['instructions'] ? "Instructions from the site:\n" . profile( $agent )['instructions'] : '',
 				$channel && channel_instructions( $channel->slug ) ? "Instructions for this channel:\n" . channel_instructions( $channel->slug ) : '',
@@ -1587,7 +1752,9 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 			? ( follows( (int) $thread->id, $message_id, $asker ) === $agent
 				? sprintf( '%s wrote the last message right after your answer, without mentioning you. If it asks you something or asks for a change, answer it now. If it only thanks you or agrees (thanks, OK, great), reply with only 👍 – it is shown as your reaction on that message. If it is not meant for you (a remark to someone else), reply with only a single dash: -', $asker_name )
 				: sprintf( '%s wrote the last message in this thread, which you take part in, without mentioning you. Answer it if it is meant for you or asks something you are clearly the one to answer – briefly, like a colleague joining in. If it only thanks you or agrees, reply with only 👍 – it is shown as your reaction on that message. Otherwise reply with only a single dash: -', $asker_name ) )
-			: sprintf( '%s mentioned you in the last message of this thread. Answer now. Only if that message asks you nothing – it just thanks you, or mentions you in passing while talking to someone else – reply with a single emoji instead and nothing else: 👍 for thanks or agreement, 👀 for being mentioned in passing. It is shown as your reaction on that message.', $asker_name ) ) );
+			: ( joining()
+				? sprintf( '%s started this thread in a channel you take part in, without mentioning you; a quick check found it is something you can help with. Answer in two or three sentences, like a colleague who chips in – no list, and offer more only if it clearly helps. If on reflection it is not for you, reply with only a single dash: -', $asker_name )
+			: sprintf( '%s mentioned you in the last message of this thread. Answer now. Only if that message asks you nothing – it just thanks you, or mentions you in passing while talking to someone else – reply with a single emoji instead and nothing else: 👍 for thanks or agreement, 👀 for being mentioned in passing. It is shown as your reaction on that message.', $asker_name ) ) ) );
 	return array(
 		'system' => (string) apply_filters( 'flurfunk_ai_system', $system, $thread, $agent ),
 		'prompt' => options()['redact'] ? redact( $prompt ) : $prompt,
@@ -1992,6 +2159,15 @@ function render_section(): void {
 					<legend style="padding:0 4px;font-weight:600">#<?php echo esc_html( $c->slug ); ?></legend>
 					<p style="margin:0 0 6px"><label for="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>"><?php esc_html_e( 'Instructions', 'flurfunk' ); ?></label><br>
 						<textarea id="ff-ai-c-<?php echo esc_attr( $c->slug ); ?>" name="ai_channels[<?php echo esc_attr( $c->slug ); ?>]" rows="2" class="large-text"><?php echo esc_textarea( (string) ( $notes[ $c->slug ] ?? '' ) ); ?></textarea></p>
+					<?php $cr = routines( (string) $c->slug ); ?>
+					<?php if ( $cr ) : ?>
+						<p style="margin:0 0 6px"><b><?php esc_html_e( 'Routines', 'flurfunk' ); ?></b> <span class="description"><?php esc_html_e( '(tick to remove)', 'flurfunk' ); ?></span></p>
+						<ul style="margin:0 0 8px 1.2em;list-style:disc">
+							<?php foreach ( $cr as $rid => $r ) : ?>
+								<li><label><input type="checkbox" name="ai_unroutine[]" value="<?php echo esc_attr( $rid ); ?>"> <b><?php echo esc_html( $r['name'] ); ?></b> – <?php echo esc_html( routine_when( $r ) ); ?><?php echo ! empty( $r['paused'] ) ? ' (' . esc_html__( 'paused', 'flurfunk' ) . ')' : ''; ?></label> <span class="description"><?php echo esc_html( mb_substr( (string) $r['task'], 0, 120 ) ); ?> · <?php echo esc_html( Store\person( (int) $r['owner'] )['name'] ); ?></span></li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
 					<?php $cn = notes( (string) $c->slug ); ?>
 					<?php if ( $cn ) : ?>
 						<p style="margin:0 0 6px"><b><?php esc_html_e( 'Notes', 'flurfunk' ); ?></b> <span class="description"><?php esc_html_e( '(tick to remove)', 'flurfunk' ); ?></span></p>
@@ -2015,6 +2191,8 @@ function render_section(): void {
 							printf( esc_html__( 'This month: %1$s tokens in %2$s answers.', 'flurfunk' ), esc_html( number_format_i18n( $cu['tokens'] ) ), esc_html( number_format_i18n( $cu['requests'] ) ) );
 						?></span>
 					</p>
+					<p class="ff-ai-row" style="margin:6px 0 0"><label><input type="checkbox" name="ai_rules[<?php echo esc_attr( $c->slug ); ?>][respond]" value="1" <?php checked( $rule['respond'] ); ?>> <?php esc_html_e( 'Assistants answer new threads here unasked when they clearly can help', 'flurfunk' ); ?></label>
+						<br><span class="description"><?php esc_html_e( 'A quick check decides; most threads get nothing. Every new thread here is then sent to the AI provider for that check.', 'flurfunk' ); ?></span></p>
 				</fieldset>
 			<?php endforeach; ?>
 		</details>
@@ -2053,11 +2231,12 @@ function render_log(): void {
 						echo '' !== (string) $e['error'] ? '<span style="color:#b32d2e">' . esc_html( (string) $e['error'] ) . '</span>' : esc_html( (string) $e['model'] );
 						if ( 'summary' === ( $e['kind'] ?? '' ) ) {
 							echo '<br><small>' . esc_html__( 'Summary', 'flurfunk' ) . '</small>';
-						} elseif ( str_starts_with( (string) ( $e['kind'] ?? '' ), 'check-' ) ) {
+						} elseif ( str_starts_with( (string) ( $e['kind'] ?? '' ), 'check-' ) || 'routine' === ( $e['kind'] ?? '' ) ) {
 							$words = array(
 								'check-answer' => __( 'Quick check: for it', 'flurfunk' ),
 								'check-thanks' => __( 'Quick check: thanks (reacted)', 'flurfunk' ),
 								'check-in'     => __( 'Checked back as asked', 'flurfunk' ),
+								'routine'      => __( 'Routine', 'flurfunk' ),
 							);
 							echo '<br><small>' . esc_html( $words[ $e['kind'] ] ?? __( 'Quick check: not for it', 'flurfunk' ) ) . '</small>';
 						}
@@ -2104,14 +2283,24 @@ function save(): void {
 		$r     = (array) ( $rules_in[ $c->slug ] ?? array() );
 		$limit = sanitize_key( (string) ( $r['limit'] ?? '' ) );
 		$rule  = array(
-			'limit'  => isset( limit_roles()[ $limit ] ) ? $limit : '',
-			'budget' => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+			'limit'   => isset( limit_roles()[ $limit ] ) ? $limit : '',
+			'budget'  => max( 0, (int) ( $r['budget'] ?? 0 ) ),
+			'respond' => ! empty( $r['respond'] ),
 		);
-		if ( '' !== $rule['limit'] || $rule['budget'] ) {
+		if ( '' !== $rule['limit'] || $rule['budget'] || $rule['respond'] ) {
 			$rules[ $c->slug ] = $rule;
 		}
 	}
 	update_option( CHANNEL_RULES, $rules, false );
+	$unroutine = isset( $_POST['ai_unroutine'] ) && is_array( $_POST['ai_unroutine'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['ai_unroutine'] ) ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized right here.
+	if ( $unroutine ) {
+		$all_r = (array) get_option( ROUTINES, array() );
+		foreach ( $unroutine as $rid ) {
+			wp_clear_scheduled_hook( ROUTINE_HOOK, array( $rid ) );
+			unset( $all_r[ $rid ] );
+		}
+		update_option( ROUTINES, $all_r, false );
+	}
 	$forget = isset( $_POST['ai_forget'] ) && is_array( $_POST['ai_forget'] ) ? wp_unslash( $_POST['ai_forget'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only numbers of notes are read.
 	foreach ( $forget as $slug => $which ) {
 		$slug  = sanitize_key( (string) $slug );
@@ -2146,7 +2335,7 @@ function privacy_text(): void {
 	if ( function_exists( 'wp_add_privacy_policy_content' ) ) {
 		wp_add_privacy_policy_content(
 			__( 'Flurfunk AI assistants', 'flurfunk' ),
-			'<p>' . esc_html__( 'When someone mentions an AI assistant in a Flurfunk conversation or talks to it in a private conversation, the text of that conversation (names, messages, titles of linked posts and files and, if the site allows it, the text of posts the assistant reads) is sent to the AI provider set up under Settings → Connectors, so the assistant can answer. Only conversations in which an assistant takes part are sent. The answer is stored as a message in the conversation. Private conversations with an assistant are seen only by the person who started them (and the assistant), not by other users or the site\'s administrators in Flurfunk. If the site keeps notes per channel, what someone asks an assistant to remember is stored with that channel and sent along with the assistant\'s requests there.', 'flurfunk' ) . '</p>'
+			'<p>' . esc_html__( 'When someone mentions an AI assistant in a Flurfunk conversation or talks to it in a private conversation, the text of that conversation (names, messages, titles of linked posts and files and, if the site allows it, the text of posts the assistant reads) is sent to the AI provider set up under Settings → Connectors, so the assistant can answer. Only conversations in which an assistant takes part are sent. The answer is stored as a message in the conversation. Private conversations with an assistant are seen only by the person who started them (and the assistant), not by other users or the site\'s administrators in Flurfunk. If the site keeps notes per channel, what someone asks an assistant to remember is stored with that channel and sent along with the assistant\'s requests there. In channels where assistants answer unasked, every new thread is sent to the AI provider for a quick check whether an assistant should answer.', 'flurfunk' ) . '</p>'
 		);
 	}
 }
