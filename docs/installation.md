@@ -348,6 +348,12 @@ one it is for answers in two or three sentences, the others stay quiet. Most thr
 but each one is sent to the AI provider for the check (a few hundred tokens), so switch it on where
 questions are expected, e.g. in a proofreading or help channel.
 
+**Pages and design** (pack, off by default, for administrators): an assistant writes page drafts –
+with layouts of core blocks if asked – and proposes changes to the look (additional CSS; for block
+themes base colors and palette) as a card. The card runs with the rights of the administrator who
+clicks it, and "Undo" puts the look back as long as nobody changed it again since. Assistants
+themselves never change the theme.
+
 **Numbers and site check** (pack, off by default): an assistant checks the published content for SEO
 gaps, reads the site's numbers and keeps them per channel with a note, to compare later. WordPress
 itself gives content and comment numbers; for visits a statistics plugin has to provide them through

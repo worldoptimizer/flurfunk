@@ -2061,6 +2061,35 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/site-check
 	wp_delete_post( $in_p, true );
 	$extra_threads[] = $in_t;
 }
+// The site's look: read it, propose a change as a card an administrator applies – and undoes.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Styles\NAME ) ) {
+	$as( $team );
+	$st_now = Flurfunk\Styles\get();
+	$st_ok  = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'css' => '.wp-block-button__link { border-radius: 0; }', 'why' => 'Eckige Buttons' ) ) );
+	$st_bad = Flurfunk\Styles\validate( array( 'css' => '@import url(https://evil.example/x.css);' ) );
+	$st_bc  = Flurfunk\Styles\validate( array( 'css' => 'a{}</style><script>x</script>' ) );
+	$as( $team2 );
+	$st_ed = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team2, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'css' => 'a{color:red}' ) ) );
+	$as( $team );
+	$check( 'a change of the look can be proposed for an administrator (not for an editor); CSS with markup or imports is refused', '' !== (string) ( $st_now['theme'] ?? '' ) && true === $st_ok && is_wp_error( $st_bad ) && is_wp_error( $st_bc ) && true !== $st_ed, array( $st_ok, $st_ed ) );
+	$st_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Design' ) );
+	$st_pid = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Styles\NAME, array( 'css' => '.ff-test-look { color: #123456; }', 'why' => 'Test' ), $ai_bot, $st_t );
+	$st_snap = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
+	$st_run = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $st_pid ), array(), $team );
+	$st_css = $st_now['block_theme'] ? (string) ( Flurfunk\Styles\get()['css'] ?? '' ) : (string) wp_get_custom_css();
+	$st_after = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
+	$st_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $st_pid ), array(), $team );
+	$st_back = $st_now['block_theme'] ? (string) ( Flurfunk\Styles\get()['css'] ?? '' ) : (string) wp_get_custom_css();
+	$check( '… the card says what changes; applied with the clicker\'s rights it adds the CSS, offers undo, and undo puts it back', str_contains( (string) $st_snap['data']['sub'], 'Test' ) && null === $st_run && str_contains( $st_css, '.ff-test-look' ) && in_array( 'undo', (array) $st_after['actions'], true ) && null === $st_undo && ! str_contains( $st_back, '.ff-test-look' ), array( $st_run, $st_undo, $st_snap['data']['sub'] ?? null ) );
+	$extra_threads[] = $st_t;
+	// A page as a draft, with a layout of blocks.
+	$pg = Flurfunk\Drafts\create( array( 'title' => 'Über uns (Test)', 'type' => 'page', 'text' => "<!-- wp:columns -->\n<div class=\"wp-block-columns\"><!-- wp:column -->\n<div class=\"wp-block-column\"><!-- wp:paragraph -->\n<p>Links</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:column --></div>\n<!-- /wp:columns -->" ) );
+	$pg_p = get_post( (int) ( $pg['id'] ?? 0 ) );
+	$check( 'a page can be written as a draft, with a layout of blocks kept as it is', $pg_p && 'page' === $pg_p->post_type && 'draft' === $pg_p->post_status && str_contains( $pg_p->post_content, '<!-- wp:columns -->' ), $pg );
+	if ( $pg_p ) {
+		wp_delete_post( $pg_p->ID, true );
+	}
+}
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

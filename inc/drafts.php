@@ -28,17 +28,29 @@ const NAMES  = array( 'flurfunk/create-draft', 'flurfunk/update-draft' );
 add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\\register' );
 
 /**
- * Post types drafts can be made of: Flurfunk's post types the person may create.
+ * Post types drafts can be made of: Flurfunk's post types, and pages (to build the site with).
  *
  * @return string[]
  */
 function types(): array {
 	return array_values(
-		array_filter(
-			(array) \Flurfunk\Settings\get()['post_types'],
-			static fn ( $t ) => post_type_exists( (string) $t ) && 'attachment' !== $t
+		array_unique(
+			array_filter(
+				array_merge( (array) \Flurfunk\Settings\get()['post_types'], array( 'page' ) ),
+				static fn ( $t ) => post_type_exists( (string) $t ) && 'attachment' !== $t
+			)
 		)
 	);
+}
+
+/**
+ * The text of a draft as blocks: block markup as it is (WordPress filters it on saving, as for
+ * anyone without "unfiltered_html" – which an assistant never has), plain text converted.
+ *
+ * @param string $text Text or block markup.
+ */
+function content( string $text ): string {
+	return str_contains( $text, '<!-- wp:' ) ? trim( wp_kses_post( $text ) ) : blocks( $text );
 }
 
 /**
@@ -234,7 +246,7 @@ function create( array $input ) {
 	if ( is_wp_error( $check ) ) {
 		return $check;
 	}
-	$text = blocks( (string) ( $input['text'] ?? '' ) );
+	$text = content( (string) ( $input['text'] ?? '' ) );
 	$id   = wp_insert_post(
 		wp_slash(
 			array(
@@ -301,7 +313,7 @@ function update( array $input ) {
 		$data['post_title'] = sanitize_text_field( (string) $input['title'] );
 	}
 	if ( isset( $input['text'] ) ) {
-		$data['post_content'] = blocks( (string) $input['text'] );
+		$data['post_content'] = content( (string) $input['text'] );
 	}
 	if ( isset( $input['excerpt'] ) ) {
 		$data['post_excerpt'] = sanitize_textarea_field( (string) $input['excerpt'] );
@@ -344,7 +356,7 @@ function register(): void {
 	);
 	$text   = array(
 		'type'        => 'string',
-		'description' => __( 'The text: paragraphs separated by a blank line; "- " for lists, "## " for headings, *bold*. No HTML.', 'flurfunk' ),
+		'description' => __( 'The text: paragraphs separated by a blank line; "- " for lists, "## " for headings, *bold*. Or, for a page with a layout, WordPress block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator); it is filtered like anyone\'s without "unfiltered_html".', 'flurfunk' ),
 	);
 	wp_register_ability(
 		'flurfunk/create-draft',

@@ -299,8 +299,19 @@ function admin_read( ?bool $set = null ): bool {
  */
 function reads_as_admin( string $ability ): bool {
 	$a  = function_exists( 'wp_get_ability' ) ? wp_get_ability( $ability ) : null;
-	$ok = $a && ( str_starts_with( $ability, 'core/' ) || in_array( $ability, array( 'flurfunk/list-code', 'flurfunk/search-code', 'flurfunk/read-code' ), true ) ) && ! empty( $a->get_meta()['annotations']['readonly'] );
+	$ok = $a && ( str_starts_with( $ability, 'core/' ) || in_array( $ability, array( 'flurfunk/list-code', 'flurfunk/search-code', 'flurfunk/read-code', 'flurfunk/get-styles' ), true ) ) && ! empty( $a->get_meta()['annotations']['readonly'] );
 	return (bool) apply_filters( 'flurfunk_ai_admin_read', $ok, $ability );
+}
+
+/**
+ * May a card of this ability run with the administrator rights of the person who clicks it? Only
+ * for abilities made for it (the site's look): an assistant only proposes them, a person decides –
+ * and a limit (role, channel) still applies. The filter flurfunk_ai_admin_cards adds others.
+ *
+ * @param string $ability Ability name.
+ */
+function runs_as_admin( string $ability ): bool {
+	return (bool) apply_filters( 'flurfunk_ai_admin_cards', \Flurfunk\Styles\NAME === $ability, $ability );
 }
 
 /**
