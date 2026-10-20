@@ -334,11 +334,17 @@ function register(): void {
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
-				'properties'           => array(),
+				'properties'           => array(
+					'keys' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'string' ),
+						'description' => __( 'Only these numbers (keys); leave it out for all.', 'flurfunk' ),
+					),
+				),
 				'additionalProperties' => false,
 			),
 			'output_schema'       => array( 'type' => 'object' ),
-			'execute_callback'    => static fn () => metrics(),
+			'execute_callback'    => static fn ( $input = array() ) => empty( ( (array) $input )['keys'] ) ? metrics() : array_intersect_key( metrics(), array_flip( array_map( 'strval', (array) $input['keys'] ) ) ),
 			'permission_callback' => __NAMESPACE__ . '\\may',
 			'meta'                => $read,
 		)

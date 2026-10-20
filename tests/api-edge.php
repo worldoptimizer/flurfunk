@@ -2090,6 +2090,19 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Styles\NAME
 		wp_delete_post( $pg_p->ID, true );
 	}
 }
+// Every Flurfunk ability describes its input as an object with properties – an empty list would be
+// sent as [] and AI providers refuse the whole request.
+if ( function_exists( 'wp_get_abilities' ) ) {
+	$sc_bad = array();
+	foreach ( wp_get_abilities() as $sc_a ) {
+		$sc_s = $sc_a->get_input_schema();
+		if ( str_starts_with( $sc_a->get_name(), 'flurfunk/' ) && isset( $sc_s['properties'] ) && array() === $sc_s['properties'] ) {
+			$sc_bad[] = $sc_a->get_name();
+		}
+	}
+	$check( 'no Flurfunk ability has an empty list of properties (providers would refuse every request)', array() === $sc_bad, $sc_bad );
+}
+$check( 'reading code gets more rounds of looking things up than other questions', 8 === Flurfunk\Modules\Ai\rounds( 0 ) || 4 === Flurfunk\Modules\Ai\rounds( 0 ) );
 // Packs that share a setting: switching one off keeps what the other still needs.
 $pk_both = Flurfunk\Modules\Ai\apply_packs( array( 'posts' => false, 'drafts' => false, 'tools' => array( 'flurfunk/list-threads' ), 'proposals' => array() ), array( 'posts' => true, 'drafts' => false, 'tools' => array( 'flurfunk/list-channels', 'flurfunk/list-threads', 'flurfunk/get-thread' ), 'proposals' => array() ), array( 'lookup' ) );
 $check( 'switching "Proofreading" off while "Looking things up" stays on keeps reading posts', true === $pk_both['posts'], $pk_both );

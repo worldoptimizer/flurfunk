@@ -290,11 +290,17 @@ function register(): void {
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
-				'properties'           => array(),
+				'properties'           => array(
+					'css' => array(
+						'type'        => 'boolean',
+						'default'     => true,
+						'description' => __( 'Include the additional CSS.', 'flurfunk' ),
+					),
+				),
 				'additionalProperties' => false,
 			),
 			'output_schema'       => array( 'type' => 'object' ),
-			'execute_callback'    => static fn () => get(),
+			'execute_callback'    => static fn ( $input = array() ) => array_diff_key( get(), false === ( ( (array) $input )['css'] ?? true ) ? array( 'css' => 1 ) : array() ),
 			'permission_callback' => __NAMESPACE__ . '\\may',
 			'meta'                => array(
 				'annotations' => array(

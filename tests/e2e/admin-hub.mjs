@@ -133,16 +133,24 @@ await max.evaluate( ( [ I, T, S, P, model ] ) => {
 		tick( id, 'channels', channels );
 		tick( id, 'auto', auto );
 	};
-	set( I, 'Schreibt Entwürfe und korrigiert Beiträge', model, [ 'proofread', 'drafts', 'edits', 'lookup' ], [ 'inhalte' ], [ 'inhalte' ], 'Du betreust die Inhalte dieser Website für ihre Betreiberin. Arbeite selbstständig und knapp.' );
-	set( T, 'Hat den Zustand der Website im Blick', 'claude-haiku-5-5', [ 'tech', 'lookup' ], [ 'technik' ], [ 'technik' ], 'Du kümmerst dich um die Technik dieser Website. Sag klar, was du sehen kannst und was nicht.' );
-	set( S, 'Titel, Auszüge und Beschreibungen für Suchmaschinen', 'claude-haiku-5-5', [ 'proofread', 'edits', 'seo' ], [ 'seo' ], [ 'seo' ], 'Du kümmerst dich um SEO: Titel, Auszüge, Beschreibungen. Schlag Änderungen als Karte vor.' );
+	set( I, 'Schreibt Entwürfe, baut Seiten, pflegt das Design', model, [ 'proofread', 'drafts', 'edits', 'lookup', 'design' ], [ 'inhalte' ], [ 'inhalte' ], 'Du betreust die Inhalte und das Aussehen dieser Website für ihre Betreiberin. Arbeite selbstständig und knapp.' );
+	set( T, 'Technik, Code und Kommentare', model, [ 'tech', 'lookup', 'code', 'comments' ], [ 'technik' ], [ 'technik' ], 'Du kümmerst dich um die Technik dieser Website, ihre Plugins und die Kommentare. Sag klar, was du sehen kannst und was nicht.' );
+	set( S, 'Titel, Auszüge, Beschreibungen und die Kennzahlen', 'claude-haiku-5-5', [ 'proofread', 'edits', 'seo', 'insights' ], [ 'seo', 'inhalte' ], [ 'seo' ], 'Du kümmerst dich um SEO und die Kennzahlen: Titel, Auszüge, Beschreibungen, ob Maßnahmen wirken. Schlag Änderungen als Karte vor.' );
 	tick( P, 'channels', [ 'redaktion', 'inhalte', 'technik', 'seo' ] );
 	tick( P, 'packs', [ 'lookup', 'tasks' ] );
 }, [ INHALTE, TECHNIK, SEO, PLAN, MODEL ] );
 await max.locator( '#flurfunk-ai form [type=submit]' ).last().click();
 await max.waitForLoadState( 'domcontentloaded' );
+// The module "Comment cards" (comments as cards with buttons) on.
+await settings();
+if ( ! ( await max.locator( 'input[type=checkbox][name="modules[flurfunk/comments]"]' ).isChecked() ) ) {
+	await max.locator( 'input[type=checkbox][name="modules[flurfunk/comments]"]' ).check();
+	await max.locator( 'form:has([name="modules[flurfunk/comments]"]) [type=submit]' ).first().click();
+	await max.waitForLoadState( 'domcontentloaded' );
+}
 await app();
 const created = [];
+const devApi = ( route, body ) => max.evaluate( async ( [ r, b ] ) => ( await fetch( '/wp-json/flurfunk-dev/v1/' + r, { method: 'POST', headers: { 'X-WP-Nonce': window.flurfunkConfig.nonce, 'Content-Type': 'application/json' }, body: JSON.stringify( b ) } ) ).json(), [ route, body ] );
 
 /* ---------------------------------------------------------------- the hub */
 await step( 'The hub: every area assistant can be asked in private too, the channels are there', async () => {
@@ -153,7 +161,11 @@ await step( 'The hub: every area assistant can be asked in private too, the chan
 let tech;
 await step( 'Technik: "how is the site?" – a new thread in #technik, answered without @', async () => {
 	tech = await ask( 'technik', 'Wie geht es der Website? Welche WordPress- und PHP-Version laufen, und ist irgendwas auffällig?' );
-	return { ok: tech.msgs.length && /PHP[^.]{0,40}\d+\.\d+/.test( said( tech ) ), note: said( tech ) }; // A version number, not only the word.
+	return { ok: tech.msgs.length && /PHP[^.\n]{0,40}\d+\.\d+/.test( said( tech ) ), note: said( tech ) }; // A version number, not only the word.
+} );
+await step( 'Technik: how to extend a plugin – it searches the code and names files and lines', async () => {
+	const r = await ask( 'technik', 'Ich möchte für Flurfunk einen eigenen Slash-Befehl bauen, der eine Karte mit unseren Vereinsterminen zeigt. Wie geht das, welche Funktion und welche Hooks brauche ich? Schau bitte in den Code.', 0, { timeout: 240000 } );
+	return { ok: r.msgs.length && /flurfunk_register_provider/.test( said( r ) ) && /\.php/.test( said( r ) ), note: said( r ) };
 } );
 await step( 'Technik: plugin updates and security – it should say what it cannot see (a known limit)', async () => {
 	const r = await ask( 'technik', 'Gibt es Updates für Plugins oder Sicherheitsprobleme?', tech.id );
@@ -195,12 +207,68 @@ await step( 'SEO: posts without an excerpt – suggestions as a card', async () 
 	const c = cardOf( r );
 	return { ok: r.msgs.length && c ? true : r.msgs.length ? 'warn' : false, note: said( r ) + ( c ? ' · card: ' + clip( c.snapshot?.data?.line || c.snapshot?.title, 120 ) : ' · no card' ) };
 } );
-await step( 'Assistants hand work to each other: Inhalte asks SEO (a known limit: assistants do not wake each other)', async () => {
-	const r = await ask( 'inhalte', `<@${ INHALTE }> wenn der Entwurf zum Vereinsfest fertig ist, sag bitte <@${ SEO }> Bescheid, dass er einen Auszug dafür vorschlägt.`, 0, { timeout: 150000 } );
-	const seo = r.msgs.some( ( m ) => SEO === m.author );
-	const r2 = seo ? r : await watch( r.id, Math.max( ...r.msgs.map( ( m ) => m.id ), 0 ), { quiet: 30000 } );
-	const seoLater = r2.msgs.some( ( m ) => SEO === m.author );
-	return { ok: seo || seoLater ? true : 'warn', note: said( r ) + ( seo || seoLater ? '' : ' · SEO-KI did not react (assistants do not answer assistants)' ) };
+await step( 'Assistants hand work to each other: Inhalte writes, then hands the excerpt to SEO', async () => {
+	const r = await ask( 'inhalte', 'Schreib bitte einen kurzen Entwurf "Neue Öffnungszeiten der Geschäftsstelle" (Mo–Do 9–12 Uhr) und lass die SEO-KI direkt einen Auszug dafür vorschlagen.', 0, { timeout: 200000 } );
+	let all = r;
+	if ( ! r.msgs.some( ( m ) => SEO === m.author ) ) {
+		all = await watch( r.id, Math.max( ...r.msgs.map( ( m ) => m.id ), 0 ), { timeout: 150000 } );
+	}
+	const fromSeo = ( all.view?.messages || [] ).filter( ( m ) => SEO === m.author );
+	const meta = fromSeo.length ? ( all.view.ai_meta || {} )[ fromSeo[ 0 ].id ] || {} : {};
+	const drafts = await wp( 'posts?status=draft&search=' + encodeURIComponent( 'Öffnungszeiten' ) + '&context=edit' );
+	for ( const d of drafts || [] ) {
+		created.push( d.id );
+	}
+	return { ok: fromSeo.length && INHALTE === meta.from, note: said( r ) + ' || ' + fromSeo.map( ( m ) => 'SEO-KI: ' + clip( m.text, 300 ) ).join( ' ' ) + ' · handed over by: ' + ( NAMES[ meta.from ] || '–' ) };
+} );
+await step( 'A page with a layout: "about us" with two columns and a button, as a draft', async () => {
+	const r = await ask( 'inhalte', 'Bau mir bitte eine Seite "Über uns": links zwei Absätze über den Verein (gegründet 1987, 240 Mitglieder, Stadtteilarbeit in der Südstadt), rechts Kontakt (Geschäftsstelle, Marktstraße 4), darunter ein Button "Mitglied werden". Als Entwurf.', 0, { timeout: 240000 } );
+	const pages = await wp( 'pages?status=draft&search=' + encodeURIComponent( 'Über uns' ) + '&context=edit' );
+	for ( const pg of pages || [] ) {
+		created.push( pg.id );
+	}
+	const html = ( pages || [] ).map( ( pg ) => pg.content?.raw || '' ).join( '' );
+	return { ok: ( pages || [] ).length && /wp:columns/.test( html ) && /wp:button/.test( html ), note: said( r ) + ' · page blocks: ' + [ ...new Set( ( html.match( /wp:[a-z-]+/g ) || [] ) ) ].join( ', ' ) };
+} );
+await step( 'The look: square buttons and dark green links as a card – applied, then undone', async () => {
+	const r = await ask( 'inhalte', 'Mach bitte die Buttons auf der ganzen Seite eckig und die Links dunkelgrün.', 0, { timeout: 240000 } );
+	const c = cardOf( r );
+	if ( ! c ) {
+		return { ok: false, note: said( r ) + ' · no card' };
+	}
+	await app( 'thread:' + r.id );
+	await max.waitForSelector( '.ff-pane .ff-card', { timeout: 20000 } );
+	await max.locator( '.ff-pane .ff-card button', { hasText: /Übernehmen|Apply/ } ).last().click();
+	await sleep( 1500 );
+	const confirm = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Übernehmen|Apply|Ausführen|Run|Ja|Yes/ } ).last();
+	if ( await confirm.count() ) {
+		await confirm.click();
+	}
+	await sleep( 4000 );
+	const applied = clip( await max.locator( '.ff-pane .ff-card' ).last().innerText(), 200 );
+	const undoBtn = max.locator( '.ff-pane .ff-card button', { hasText: /Rückgängig|Undo/ } ).last();
+	let undone = '';
+	if ( await undoBtn.count() ) {
+		await undoBtn.click();
+		await sleep( 1500 );
+		const c2 = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Rückgängig|Undo|Ja|Yes/ } ).last();
+		if ( await c2.count() ) {
+			await c2.click();
+		}
+		await sleep( 4000 );
+		undone = clip( await max.locator( '.ff-pane .ff-card' ).last().innerText(), 200 );
+	}
+	await app();
+	return { ok: /border-radius|radius/i.test( JSON.stringify( c.snapshot ) ) && undone ? true : 'warn', note: said( r ) + ' · applied: ' + applied + ' · undone: ' + ( undone || 'no undo button' ) };
+} );
+await step( 'SEO: the site check, the numbers kept with a note', async () => {
+	const r = await ask( 'seo', 'Mach bitte einen SEO-Check der Website und halte die aktuellen Zahlen fest – wir fangen jetzt an, fehlende Auszüge zu ergänzen.', 0, { timeout: 200000 } );
+	return { ok: r.msgs.length && /Auszug|Beschreibung|description/i.test( said( r ) ), note: said( r ) };
+} );
+await step( 'Three weeks later (made-up numbers): did the measure help? It compares, with numbers', async () => {
+	await devApi( 'snapshot', { channel: 'seo', note: 'Vor der Auszug-Aktion', days: 21, scale: 0.7, missing: 9 } );
+	const r = await ask( 'seo', 'Hat die Auszug-Aktion etwas gebracht? Vergleich bitte mit dem Stand von vor drei Wochen ("Vor der Auszug-Aktion").', 0, { timeout: 200000 } );
+	return { ok: r.msgs.length && /%/.test( said( r ) ), note: said( r ) };
 } );
 await step( 'The overview: the organising assistant sums up what the area assistants did today', async () => {
 	const t = await api( 'threads', { private_with: PLAN, body: 'Was haben die Assistenten heute in #inhalte, #technik und #seo erledigt, und was ist noch offen? Kurz, als Liste.' } );
@@ -214,9 +282,14 @@ await step( 'A weekly site report as a routine (set up, then removed again)', as
 	const r2 = await watch( tech.id, id, { timeout: 120000 } );
 	return { ok: r.msgs.length && /Montag|8/.test( said( r ) ), note: said( r ) + ' || ' + said( r2 ) };
 } );
-await step( 'Comments waiting for approval (a known limit: no ability for comments yet)', async () => {
+await step( 'Comments waiting for approval: shown as cards with buttons, spam named', async () => {
+	const posts = await wp( 'posts?per_page=1&status=publish' );
+	for ( const [ author, content ] of [ [ 'Leserin Lea', 'Toller Artikel! Wann kommt der zweite Teil?' ], [ 'Cheap Pills', 'Best prices!!! https://spam.example/a https://spam.example/b https://spam.example/c' ] ] ) {
+		await wp( 'comments', { post: posts[ 0 ].id, author_name: author, author_email: 'x@example.test', content, status: 'hold' } );
+	}
 	const r = await ask( 'technik', 'Gibt es Kommentare, die auf Freigabe warten?', tech.id );
-	return { ok: r.msgs.length ? 'warn' : false, note: said( r ) };
+	const cards = r.msgs.flatMap( ( m ) => m.attachments || [] ).filter( ( c ) => 'flurfunk/comment' === c.provider );
+	return { ok: r.msgs.length && cards.length >= 2 && /spam/i.test( said( r ) ), note: said( r ) + ' · comment cards: ' + cards.length };
 } );
 await step( 'Site settings: "change the tagline" (by design an assistant never administers the site)', async () => {
 	const r = await ask( 'technik', 'Ändere bitte den Untertitel der Website auf "Das Vereinsblatt für die Südstadt".', tech.id );

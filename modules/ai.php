@@ -46,7 +46,7 @@ const MAX_POST_CHARS = 20000;
 // Tool use: at most this many rounds of looking things up before the answer.
 const POST_TOOLS = array( 'flurfunk/find-posts', 'flurfunk/get-post' ); // Come with "reads posts".
 const DRAFT_TOOLS = \Flurfunk\Drafts\NAMES; // Come with "writes drafts"; they run directly (only drafts, never published).
-const MAX_ROUNDS = 4;
+const MAX_ROUNDS = 4; // Rounds of looking things up per answer (more for reading code, see rounds()).
 
 require_once __DIR__ . '/ai-proposals.php';
 require_once __DIR__ . '/ai-limits.php';
@@ -1725,13 +1725,14 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 	$notes  = array(); // Comments waiting for approval it found: cards with buttons under the answer.
 	$ran    = array(); // Other tools it used (a thread it opened is in $looked, a post it read in $posts).
 	$posts  = (array) ( $context['posts'] ?? array() );
-	for ( $round = 0; $round < MAX_ROUNDS; $round++ ) {
+	$max = rounds( $agent );
+	for ( $round = 0; $round < $max; $round++ ) {
 		if ( $round ) {
 			set_busy( (int) $context['thread'], $agent, true, 'write' );
 		}
 		$builder = wp_ai_client_prompt()
 			->with_history( ...$history )
-			->using_system_instruction( $context['system'] . ( MAX_ROUNDS - 1 === $round ? "\n\nYou have looked up enough: answer now with what you have, without tools." : '' ) )
+			->using_system_instruction( $context['system'] . ( $max - 1 === $round ? "\n\nYou have looked up enough: answer now with what you have, without tools." : '' ) )
 			->using_max_tokens( (int) apply_filters( 'flurfunk_ai_max_tokens', 4000, $agent ) )
 			->using_abilities( ...$offered );
 		if ( $models ) {
@@ -1749,7 +1750,7 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 				$calls[] = $part->getFunctionCall();
 			}
 		}
-		if ( ! $calls || MAX_ROUNDS - 1 === $round ) {
+		if ( ! $calls || $max - 1 === $round ) {
 			try {
 				$text = (string) $result->toText();
 			} catch ( \Throwable $e ) {
@@ -1838,6 +1839,17 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 		}
 	}
 	return new \WP_Error( 'flurfunk_ai_rounds', __( 'I looked things up but did not get to an answer. Please ask more specifically.', 'flurfunk' ) );
+}
+
+/**
+ * How many rounds of looking things up an assistant gets for one answer: more for reading code
+ * (list, search, read, read again).
+ *
+ * @param int $agent Assistant.
+ */
+function rounds( int $agent ): int {
+	$code = (bool) array_intersect( array( 'flurfunk/search-code', 'flurfunk/read-code' ), profile( $agent )['tools'] );
+	return max( 2, (int) apply_filters( 'flurfunk_ai_rounds', $code ? 8 : MAX_ROUNDS, $agent ) );
 }
 
 /**

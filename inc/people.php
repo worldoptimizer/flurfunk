@@ -105,11 +105,10 @@ function labels(): array {
 function exceptions(): array {
 	global $wpdb;
 	$out = array();
-	// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key, WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- a handful of accounts, on the settings page only.
 	$ids = get_users(
 		array(
 			'fields'     => 'ID',
-			'meta_query' => array(
+			'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- a handful of accounts, on the settings page only.
 				array(
 					'key'     => $wpdb->get_blog_prefix() . 'capabilities',
 					'value'   => 'flurfunk_',
