@@ -35,6 +35,7 @@ const LOG_MAX  = 100;
 const META     = 'flurfunk_ai_meta';
 const META_MAX = 2000;
 const BUSY     = 'flurfunk_ai_busy_';
+const MUTED    = 'flurfunk_ai_muted'; // thread => [ assistants muted there ].
 const CAP      = 'flurfunk_use_ai';
 // How much of a thread goes to the AI: the newest messages, and at most this many characters.
 const MAX_MESSAGES = 60;
@@ -63,6 +64,7 @@ add_action( 'admin_post_flurfunk_ai', __NAMESPACE__ . '\\save' );
 add_action( 'admin_init', __NAMESPACE__ . '\\privacy_text' );
 add_filter( 'flurfunk_notify_recipients', __NAMESPACE__ . '\\quiet_answer', 10, 3 );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\routes' );
+add_action( 'flurfunk_reaction', __NAMESPACE__ . '\\thumbs_down', 10, 5 );
 
 /* -------------------------------------------------------------------------
  * Profiles
@@ -603,6 +605,62 @@ function present( int $thread_id ): array {
 }
 
 /**
+ * Is an assistant muted in a thread (a 👎 on one of its answers there)? Then it only answers when
+ * mentioned again, as with Claude Tag's thumbs-down.
+ *
+ * @param int $thread_id Thread.
+ * @param int $agent     Assistant.
+ */
+function muted( int $thread_id, int $agent ): bool {
+	return in_array( $agent, (array) ( ( (array) get_option( MUTED, array() ) )[ $thread_id ] ?? array() ), true );
+}
+
+/**
+ * Mute or unmute an assistant in a thread.
+ *
+ * @param int  $thread_id Thread.
+ * @param int  $agent     Assistant.
+ * @param bool $on        Mute.
+ */
+function mute( int $thread_id, int $agent, bool $on = true ): void {
+	$all  = (array) get_option( MUTED, array() );
+	$list = array_values( array_diff( (array) ( $all[ $thread_id ] ?? array() ), array( $agent ) ) );
+	if ( $on ) {
+		$list[] = $agent;
+	}
+	if ( $list === (array) ( $all[ $thread_id ] ?? array() ) ) {
+		return;
+	}
+	if ( $list ) {
+		$all[ $thread_id ] = $list;
+	} else {
+		unset( $all[ $thread_id ] );
+	}
+	update_option( MUTED, array_slice( $all, -500, null, true ), false );
+}
+
+/**
+ * A 👎 on an assistant's answer mutes it in that thread; taking the 👎 back unmutes it.
+ *
+ * @param object $thread     Thread row.
+ * @param int    $message_id Message (0 = the thread).
+ * @param string $emoji      Emoji.
+ * @param int    $user_id    Who reacted.
+ * @param bool   $added      Added or taken back.
+ */
+function thumbs_down( $thread, int $message_id, string $emoji, int $user_id, bool $added ): void {
+	global $wpdb;
+	if ( '1f44e' !== \Flurfunk\Reactions\key( $emoji ) || ! $message_id ) {
+		return;
+	}
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table.
+	$author = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT author_id FROM %i WHERE id = %d AND thread_id = %d', table( 'messages' ), $message_id, (int) $thread->id ) );
+	if ( $author && in_array( $author, agents(), true ) ) {
+		mute( (int) $thread->id, $author, $added );
+	}
+}
+
+/**
  * Queue a listening run for every assistant taking part in the thread (no "is thinking" yet: that
  * shows once the quick check says the message is for it).
  *
@@ -616,12 +674,16 @@ function listen( object $thread, int $message_id, int $author ): array {
 	if ( ! $channel || Access\is_bot( $author ) || ! Access\can_see( $thread, $author ) || ! apply_filters( 'flurfunk_ai_follow_ups', true, (int) $thread->id, $author ) ) {
 		return array();
 	}
+	// Guests reach an assistant by mentioning it; what they write otherwise is context, not a request.
+	if ( 'guest' === Access\kind( $author ) ) {
+		return array();
+	}
 	$queued = array();
 	// Those taking part, and the one whose answer this person writes right after (a follow-up, also
-	// when it does not stay in threads otherwise).
+	// when it does not stay in threads otherwise) – not one muted in this thread.
 	$follow = follows( (int) $thread->id, $message_id, $author );
 	foreach ( array_unique( array_merge( present( (int) $thread->id ), $follow ? array( $follow ) : array() ) ) as $agent ) {
-		if ( ! may_answer( $agent, $author, $channel, $thread ) ) {
+		if ( muted( (int) $thread->id, $agent ) || ! may_answer( $agent, $author, $channel, $thread ) ) {
 			continue;
 		}
 		$args = array( (int) $thread->id, $message_id, $agent );
@@ -634,6 +696,26 @@ function listen( object $thread, int $message_id, int $author ): array {
 		start_soon( (int) $thread->id, $message_id, $queued );
 	}
 	return $queued;
+}
+
+/**
+ * The quick check's question: the end of the thread, the assistant's name and role, the channel's
+ * notes (they may say when to answer unasked).
+ *
+ * @param object $thread Thread row.
+ * @param int    $agent  Assistant.
+ * @param array  $full   The thread as the assistant sees it.
+ */
+function check_prompt( object $thread, int $agent, array $full ): string {
+	$lines = array();
+	foreach ( array_slice( array_filter( $full['messages'], static fn ( $m ) => 'message' === $m['type'] ), -8 ) as $m ) {
+		$lines[] = line( (int) $m['author'], '', mb_substr( (string) $m['text'], 0, 400 ) );
+	}
+	$me     = Store\person( $agent )['name'];
+	$role   = profile( $agent )['role'];
+	$notes  = notes_text( channel_slug( $thread ) );
+	$prompt = sprintf( "You are %s, an AI assistant%s taking part in this team chat thread. Look at the LAST message only.\n\nANSWER – it asks you something or asks you to do something, or asks the group something you are clearly the one to answer (also a correction of or follow-up to what you said).\nTHANKS – it only thanks you or agrees with you (thanks, great, OK) right after your answer.\nNO – anything else: people talking to each other, plans, thanks to someone else, remarks.%s\n\n<thread>\n%s\n</thread>\n\nAnswer with one word: ANSWER, THANKS or NO.", $me, '' !== $role ? ' (' . $role . ')' : '', '' !== $notes ? "\n\nThe channel's notes (they may say when to answer unasked):\n" . $notes : '', implode( "\n\n", $lines ) );
+	return $prompt;
 }
 
 /**
@@ -658,13 +740,7 @@ function check_message( object $thread, int $message_id, int $agent ): string {
 	if ( is_wp_error( $full ) ) {
 		return 'no';
 	}
-	$lines = array();
-	foreach ( array_slice( array_filter( $full['messages'], static fn ( $m ) => 'message' === $m['type'] ), -8 ) as $m ) {
-		$lines[] = line( (int) $m['author'], '', mb_substr( (string) $m['text'], 0, 400 ) );
-	}
-	$me     = Store\person( $agent )['name'];
-	$role   = profile( $agent )['role'];
-	$prompt = sprintf( "You are %s, an AI assistant%s taking part in this team chat thread. Look at the LAST message only.\n\nANSWER – it asks you something or asks you to do something, or asks the group something you are clearly the one to answer (also a correction of or follow-up to what you said).\nTHANKS – it only thanks you or agrees with you (thanks, great, OK) right after your answer.\nNO – anything else: people talking to each other, plans, thanks to someone else, remarks.\n\n<thread>\n%s\n</thread>\n\nAnswer with one word: ANSWER, THANKS or NO.", $me, '' !== $role ? ' (' . $role . ')' : '', implode( "\n\n", $lines ) );
+	$prompt = check_prompt( $thread, $agent, $full );
 	// Room for a short word and whatever a model does before it (newer models think first; a limit
 	// it hits counts as an error). Small models make this a fraction of a cent.
 	$builder = wp_ai_client_prompt( options()['redact'] ? redact( $prompt ) : $prompt )->using_max_tokens( (int) apply_filters( 'flurfunk_ai_check_max_tokens', 600 ) );
@@ -739,6 +815,7 @@ function queue( object $thread, int $message_id, int $author, string $text ): ar
 		if ( ! wp_next_scheduled( HOOK, $args ) ) {
 			wp_schedule_single_event( time(), HOOK, $args );
 		}
+		mute( (int) $thread->id, $agent, false ); // Mentioned again: it takes part again.
 		set_busy( (int) $thread->id, $agent, true );
 		$queued[] = $agent;
 	}
@@ -873,6 +950,7 @@ function thread_view( array $view, object $thread, int $user_id = 0 ): array {
 			'threads' => $threads,
 			'tools'   => array_values( array_unique( $tools ) ),
 			'asker'   => (int) ( $e['asker'] ?? 0 ),
+			'model'   => (string) ( $e['model'] ?? '' ),
 		);
 	}
 	$view['ai_meta'] = (object) $meta;
@@ -892,6 +970,7 @@ function remember_meta( int $message_id, array $meta ): void {
 		'threads' => array_values( array_unique( array_map( 'intval', (array) ( $meta['threads'] ?? array() ) ) ) ),
 		'tools'   => array_values( array_unique( array_map( 'strval', (array) ( $meta['tools'] ?? array() ) ) ) ),
 		'asker'   => (int) ( $meta['asker'] ?? 0 ),
+		'model'   => mb_substr( (string) ( $meta['model'] ?? '' ), 0, 80 ),
 	);
 	update_option( META, array_slice( $all, -META_MAX, null, true ), false );
 }
@@ -1084,6 +1163,7 @@ function run( int $thread_id, int $message_id, int $agent ) {
 					'threads' => (array) ( $answer['looked'] ?? array() ),
 					'tools'   => (array) ( $answer['ran'] ?? array() ),
 					'asker'   => answering( $agent ),
+					'model'   => (string) ( $answer['model'] ?? '' ),
 				)
 			);
 		}

@@ -1078,6 +1078,10 @@ $fu_keep = array( get_user_meta( $ai_bot, 'flurfunk_ai_usage', true ), get_optio
 $fresh_rate();
 $as( $team );
 $fu_last = static fn ( int $tid ) => (int) $ai_lastm( $tid )['author'];
+$fu_last_id = static function ( int $t ) use ( $ai_bot ): int {
+	$ms = array_values( array_filter( Store\full_thread( $t, $ai_bot )['messages'], static fn ( $m ) => $ai_bot === (int) $m['author'] && 'message' === $m['type'] ) );
+	return $ms ? (int) end( $ms )['id'] : 0;
+};
 $fu_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Erste Frage" ) );
 Flurfunk\Modules\Ai\run( $fu_t, 0, $ai_bot );
 $fu_m = Store\add_message( $fu_t, array( 'body' => 'Und wie ist es am Montag?' ) );
@@ -1123,6 +1127,19 @@ $mp_r5 = Flurfunk\Modules\Ai\run( $mp_t5, $mp_th, $ai_bot );
 remove_filter( 'flurfunk_ai_pre_check', $mp_thanks );
 remove_filter( 'flurfunk_ai_pre_answer', $mp_fake2, 20 );
 $check( 'the quick check says "thanks": a 👍 on the message right away, no answer and no big model', null === $mp_r5 && $team === $fu_last( $mp_t5 ) && (bool) array_filter( Flurfunk\Reactions\for_threads( array( $mp_t5 ) )[ $mp_t5 ][ $mp_th ] ?? array(), static fn ( $r ) => in_array( $ai_bot, $r['people'], true ) ) );
+// A 👎 on its answer mutes it in that thread (as Claude Tag's thumbs-down); a mention brings it back.
+$mu_ans = (int) $fu_last_id( $fu_t );
+Flurfunk\Reactions\toggle( $fu_t, $mu_ans, '👎', $team );
+$mu_m1 = Store\add_message( $fu_t, array( 'body' => 'Und noch eine Frage dazu?' ) );
+$mu_q1 = (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mu_m1, $ai_bot ) );
+$mu_m2 = Store\add_message( $fu_t, array( 'body' => "<@$ai_bot> doch noch eine Frage" ) );
+$mu_m3 = Store\add_message( $fu_t, array( 'body' => 'Und danach?' ) );
+$check( 'a 👎 on its answer mutes the assistant in that thread; mentioning it again brings it back', Flurfunk\Modules\Ai\muted( $fu_t, $ai_bot ) === false && ! $mu_q1 && (bool) wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mu_m3, $ai_bot ) ) );
+Flurfunk\Reactions\toggle( $fu_t, $mu_ans, '👎', $team );
+Flurfunk\Reactions\toggle( $fu_t, $mu_ans, '👎', $team );
+$mu_on = Flurfunk\Modules\Ai\muted( $fu_t, $ai_bot );
+Flurfunk\Reactions\toggle( $fu_t, $mu_ans, '👎', $team );
+$check( '… and taking the 👎 back unmutes it', $mu_on && ! Flurfunk\Modules\Ai\muted( $fu_t, $ai_bot ) );
 $check( '… it does not listen to a message for someone else, after its time in the thread, or when its profile says so', ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m2, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m3, $ai_bot ) ) && ! wp_next_scheduled( 'flurfunk_ai_run', array( $fu_t, $mp_m4, $ai_bot ) ) );
 $fu_t2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Zweite Frage" ) );
 Flurfunk\Modules\Ai\run( $fu_t2, 0, $ai_bot );
@@ -1662,6 +1679,26 @@ $lk_g = Flurfunk\Modules\Ai\lookup_channels( $ai_bot, Store\create_thread( array
 $lk_i = Flurfunk\Modules\Ai\lookup_channels( $ai_bot, $lk_internal );
 Store\ensure_channel( 'ff-test', array( 'access_guests' => $lk_guests ), true );
 $check( 'looking things up: from a channel guests read only in that channel, from an internal one in all its channels', array( 'ff-test' ) === $lk_g && ! array_diff( array( 'ff-test', 'ff-test-mem' ), $lk_i ) && 2 === count( $lk_i ), array( $lk_g, $lk_i ) );
+// Guests reach an assistant only by mentioning it; channel notes reach the quick check.
+$gu_old = (string) Store\channel_by_slug( 'ff-test' )->access_guests;
+Store\ensure_channel( 'ff-test', array( 'access_guests' => 'all' ), true );
+$as( $team );
+$gu_t = Store\create_thread( array( 'channel' => 'ff-test', 'body' => "<@$ai_bot> Eine Frage" ) );
+add_filter( 'flurfunk_ai_pre_answer', $gu_fake = static fn () => array( 'text' => 'Antwort.', 'tokens' => 5 ), 20 );
+Flurfunk\Modules\Ai\run( $gu_t, 0, $ai_bot );
+remove_filter( 'flurfunk_ai_pre_answer', $gu_fake, 20 );
+$as( $guest );
+$gu_m = Store\add_message( $gu_t, array( 'body' => 'Und was meint ihr dazu?' ) );
+$as( $team );
+Store\ensure_channel( 'ff-test', array( 'access_guests' => $gu_old ), true );
+$check( 'a guest writing on without a mention does not wake the assistant (only explicit mentions do)', ! wp_next_scheduled( 'flurfunk_ai_run', array( $gu_t, $gu_m, $ai_bot ) ) );
+$np_opts = get_option( 'flurfunk_ai_settings', null );
+update_option( 'flurfunk_ai_settings', array_merge( (array) $np_opts, array( 'memory' => true ) ) );
+Flurfunk\Modules\Ai\save_notes( 'ff-test', array( array( 'text' => 'Beantworte Rechtschreibfragen auch ohne Erwähnung.', 'at' => time(), 'thread' => $gu_t ) ) );
+$np_prompt = Flurfunk\Modules\Ai\check_prompt( Store\thread_row( $gu_t ), $ai_bot, Store\full_thread( $gu_t, $ai_bot ) );
+Flurfunk\Modules\Ai\save_notes( 'ff-test', array() );
+null === $np_opts ? delete_option( 'flurfunk_ai_settings' ) : update_option( 'flurfunk_ai_settings', $np_opts );
+$check( 'the quick check reads the channel\'s notes (they can say when to answer unasked)', str_contains( $np_prompt, 'Beantworte Rechtschreibfragen auch ohne Erwähnung.' ) && str_contains( $np_prompt, 'ANSWER, THANKS or NO' ) );
 // Drafts: an assistant writes drafts (never published), with images from the conversation.
 WP_CLI::log( 'AI drafts' );
 $dr_text = "## Zwischentitel\n\nErster *fetter* Absatz.\nZweite Zeile.\n\n- eins\n- zwei\n\n<script>x</script> & https://example.org";

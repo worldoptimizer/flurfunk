@@ -766,6 +766,9 @@
 		if ( meta.asker ) {
 			parts.push( meta.asker === boot.me.id ? t( 'only you were notified' ) : t( 'only %s was notified', person( meta.asker ).name ) );
 		}
+		if ( meta.model ) {
+			parts.push( meta.model ); // Which model answered, as in Claude Tag's footer.
+		}
 		return '<p class="ff-ai-meta">' + esc( parts.join( ' · ' ) ) + '</p>';
 	};
 	const messagesHtml = ( th ) => {
