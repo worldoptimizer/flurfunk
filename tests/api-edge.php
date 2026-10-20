@@ -1262,7 +1262,18 @@ if ( function_exists( 'wp_get_ability' ) ) {
 	$gp_team = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $ai_post ) );
 	$check( 'find-posts: the latest posts, the team\'s own draft among them; search finds it', is_array( $fp_all ) && in_array( $ai_post, array_column( $fp_all, 'id' ), true ) && $ai_post === ( $fp_hit[0]['id'] ?? 0 ) && 'draft' === $fp_hit[0]['status'], $fp_hit );
 	$check( 'get-post: the text as plain text, without markup or invisible characters', is_array( $gp_team ) && str_contains( $gp_team['text'], 'Kolibris fliegen rückwärts.' ) && ! str_contains( $gp_team['text'], 'wp:paragraph' ) && str_contains( $gp_team['text'], 'Unsichtbargedreht' ), $gp_team );
+	// Pages on request (for a menu or a link): published ones with their address, a draft only for editors.
+	$fp_pg   = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'FF-Testseite Kontakt', 'post_content' => 'Hier ist der Kontakt.' ) );
+	$fp_pd   = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'draft', 'post_title' => 'FF-Testseite Entwurf', 'post_content' => 'Noch nicht fertig.' ) );
+	$fp_pgs  = wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'type' => 'page', 'search' => 'FF-Testseite' ) );
+	$fp_pst  = wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'FF-Testseite' ) );
+	$gp_pg   = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $fp_pg ) );
+	$check( 'find-posts with type page: the pages with their address; without it only posts; get-post reads a page', 2 === count( (array) $fp_pgs ) && '' !== ( array_column( (array) $fp_pgs, 'url', 'id' )[ $fp_pg ] ?? '' ) && ! in_array( $fp_pg, array_column( (array) $fp_pst, 'id' ), true ) && str_contains( (string) ( $gp_pg['text'] ?? '' ), 'Kontakt' ), array( $fp_pgs, $gp_pg ) );
 	$as( $guest );
+	$fp_gpg = array_column( (array) wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'type' => 'page', 'search' => 'FF-Testseite' ) ), 'id' );
+	$check( '… a guest finds the published page, not the draft', in_array( $fp_pg, $fp_gpg, true ) && ! in_array( $fp_pd, $fp_gpg, true ) && is_wp_error( wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $fp_pd ) ) ), $fp_gpg );
+	wp_delete_post( $fp_pg, true );
+	wp_delete_post( $fp_pd, true );
 	$fp_g = wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'search' => 'KI-Entwurf' ) );
 	$gp_g = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $ai_post ) );
 	$check( '… a guest finds and reads only their own posts', is_array( $fp_g ) && ! in_array( $ai_post, array_column( $fp_g, 'id' ), true ) && is_wp_error( $gp_g ) && in_array( $guest_post, array_column( (array) wp_get_ability( 'flurfunk/find-posts' )->execute( array( 'limit' => 20, 'search' => get_the_title( $guest_post ) ) ), 'id' ), true ) );
@@ -2115,6 +2126,20 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Templates\N
 		$check( 'a template part (the footer) is changed by a card an administrator applies – without the script – and undo brings back the theme\'s own', true === $tp_ok && is_wp_error( $tp_miss ) && null === $tp_run && str_contains( $tp_now, 'FF-Test-Fuss' ) && ! str_contains( $tp_now, '<script' ) && null === $tp_undo && ! str_contains( $tp_back, 'FF-Test-Fuss' ), array( $tp_run, $tp_undo, $tp_foot['id'] ) );
 		$extra_threads[] = $tp_t;
 	}
+	// The menu: listed with the templates, changed by a card (a page list becomes chosen links), undone.
+	$nv_id   = wp_insert_post( array( 'post_type' => 'wp_navigation', 'post_status' => 'publish', 'post_title' => 'FF-Test-Menü', 'post_content' => '<!-- wp:page-list /-->' ) );
+	$nv_list = wp_list_pluck( array_filter( (array) Flurfunk\Templates\get( array() ), static fn ( $t ) => 'wp_navigation' === ( $t['type'] ?? '' ) ), 'id' );
+	$nv_in   = array( 'id' => (string) $nv_id, 'type' => 'wp_navigation', 'find' => '<!-- wp:page-list /-->', 'replace' => '<!-- wp:navigation-link {"label":"Über uns","url":"/ueber-uns/","kind":"custom"} /--><script>x</script>', 'why' => 'Test' );
+	$nv_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Menü' ) );
+	$nv_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Templates\NAME, $nv_in, $ai_bot, $nv_t );
+	$nv_snap = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $nv_pid ) );
+	$nv_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $nv_pid ), array(), $team );
+	$nv_now  = (string) get_post( $nv_id )->post_content;
+	$nv_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $nv_pid ), array(), $team );
+	$nv_back = (string) get_post( $nv_id )->post_content;
+	$check( 'a navigation menu is listed with the templates, changed by a card (without the script) and undone', in_array( (string) $nv_id, $nv_list, true ) && str_contains( (string) ( $nv_snap['title'] ?? '' ), 'FF-Test-Menü' ) && null === $nv_run && str_contains( $nv_now, 'Über uns' ) && ! str_contains( $nv_now, '<script' ) && null === $nv_undo && '<!-- wp:page-list /-->' === $nv_back, array( $nv_run, $nv_undo, $nv_now, $nv_back, $nv_snap['title'] ?? '' ) );
+	wp_delete_post( $nv_id, true );
+	$extra_threads[] = $nv_t;
 	// The card says what happens to the visible text, not the block comments around it.
 	$tp_sum = array(
 		Flurfunk\Templates\summary( array( 'find' => '<!-- /wp:group -->', 'replace' => '<!-- /wp:group --><!-- wp:paragraph --><p>© 2026 Verein</p><!-- /wp:paragraph -->' ) ),
@@ -2135,6 +2160,9 @@ if ( function_exists( 'wp_get_abilities' ) ) {
 		}
 	}
 	$check( 'no Flurfunk ability has an empty list of properties (providers would refuse every request)', array() === $sc_bad, $sc_bad );
+}
+if ( function_exists( 'wp_ai_client_prompt' ) ) {
+	$check( 'an answer waits longer for the AI provider than WordPress\'s 30 seconds (the prompt still builds)', is_object( Flurfunk\Modules\Ai\patient( wp_ai_client_prompt( 'x' ), 0 ) ) );
 }
 $check( 'reading code or templates gets more rounds of looking things up than other questions', in_array( Flurfunk\Modules\Ai\rounds( 0 ), array( 4, 8 ), true ) );
 // Packs that share a setting: switching one off keeps what the other still needs.

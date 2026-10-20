@@ -306,6 +306,41 @@ await step( 'The theme: a line in the footer as a template card – applied, the
 	await app();
 	return { ok: shown && undone ? true : 'warn', note: said( r ) + ' · applied: ' + applied + ' · on the site: ' + ( shown ? 'yes' : 'no' ) + ' · undone: ' + ( undone || 'no undo button' ) };
 } );
+await step( 'The menu: only two chosen links instead of all pages, as a card – applied, then undone', async () => {
+	const menu = ( ( await wp( 'navigation?context=edit&per_page=1&orderby=date&order=desc' ) ) || [] )[ 0 ];
+	const r = await ask( 'inhalte', 'Im Menü oben sollen nur noch "Startseite" und "Über uns" stehen, in dieser Reihenfolge – nicht mehr alle Seiten.', 0, { timeout: 240000 } );
+	const c = cardOf( r );
+	if ( ! c ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	await app( 'thread:' + r.id );
+	await max.waitForSelector( '.ff-pane .ff-card', { timeout: 20000 } );
+	await max.locator( '.ff-pane .ff-card button', { hasText: /Übernehmen|Apply/ } ).last().click();
+	await sleep( 1500 );
+	const confirm = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Übernehmen|Apply|Ausführen|Run|Ja|Yes/ } ).last();
+	if ( await confirm.count() ) {
+		await confirm.click();
+	}
+	await sleep( 4000 );
+	const applied = clip( await max.locator( '.ff-pane .ff-card' ).last().innerText(), 200 );
+	const after = menu ? ( await wp( 'navigation/' + menu.id + '?context=edit' ) )?.content?.raw || '' : '';
+	const undoBtn = max.locator( '.ff-pane .ff-card button', { hasText: /Rückgängig|Undo/ } ).last();
+	let undone = '';
+	if ( await undoBtn.count() ) {
+		await undoBtn.click();
+		await sleep( 1500 );
+		const c2 = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Rückgängig|Undo|Ja|Yes/ } ).last();
+		if ( await c2.count() ) {
+			await c2.click();
+		}
+		await sleep( 4000 );
+		undone = clip( await max.locator( '.ff-pane .ff-card' ).last().innerText(), 200 );
+	}
+	const back = menu ? ( await wp( 'navigation/' + menu.id + '?context=edit' ) )?.content?.raw || '' : '';
+	await app();
+	const links = ( after.match( /"label":"[^"]+"/g ) || [] ).join( ', ' );
+	return { ok: /wp:navigation-link|wp:home-link/.test( after ) && ! /wp:page-list/.test( after ) && back === menu?.content?.raw ? true : 'warn', note: said( r ) + ' · applied: ' + applied + ' · menu: ' + ( links || clip( after, 160 ) ) + ' · undone: ' + ( undone ? 'yes, back to: ' + clip( back, 80 ) : 'no undo button' ) };
+} );
 await step( 'SEO: the site check, the numbers kept with a note', async () => {
 	const r = await ask( 'seo', 'Mach bitte einen SEO-Check der Website und halte die aktuellen Zahlen fest – wir fangen jetzt an, fehlende Auszüge zu ergänzen.', 0, { timeout: 200000 } );
 	return { ok: r.msgs.length && /Auszug|Beschreibung|description/i.test( said( r ) ), note: said( r ) };

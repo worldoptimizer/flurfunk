@@ -1187,6 +1187,9 @@ function step_label( string $ability, array $args, array $result ): string {
 			/* translators: %s: draft title */
 			return sprintf( __( 'Changed the draft "%s"', 'flurfunk' ), (string) ( $result['title'] ?? '' ) );
 		case 'flurfunk/get-templates':
+			if ( 'wp_navigation' === ( $args['type'] ?? '' ) ) {
+				return __( 'Read the menu', 'flurfunk' );
+			}
 			return empty( $args['id'] ) ? __( 'Looked at the theme\'s templates', 'flurfunk' ) : sprintf( /* translators: %s: template */ __( 'Read the template %s', 'flurfunk' ), (string) $args['id'] );
 		case 'flurfunk/get-styles':
 			return __( 'Looked at the site\'s look', 'flurfunk' );
@@ -1671,9 +1674,12 @@ function answer( object $thread, int $message_id, int $agent, ?array $context = 
 	if ( ( $tools || proposal_abilities( $agent ) ) && class_exists( 'WP_AI_Client_Ability_Function_Resolver' ) ) {
 		return answer_with_tools( $context, $agent, $tools, $models );
 	}
-	$builder = wp_ai_client_prompt( $context['prompt'] )
-		->using_system_instruction( $context['system'] )
-		->using_max_tokens( (int) apply_filters( 'flurfunk_ai_max_tokens', 4000, $agent ) );
+	$builder = patient(
+		wp_ai_client_prompt( $context['prompt'] )
+			->using_system_instruction( $context['system'] )
+			->using_max_tokens( (int) apply_filters( 'flurfunk_ai_max_tokens', 4000, $agent ) ),
+		$agent
+	);
 	if ( $models ) {
 		$builder = $builder->using_model_preference( ...$models );
 	}
@@ -1732,11 +1738,14 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 		if ( $round ) {
 			set_busy( (int) $context['thread'], $agent, true, 'write' );
 		}
-		$builder = wp_ai_client_prompt()
-			->with_history( ...$history )
-			->using_system_instruction( $context['system'] . ( $max - 1 === $round ? "\n\nYou have looked up enough: answer now with what you have, without tools." : '' ) )
-			->using_max_tokens( (int) apply_filters( 'flurfunk_ai_max_tokens', 4000, $agent ) )
-			->using_abilities( ...$offered );
+		$builder = patient(
+			wp_ai_client_prompt()
+				->with_history( ...$history )
+				->using_system_instruction( $context['system'] . ( $max - 1 === $round ? "\n\nYou have looked up enough: answer now with what you have, without tools." : '' ) )
+				->using_max_tokens( (int) apply_filters( 'flurfunk_ai_max_tokens', 4000, $agent ) )
+				->using_abilities( ...$offered ),
+			$agent
+		);
 		if ( $models ) {
 			$builder = $builder->using_model_preference( ...$models );
 		}
@@ -1841,6 +1850,24 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 		}
 	}
 	return new \WP_Error( 'flurfunk_ai_rounds', __( 'I looked things up but did not get to an answer. Please ask more specifically.', 'flurfunk' ) );
+}
+
+/**
+ * Give an answer time: WordPress waits 30 seconds for the AI provider by default, and an answer
+ * that writes a page, a template or a long correction with tools can take longer before its first
+ * byte. Answers run in the background (WP-Cron), so waiting does not block anyone.
+ *
+ * @param \WP_AI_Client_Prompt_Builder $builder Prompt.
+ * @param int                         $agent   Assistant.
+ * @return \WP_AI_Client_Prompt_Builder
+ */
+function patient( $builder, int $agent ) {
+	$options = '\\WordPress\\AiClient\\Providers\\Http\\DTO\\RequestOptions';
+	if ( ! class_exists( $options ) ) {
+		return $builder;
+	}
+	$seconds = (float) apply_filters( 'flurfunk_ai_timeout', 120, $agent );
+	return $builder->using_request_options( $options::fromArray( array( $options::KEY_TIMEOUT => max( 30.0, $seconds ) ) ) );
 }
 
 /**
@@ -2041,7 +2068,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 						: sprintf( 'You work with the rights of %1$s, the person asking, but at most with what the role %2$s may on this site (your limit here), and never administer the site (users, plugins, settings). What that limit may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit (%2$s), and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, '"' . limit_label( $agent, channel_slug( $thread ) ) . '"' ) )
 					: '',
 				profile( $agent )['drafts'] && function_exists( 'wp_get_ability' ) && wp_get_ability( DRAFT_TOOLS[0] ) ? 'You can write drafts: flurfunk/create-draft makes one (never published; the person asking is its author), flurfunk/update-draft changes a draft made that way as long as nobody else has worked on it since. Use them when the person asks for a draft, an article, a text for the site or changes to the draft you wrote; do it, do not just announce it. Then say in one sentence what you wrote – a card with the draft appears under your answer. Write the text plainly: paragraphs separated by a blank line, "- " for lists, "## " for subheadings, no HTML. Files in the thread are shown as [File #ID: name]; when the person wants an image in the draft, pass its ID as featured_image (the main picture) or in images. If adding an image is refused, write the draft without it and say why. You can never publish; say so if asked.' : '',
-				in_array( 'flurfunk/get-styles', profile( $agent )['tools'], true ) ? 'For the site\'s look: read it with flurfunk/get-styles first. To change colors or add CSS, call flurfunk/update-styles with only what changes and a short why – it becomes a card the person applies and can undo. Keep CSS small and scoped to the theme\'s blocks and classes; never hide content, never import anything. For a new page, write a draft of type page; for a layout use block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator) with the theme\'s palette colors. To change the header, footer or a page template of a block theme: list them with flurfunk/get-templates, read the one you need (id), then propose flurfunk/update-template with an exact find and replace in its block markup – small and precise. Classic themes keep templates in files: suggest a child theme instead.' : '',
+				in_array( 'flurfunk/get-styles', profile( $agent )['tools'], true ) ? 'For the site\'s look: read it with flurfunk/get-styles first. To change colors or add CSS, call flurfunk/update-styles with only what changes and a short why – it becomes a card the person applies and can undo. Keep CSS small and scoped to the theme\'s blocks and classes; never hide content, never import anything. For a new page, write a draft of type page; for a layout use block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator) with the theme\'s palette colors. To change the header, footer or a page template of a block theme: list them with flurfunk/get-templates, read the one you need (id), then propose flurfunk/update-template with an exact find and replace in its block markup – small and precise. The menu is a navigation menu in the same list (type wp_navigation): a page list in it shows every published page by itself, so publishing a page adds it; to choose the links or their order, propose flurfunk/update-template on the menu (its id, type wp_navigation) with navigation-link blocks – look up the pages' addresses with flurfunk/find-posts, type page, instead of guessing them. Classic themes keep templates in files: suggest a child theme instead.' : '',
 				in_array( 'flurfunk/metrics', profile( $agent )['tools'], true ) ? sprintf( 'For the site\'s state and SEO: flurfunk/site-check finds gaps in the content, flurfunk/metrics gives the numbers (what a statistics plugin provides, if any – say so if visits are missing). Keep the numbers with flurfunk/snapshot (thread %d, action take, a note what was done or planned) when someone starts a measure or asks to, and compare later (action compare, since: the number from list) to say whether it helped – changes, not guesses; say when a change may have other causes.', (int) $thread->id ) : '',
 				in_array( 'flurfunk/search-code', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'To explain how a plugin or theme works or how to extend it: find it with flurfunk/list-code, search its code with flurfunk/search-code (hook names, functions, classes), read the relevant lines with flurfunk/read-code. Name file and line. To extend something, suggest a small separate plugin or a snippet using its hooks – never changes to its own files, which an update would overwrite. You cannot change files.' : '',
 				in_array( 'flurfunk/list-comments', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'For comments: find them with flurfunk/list-comments. Those waiting for approval appear as cards with buttons to approve, mark as spam or trash under your answer, so do not list them all again – say briefly which look like spam and why (many links, off-topic, generic praise) and which deserve an answer. To answer one, call flurfunk/reply-comment; it becomes a card too.' : '',

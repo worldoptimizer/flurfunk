@@ -357,7 +357,7 @@ function register(): void {
 		'flurfunk/find-posts',
 		array(
 			'label'               => __( 'Find posts', 'flurfunk' ),
-			'description'         => __( 'Posts of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author, the address of published ones and the first words; read one with flurfunk/get-post.', 'flurfunk' ),
+			'description'         => __( 'Posts (or, with type page, pages) of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author, the address of published ones and the first words; read one with flurfunk/get-post.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -383,6 +383,12 @@ function register(): void {
 						'maximum' => 20,
 						'default' => 10,
 					),
+					'type'   => array(
+						'type'        => 'string',
+						'enum'        => array( 'post', 'page' ),
+						'default'     => 'post',
+						'description' => __( 'page: the site\'s pages instead of its posts (e.g. their addresses for a menu or a link).', 'flurfunk' ),
+					),
 				),
 				'additionalProperties' => false,
 			),
@@ -396,7 +402,7 @@ function register(): void {
 				$status = (string) ( $input['status'] ?? 'any' );
 				$limit  = max( 1, min( 20, (int) ( $input['limit'] ?? 10 ) ) );
 				$args   = array(
-					'post_type'           => \Flurfunk\Settings\get()['post_types'],
+					'post_type'           => 'page' === ( $input['type'] ?? '' ) ? array( 'page' ) : \Flurfunk\Settings\get()['post_types'],
 					'post_status'         => in_array( $status, array( 'publish', 'draft', 'pending', 'future' ), true ) ? array( $status ) : array( 'publish', 'future', 'draft', 'pending', 'private' ),
 					'posts_per_page'      => $limit * 3, // Some may not be visible to this person.
 					'orderby'             => 'modified' === ( $input['order'] ?? '' ) ? 'modified' : 'date',
@@ -451,7 +457,7 @@ function register(): void {
 		'flurfunk/get-post',
 		array(
 			'label'               => __( 'Read a post', 'flurfunk' ),
-			'description'         => __( 'The text of one post (as plain text, without markup), if the current user may see it – drafts only for those who may edit them.', 'flurfunk' ),
+			'description'         => __( 'The text of one post or page (as plain text, without markup), if the current user may see it – drafts only for those who may edit them.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -468,7 +474,7 @@ function register(): void {
 			'execute_callback'    => static function ( $input = array() ) {
 				$uid = get_current_user_id();
 				$p   = get_post( (int) ( (array) $input )['id'] );
-				$ok  = $p && in_array( $p->post_type, \Flurfunk\Settings\get()['post_types'], true ) && \Flurfunk\Providers\visible_post( $p, $uid ) && user_can( $uid, 'read_post', $p->ID )
+				$ok  = $p && in_array( $p->post_type, array_merge( \Flurfunk\Settings\get()['post_types'], array( 'page' ) ), true ) && \Flurfunk\Providers\visible_post( $p, $uid ) && user_can( $uid, 'read_post', $p->ID )
 					&& ( 'team' === Access\kind( $uid ) || 'publish' === $p->post_status || in_array( $p->ID, Access\owned_post_ids( $uid ), true ) );
 				if ( ! $ok ) {
 					return new \WP_Error( 'flurfunk_forbidden', __( 'This post does not exist or you may not see it.', 'flurfunk' ), array( 'status' => 404 ) );

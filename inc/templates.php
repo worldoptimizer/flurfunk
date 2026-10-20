@@ -1,8 +1,8 @@
 <?php
 /**
- * The templates of a block theme – the page templates and the parts like header and footer: read,
- * and changed by a person who may edit the theme's options (an AI assistant only proposes it, as a
- * card the person applies and can undo).
+ * The templates of a block theme – the page templates, the parts like header and footer, and the
+ * navigation menus: read, and changed by a person who may edit the theme's options (an AI assistant
+ * only proposes it, as a card the person applies and can undo).
  *
  * A change saves the site's own copy of the template, as the Site Editor does; "undo" puts back the
  * state before – the theme's original again, or the copy before – unless it was changed since. What
@@ -21,23 +21,51 @@ const NAME = 'flurfunk/update-template';
 
 add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\\register' );
 
+const TYPES = array( 'wp_template_part', 'wp_template', 'wp_navigation' );
+
 /**
- * REST base of a template type.
+ * The type asked for (a template part if none).
  *
- * @param string $type wp_template or wp_template_part.
+ * @param mixed $type Input.
  */
-function route( string $type ): string {
-	return 'wp_template' === $type ? '/wp/v2/templates/' : '/wp/v2/template-parts/';
+function type( $type ): string {
+	return in_array( $type, TYPES, true ) ? (string) $type : 'wp_template_part';
 }
 
 /**
- * One template.
+ * REST base of a template type.
  *
- * @param string $id   "theme//slug".
- * @param string $type wp_template or wp_template_part.
+ * @param string $type wp_template, wp_template_part or wp_navigation.
+ */
+function route( string $type ): string {
+	return array(
+		'wp_template'      => '/wp/v2/templates/',
+		'wp_template_part' => '/wp/v2/template-parts/',
+		'wp_navigation'    => '/wp/v2/navigation/',
+	)[ type( $type ) ];
+}
+
+/**
+ * One template – or a navigation menu, in the same shape.
+ *
+ * @param string $id   "theme//slug", or the menu's post ID.
+ * @param string $type wp_template, wp_template_part or wp_navigation.
  */
 function one( string $id, string $type ): ?\WP_Block_Template {
-	return function_exists( 'get_block_template' ) ? get_block_template( $id, 'wp_template' === $type ? 'wp_template' : 'wp_template_part' ) : null;
+	if ( 'wp_navigation' === $type ) {
+		$post = get_post( (int) $id );
+		if ( ! $post || 'wp_navigation' !== $post->post_type || 'trash' === $post->post_status ) {
+			return null;
+		}
+		$t          = new \WP_Block_Template();
+		$t->id      = (string) $post->ID;
+		$t->type    = 'wp_navigation';
+		$t->title   = '' !== $post->post_title ? $post->post_title : __( 'Navigation', 'flurfunk' );
+		$t->content = $post->post_content;
+		$t->source  = 'custom';
+		return $t;
+	}
+	return function_exists( 'get_block_template' ) ? get_block_template( $id, type( $type ) ) : null;
 }
 
 /**
@@ -50,7 +78,7 @@ function get( array $input ) {
 	if ( ! wp_is_block_theme() ) {
 		return new \WP_Error( 'flurfunk_templates', __( 'This theme is not a block theme: its templates are files, which cannot be changed here.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
-	$type = 'wp_template' === ( $input['type'] ?? '' ) ? 'wp_template' : 'wp_template_part';
+	$type = type( $input['type'] ?? '' );
 	if ( ! empty( $input['id'] ) ) {
 		$t = one( (string) $input['id'], $type );
 		if ( ! $t ) {
@@ -77,6 +105,27 @@ function get( array $input ) {
 				)
 			);
 		}
+	}
+	// The menus: a navigation block without "ref" shows the most recently published one.
+	$menus = get_posts(
+		array(
+			'post_type'      => 'wp_navigation',
+			'post_status'    => 'publish',
+			'posts_per_page' => 20,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		)
+	);
+	foreach ( $menus as $i => $m ) {
+		$out[] = array_filter(
+			array(
+				'id'     => (string) $m->ID,
+				'type'   => 'wp_navigation',
+				'title'  => $m->post_title,
+				'area'   => 0 === $i ? 'navigation (shown where a navigation block has no ref)' : 'navigation',
+				'source' => 'custom',
+			)
+		);
 	}
 	return $out;
 }
@@ -142,7 +191,7 @@ function validate( array $input ) {
 	if ( ! wp_is_block_theme() ) {
 		return new \WP_Error( 'flurfunk_templates', __( 'This theme is not a block theme: its templates are files, which cannot be changed here.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
-	$new = changed( $input, one( (string) ( $input['id'] ?? '' ), (string) ( $input['type'] ?? '' ) ) );
+	$new = changed( $input, one( (string) ( $input['id'] ?? '' ), type( $input['type'] ?? '' ) ) );
 	return is_wp_error( $new ) ? $new : true;
 }
 
@@ -153,7 +202,7 @@ function validate( array $input ) {
  * @return array|\WP_Error What changed, and what undo needs.
  */
 function update( array $input ) {
-	$type = 'wp_template' === ( $input['type'] ?? '' ) ? 'wp_template' : 'wp_template_part';
+	$type = type( $input['type'] ?? '' );
 	$t    = one( (string) ( $input['id'] ?? '' ), $type );
 	$new  = changed( $input, $t );
 	if ( is_wp_error( $new ) ) {
@@ -189,15 +238,15 @@ function undo( array $undo ) {
 	if ( ! current_user_can( 'edit_theme_options' ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot do this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
-	$t = one( (string) ( $undo['id'] ?? '' ), (string) ( $undo['type'] ?? '' ) );
+	$t = one( (string) ( $undo['id'] ?? '' ), type( $undo['type'] ?? '' ) );
 	if ( ! $t || md5( (string) $t->content ) !== (string) ( $undo['after'] ?? '' ) ) {
 		return new \WP_Error( 'flurfunk_templates', __( 'The template was changed again since; nothing was undone.', 'flurfunk' ), array( 'status' => 409 ) );
 	}
 	if ( 'theme' === ( $undo['source'] ?? '' ) ) {
 		// It was the theme's original: remove the site's copy (as "reset" in the Site Editor).
-		$res = rest_do_request( new \WP_REST_Request( 'DELETE', route( (string) $undo['type'] ) . $t->id ) );
+		$res = rest_do_request( new \WP_REST_Request( 'DELETE', route( type( $undo['type'] ) ) . $t->id ) );
 	} else {
-		$req = new \WP_REST_Request( 'POST', route( (string) $undo['type'] ) . $t->id );
+		$req = new \WP_REST_Request( 'POST', route( type( $undo['type'] ) ) . $t->id );
 		$req->set_body_params( array( 'content' => (string) $undo['before'] ) );
 		$res = rest_do_request( $req );
 	}
@@ -221,11 +270,11 @@ function register(): void {
 	$which = array(
 		'id'   => array(
 			'type'        => 'string',
-			'description' => __( 'The template\'s ID, e.g. "twentytwentyfive//footer".', 'flurfunk' ),
+			'description' => __( 'The template\'s ID, e.g. "twentytwentyfive//footer", or a navigation menu\'s post ID.', 'flurfunk' ),
 		),
 		'type' => array(
 			'type'    => 'string',
-			'enum'    => array( 'wp_template_part', 'wp_template' ),
+			'enum'    => TYPES,
 			'default' => 'wp_template_part',
 		),
 	);
@@ -233,7 +282,7 @@ function register(): void {
 		'flurfunk/get-templates',
 		array(
 			'label'               => __( 'Read the theme\'s templates', 'flurfunk' ),
-			'description'         => __( 'Without an ID: the templates and template parts (header, footer, …) of the active block theme, with where each comes from (the theme, or the site\'s own copy). With an ID: its block markup.', 'flurfunk' ),
+			'description'         => __( 'Without an ID: the templates and template parts (header, footer, …) of the active block theme, with where each comes from (the theme, or the site\'s own copy), and the navigation menus (a navigation block without "ref" shows the newest; a page list in it adds every published page by itself). With an ID: its block markup.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -257,7 +306,7 @@ function register(): void {
 		NAME,
 		array(
 			'label'               => __( 'Change a template', 'flurfunk' ),
-			'description'         => __( 'Changes a template or template part of the active block theme: an exact replacement in its block markup (find, replace), or new markup (content). Saves the site\'s own copy, as the Site Editor does; can be undone. Scripts are filtered out.', 'flurfunk' ),
+			'description'         => __( 'Changes a template, template part or navigation menu of the active block theme: an exact replacement in its block markup (find, replace), or new markup (content). Saves the site\'s own copy, as the Site Editor does; can be undone. Scripts are filtered out.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',

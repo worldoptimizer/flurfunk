@@ -356,8 +356,9 @@ function build_snapshot( array $p ): array {
 	} elseif ( \Flurfunk\Templates\NAME === $p['ability'] ) {
 		$tpl   = \Flurfunk\Templates\one( (string) ( $in['id'] ?? '' ), (string) ( $in['type'] ?? '' ) );
 		$kind  = 'action';
-		/* translators: %s: template name, e.g. Footer */
-		$line  = sprintf( __( 'Change the template "%s"', 'flurfunk' ), $tpl ? (string) $tpl->title : (string) ( $in['id'] ?? '' ) );
+		$name  = $tpl ? (string) $tpl->title : (string) ( $in['id'] ?? '' );
+		/* translators: %s: menu name, e.g. Navigation */
+		$line  = 'wp_navigation' === ( $in['type'] ?? '' ) ? sprintf( __( 'Change the menu "%s"', 'flurfunk' ), $name ) : sprintf( /* translators: %s: template name, e.g. Footer */ __( 'Change the template "%s"', 'flurfunk' ), $name );
 		$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), \Flurfunk\Templates\summary( $in ) ) ) );
 		$run   = __( 'Apply', 'flurfunk' );
 		$extra = isset( $in['content'] ) ? (string) $in['content'] : (string) ( $in['replace'] ?? '' );

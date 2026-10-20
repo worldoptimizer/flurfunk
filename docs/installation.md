@@ -352,8 +352,8 @@ questions are expected, e.g. in a proofreading or help channel.
 with layouts of core blocks if asked – and proposes changes to the look (additional CSS; for block
 themes base colors and palette) as a card. The card runs with the rights of the administrator who
 clicks it, and "Undo" puts the look back as long as nobody changed it again since. For block themes the same
-goes for templates and parts like header and footer (saved as the site's own copy, as in the Site
-Editor; undo resets to the theme's own). What an assistant writes is always filtered – no scripts –
+goes for templates and parts like header and footer and for the navigation menus (saved as the site's
+own copy, as in the Site Editor; undo resets to the theme's own). What an assistant writes is always filtered – no scripts –
 even when an administrator applies it. Assistants themselves never change the theme.
 
 **Numbers and site check** (pack, off by default): an assistant checks the published content for SEO
