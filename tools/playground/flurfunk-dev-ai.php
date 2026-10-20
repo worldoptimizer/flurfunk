@@ -135,5 +135,41 @@ add_action(
 				},
 			)
 		);
+		// A channel's newest routine run now instead of at its time (or all its routines removed), to
+		// try a weekly report without waiting a week.
+		register_rest_route(
+			'flurfunk-dev/v1',
+			'/routine',
+			array(
+				'methods'             => 'POST',
+				'permission_callback' => static fn () => current_user_can( 'manage_options' ),
+				'callback'            => static function ( WP_REST_Request $r ) {
+					$slug = sanitize_key( (string) $r['channel'] );
+					$mine = Flurfunk\Modules\Ai\routines( $slug );
+					if ( ! empty( $r['remove'] ) ) {
+						$all = (array) get_option( Flurfunk\Modules\Ai\ROUTINES, array() );
+						foreach ( array_keys( $mine ) as $id ) {
+							unset( $all[ $id ] );
+							wp_clear_scheduled_hook( Flurfunk\Modules\Ai\ROUTINE_HOOK, array( $id ) );
+						}
+						update_option( Flurfunk\Modules\Ai\ROUTINES, $all, false );
+						return array( 'removed' => count( $mine ) );
+					}
+					$id = array_key_last( $mine );
+					if ( null === $id ) {
+						return new WP_Error( 'flurfunk_dev', 'No routine in this channel.', array( 'status' => 404 ) );
+					}
+					$before = count( Flurfunk\Insights\snapshots( $slug ) );
+					Flurfunk\Modules\Ai\run_routine( (string) $id );
+					return array(
+						'id'               => $id,
+						'thread'           => (int) $mine[ $id ]['thread'],
+						'post'             => (string) $mine[ $id ]['post'],
+						'snapshots_before' => $before,
+						'snapshots_after'  => count( Flurfunk\Insights\snapshots( $slug ) ),
+					);
+				},
+			)
+		);
 	}
 );

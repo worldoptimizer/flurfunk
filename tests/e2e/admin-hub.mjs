@@ -315,6 +315,27 @@ await step( 'Three weeks later (made-up numbers): did the measure help? It compa
 	const r = await ask( 'seo', 'Hat die Auszug-Aktion etwas gebracht? Vergleich bitte mit dem Stand von vor drei Wochen ("Vor der Auszug-Aktion").', 0, { timeout: 200000 } );
 	return { ok: r.msgs.length && /%/.test( said( r ) ), note: said( r ) };
 } );
+await step( 'Monitoring: a weekly routine keeps the numbers and says what changed (run once now, then removed)', async () => {
+	const r = await ask( 'seo', 'Halte bitte jeden Montag um 7 Uhr die aktuellen Zahlen fest und vergleiche sie mit dem letzten Stand – schreib kurz, was sich verändert hat.', 0, { timeout: 200000 } );
+	const setUp = Math.max( 0, ...r.msgs.map( ( m ) => m.id ) );
+	// The week in between: two posts get an excerpt (the made-up visits follow excerpts), put back after.
+	const week = ( await wp( 'posts?status=publish&per_page=2&context=edit' ) ) || [];
+	for ( const p of week ) {
+		await wp( 'posts/' + p.id, { excerpt: 'Kurz zusammengefasst: ' + p.title.raw } );
+	}
+	const run = await devApi( 'routine', { channel: 'seo' } ); // What would happen next Monday, now.
+	for ( const p of week ) {
+		await wp( 'posts/' + p.id, { excerpt: p.excerpt.raw } );
+	}
+	if ( ! run?.id ) {
+		return { ok: false, note: said( r ) + ' · no routine: ' + clip( JSON.stringify( run ), 200 ) };
+	}
+	const where = 'channel' === run.post ? ( await api( 'threads?channel=seo&limit=1&order=new' ) )[ 0 ]?.id : run.thread;
+	const report = ( ( await api( 'threads/' + where ) ).messages || [] ).filter( ( m ) => SEO === m.author && m.id > setUp ).pop();
+	await devApi( 'routine', { channel: 'seo', remove: true } );
+	const kept = run.snapshots_after > run.snapshots_before;
+	return { ok: kept && report && /\d/.test( report.text ) ? true : report ? 'warn' : false, note: said( r ) + ' || routine run: ' + ( report ? 'SEO-KI: ' + clip( report.text, 400 ) : 'no report' ) + ' · numbers kept: ' + ( kept ? 'yes' : 'no' ) };
+} );
 await step( 'The overview: the organising assistant sums up what the area assistants did today', async () => {
 	const t = await api( 'threads', { private_with: PLAN, body: 'Was haben die Assistenten heute in #inhalte, #technik und #seo erledigt, und was ist noch offen? Kurz, als Liste.' } );
 	const r = await watch( t.id, 0, { timeout: 180000 } );

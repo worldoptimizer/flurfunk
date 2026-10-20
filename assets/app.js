@@ -2107,9 +2107,13 @@
 		}, { passive: true } );
 		const loadList = async ( append ) => {
 			const v = viewInfo();
+			const view = ui.view; // An answer for a view left in the meantime (a search typed quickly) is dropped.
 			if ( v.notifications ) {
 				const before = append && ui.notes && ui.notes.length ? ui.notes[ ui.notes.length - 1 ].id : 0;
 				const items = await api( 'notifications?' + query( { limit: 40, before } ) );
+				if ( view !== ui.view ) {
+					return;
+				}
 				ui.notes = append ? ( ui.notes || [] ).concat( items ) : items;
 				ui.more = items.length === 40;
 				const was = ui.loading;
@@ -2130,6 +2134,10 @@
 				}
 			}
 			const items = await api( 'threads?' + query( args ) );
+			if ( view !== ui.view ) {
+				ui.prepending = false;
+				return;
+			}
 			if ( v.stream && ! append && ! ui.loading && ui.list.length ) {
 				// Refreshing a channel: the newest page takes its part; older threads loaded before stay.
 				const ids = new Set( items.map( ( x ) => x.id ) );

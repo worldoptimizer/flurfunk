@@ -542,6 +542,27 @@ test.describe( 'team', () => {
 		}
 	} );
 
+	test( 'a search typed while the list is still loading keeps its results (the late list is dropped)', async ( { page } ) => {
+		const word = 'Spaetwort' + Date.now();
+		await api( page, 'threads', { channel: 'general', body: 'e2e spät ' + word } );
+		let slow = true;
+		await page.route( /flurfunk\/v1\/threads\?/, async ( route ) => {
+			if ( slow && ! /[?&]q=/.test( route.request().url() ) ) {
+				slow = false; // The first list of all threads arrives after the search.
+				await new Promise( ( r ) => setTimeout( r, 4000 ) );
+			}
+			await route.continue();
+		} );
+		await page.goto( APP, { waitUntil: 'domcontentloaded' } );
+		await page.waitForSelector( '.ff-app .ff-search input' );
+		await page.locator( '.ff-search input' ).fill( word );
+		await page.locator( '.ff-search input' ).press( 'Enter' );
+		await expect( page.locator( '.ff-post' ) ).toHaveCount( 1 );
+		await page.waitForTimeout( 5000 ); // Past the slow answer – counted at once (the next refresh would mend it).
+		expect( await page.locator( '.ff-post' ).count() ).toBe( 1 );
+		await expect( page.locator( '.ff-head h1' ) ).toContainText( word );
+	} );
+
 	test( 'the sidebar can be dragged wider and keeps its width', async ( { page } ) => {
 		const nav = page.locator( '.ff-nav' );
 		const before = ( await nav.boundingBox() ).width;
