@@ -2037,7 +2037,7 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/site-check
 	$in_p  = wp_insert_post( array( 'post_title' => 'Kurz', 'post_status' => 'publish', 'post_author' => $team, 'post_content' => '<p>Nur ein paar Worte <img src="x.jpg"></p>' ) );
 	$in_ck = wp_get_ability( 'flurfunk/site-check' )->execute( array( 'examples' => 10 ) );
 	$in_ids = static fn ( string $k ) => array_column( (array) ( $in_ck['issues'][ $k ]['examples'] ?? array() ), 'id' );
-	$check( 'the content check finds a post without a description, with a short title, an image without alt text and few words', in_array( $in_p, $in_ids( 'no_description' ), true ) && in_array( $in_p, $in_ids( 'short_title' ), true ) && in_array( $in_p, $in_ids( 'images_without_alt' ), true ) && in_array( $in_p, $in_ids( 'thin' ), true ), array_keys( (array) ( $in_ck['issues'] ?? array() ) ) );
+	$check( 'the content check finds a post without a description, with a short title, an image without alt text and few words', in_array( $in_p, $in_ids( 'no_description' ), true ) && in_array( $in_p, $in_ids( 'short_title' ), true ) && in_array( $in_p, $in_ids( 'images_without_alt' ), true ) && in_array( $in_p, $in_ids( 'thin' ), true ) && str_contains( (string) ( $in_ck['about']['no_description'] ?? '' ), 'excerpt' ), array_keys( (array) ( $in_ck['issues'] ?? array() ) ) );
 	add_filter(
 		'flurfunk_metrics',
 		$in_f = static function ( $m ) {

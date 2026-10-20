@@ -308,6 +308,11 @@ await step( 'The theme: a line in the footer as a template card – applied, the
 } );
 await step( 'The menu: only two chosen links instead of all pages, as a card – applied, then undone', async () => {
 	const menu = ( ( await wp( 'navigation?context=edit&per_page=1&orderby=date&order=desc' ) ) || [] )[ 0 ];
+	// Max has read the "about us" draft and published it (assistants only write drafts).
+	const about = ( ( await wp( 'pages?status=draft&search=' + encodeURIComponent( 'Über uns' ) + '&orderby=date&order=desc&context=edit' ) ) || [] )[ 0 ];
+	if ( about ) {
+		await wp( 'pages/' + about.id, { status: 'publish' } );
+	}
 	const r = await ask( 'inhalte', 'Im Menü oben sollen nur noch "Startseite" und "Über uns" stehen, in dieser Reihenfolge – nicht mehr alle Seiten.', 0, { timeout: 240000 } );
 	const c = cardOf( r );
 	if ( ! c ) {

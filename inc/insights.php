@@ -106,9 +106,22 @@ function site_check( array $input ): array {
 			}
 		}
 	}
+	// What each finding means, so it is not misread (a missing description is a missing excerpt too).
+	$about = array(
+		'no_description'        => 'Neither an excerpt nor a meta description of an SEO plugin: the excerpt field is empty as well.',
+		'long_title'            => 'Title longer than 60 characters: search results cut it.',
+		'short_title'           => 'Title shorter than 15 characters.',
+		'no_featured_image'     => 'Post without a featured image.',
+		'images_without_alt'    => 'Images without alt text in the content.',
+		'thin'                  => 'Under 300 words.',
+		'no_internal_links'     => 'No link to another page of this site.',
+		'not_updated_two_years' => 'Not changed in two years.',
+		'duplicate_title'       => 'The same title as another post or page.',
+	);
 	return array(
 		'checked' => count( $posts ),
 		'issues'  => $issues,
+		'about'   => array_intersect_key( $about, $issues ),
 	);
 }
 
