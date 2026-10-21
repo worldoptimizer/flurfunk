@@ -358,9 +358,10 @@ even when an administrator applies it. Assistants themselves never change the th
 
 **Numbers and site check** (pack, off by default): an assistant checks the published content for SEO
 gaps, reads the site's numbers and keeps them per channel with a note, to compare later. WordPress
-itself gives content and comment numbers. Visits come from Koko Analytics or WP Statistics when one
-of them is active (visitors and page views of the last 7 and 30 days, visits from search engines,
-the most read posts of the week) – read on the site itself, nothing is sent anywhere. Other
+itself gives content and comment numbers. Visits come from Koko Analytics, WP Statistics or
+Independent Analytics (also Pro) when one of them is active (visitors and page views of the last 7
+and 30 days, the most read posts of the week, and with the first two visits from search engines) –
+read on the site itself, nothing is sent anywhere. Other
 statistics plugins can provide them through the filter `flurfunk_metrics` (see the developer guide);
 without any, the assistant says they are missing.
 

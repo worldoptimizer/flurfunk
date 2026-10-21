@@ -1,9 +1,10 @@
 <?php
 /**
- * Visits from statistics plugins that keep their numbers on the site itself – Koko Analytics and
- * WP Statistics – as numbers for the assistants and snapshots (filter flurfunk_metrics): visitors
- * and page views of the last 7 and 30 days, visits from search engines, and the most read posts of
- * the week. Read through the plugins' own classes, never their tables; nothing is sent anywhere.
+ * Visits from statistics plugins that keep their numbers on the site itself – Koko Analytics,
+ * WP Statistics and Independent Analytics – as numbers for the assistants and snapshots (filter
+ * flurfunk_metrics): visitors and page views of the last 7 and 30 days, visits from search engines
+ * (where the plugin offers them), and the most read posts of the week. Read through the plugins' own
+ * classes and functions, never their tables; nothing is sent anywhere.
  * Other plugins add their numbers through the same filter.
  *
  * @package Flurfunk
@@ -62,7 +63,15 @@ function entry( string $label, $value, string $source ): array {
  */
 function metrics( array $m ): array {
 	try {
-		$add = class_exists( '\\KokoAnalytics\\Stats' ) ? koko() : ( class_exists( '\\WP_Statistics\\Models\\VisitorsModel' ) ? wp_statistics() : array() );
+		if ( class_exists( '\\KokoAnalytics\\Stats' ) ) {
+			$add = koko();
+		} elseif ( class_exists( '\\WP_Statistics\\Models\\VisitorsModel' ) ) {
+			$add = wp_statistics();
+		} elseif ( function_exists( '\\IAWPSCOPED\\iawp_analytics' ) ) {
+			$add = independent_analytics();
+		} else {
+			$add = array();
+		}
 	} catch ( \Throwable $e ) {
 		$add = array(); // A plugin that changed its classes must not break the other numbers.
 	}
@@ -135,6 +144,39 @@ function wp_statistics(): array {
 			if ( $id > 0 ) {
 				$out[ 'views_7d_' . $id ] = entry( top_label( $id ), is_object( $p ) ? ( $p->views ?? 0 ) : ( $p['views'] ?? 0 ), $src );
 			}
+		}
+	}
+	return $out;
+}
+
+/**
+ * Independent Analytics (also Pro), through its public functions: views and visitors; the most read
+ * posts and pages. It has no public number for visits from search engines.
+ */
+function independent_analytics(): array {
+	$src  = 'Independent Analytics';
+	$out  = array();
+	$date = static fn ( string $day ) => new \DateTime( $day, wp_timezone() ); // Whole days, in the site's time zone.
+	foreach ( array( 7, 30 ) as $days ) {
+		list( $from, $to )           = days( $days );
+		$a                           = \IAWPSCOPED\iawp_analytics( $date( $from ), $date( $to ) );
+		$out[ "visitors_{$days}d" ]  = entry( "Visitors in the last {$days} days", $a->visitors ?? 0, $src );
+		$out[ "pageviews_{$days}d" ] = entry( "Page views in the last {$days} days", $a->views ?? 0, $src );
+	}
+	if ( function_exists( '\\IAWPSCOPED\\iawp_top_posts' ) ) {
+		list( $from, $to ) = days( 7 );
+		$top               = array();
+		foreach ( array( 'post', 'page' ) as $type ) {
+			foreach ( (array) \IAWPSCOPED\iawp_top_posts( array( 'post_type' => $type, 'limit' => TOP, 'from' => $date( $from ), 'to' => $date( $to ) ) ) as $p ) {
+				$p = (object) $p;
+				if ( (int) ( $p->id ?? 0 ) > 0 ) {
+					$top[ (int) $p->id ] = (int) ( $p->views ?? 0 );
+				}
+			}
+		}
+		arsort( $top );
+		foreach ( array_slice( $top, 0, TOP, true ) as $id => $views ) {
+			$out[ 'views_7d_' . $id ] = entry( top_label( $id ), $views, $src );
 		}
 	}
 	return $out;

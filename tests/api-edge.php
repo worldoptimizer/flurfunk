@@ -2053,7 +2053,7 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/site-check
 	$st_days = Flurfunk\Stats\days( 7 );
 	$st_se   = array_map( 'Flurfunk\\Stats\\search_engine', array( 'https://www.google.de/search?q=x', 'bing.com', 'https://duckduckgo.com/', 'https://www.facebook.com/', 'https://notgoogle.com/', '' ) );
 	$check( 'statistics plugins: a week is today and the six days before; search engines are told apart from other referrers', ( new DateTimeImmutable( $st_days[0] ) )->diff( new DateTimeImmutable( $st_days[1] ) )->days === 6 && array( true, true, true, false, false, false ) === $st_se, array( $st_days, $st_se ) );
-	$check( 'without a statistics plugin no visits are made up', class_exists( '\\KokoAnalytics\\Stats' ) || class_exists( '\\WP_Statistics\\Models\\VisitorsModel' ) || array() === Flurfunk\Stats\metrics( array() ) );
+	$check( 'without a statistics plugin no visits are made up', class_exists( '\\KokoAnalytics\\Stats' ) || class_exists( '\\WP_Statistics\\Models\\VisitorsModel' ) || function_exists( '\\IAWPSCOPED\\iawp_analytics' ) || array() === Flurfunk\Stats\metrics( array() ) );
 	// A snapshot three weeks ago (fewer visits), the excerpt added since, compared now.
 	$in_old = $in_m;
 	$in_old['visits_7d']['value'] = 1000;
