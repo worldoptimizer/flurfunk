@@ -1,0 +1,2788 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Flurfunk\n"
+"Language: de_DE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "\"%1$s\" becomes \"%2$s\""
+msgstr "„%1$s“ wird zu „%2$s“"
+
+msgid "\"%s\" does not exist yet, and you may not create it."
+msgstr "„%s“ gibt es noch nicht, und du darfst es nicht anlegen."
+
+msgid "\"%s\" does not exist."
+msgstr "„%s“ gibt es nicht."
+
+msgid "\"%s\" is not a color."
+msgstr "„%s“ ist keine Farbe."
+
+msgid "\"Also requires\": only people with this capability see the channel at all (its threads, numbers, notifications and search results), whatever team and guests may see. Assistants count only for Flurfunk's Team and Guest; for anything else only when their account has the capability, but the site's own modules can always post there."
+msgstr "„Zusätzlich nötig“: Nur wer dieses Recht hat, sieht den Kanal überhaupt (seine Threads, Zahlen, Benachrichtigungen und Suchtreffer), egal was Team und Gäste sehen dürfen. Assistenten zählen nur bei Flurfunks Team und Gast; bei allem anderen nur, wenn ihr Konto das Recht hat. Die Module der Website können dort aber immer posten."
+
+msgid "#%s (created when needed)"
+msgstr "#%s (wird bei Bedarf angelegt)"
+
+msgid "%1$d · %2$d open"
+msgstr "%1$d · %2$d offen"
+
+msgid "%1$s and %2$s"
+msgstr "%1$s und %2$s"
+
+msgid "%1$s and %2$s more"
+msgstr "%1$s und %2$s weitere"
+
+msgid "%1$s chose \"%2$s\""
+msgstr "%1$s hat „%2$s“ gewählt"
+
+msgid "%1$s for %2$s"
+msgstr "%1$s für %2$s"
+
+msgid "%1$s from %2$s"
+msgstr "%1$s von %2$s"
+
+msgid "%1$s made %2$s responsible"
+msgstr "%1$s hat %2$s zuständig gemacht"
+
+msgid "%1$s on %2$s · %3$s"
+msgstr "%1$s zu %2$s · %3$s"
+
+msgid "%1$s set the due date to %2$s"
+msgstr "%1$s hat die Fälligkeit auf %2$s gesetzt"
+
+msgid "%1$s took %2$s off the task"
+msgstr "%1$s hat %2$s von der Aufgabe genommen"
+
+msgid "%1$s: \"%2$s\" cannot be set here (typography, spacing, color and border can)."
+msgstr "%1$s: „%2$s“ lässt sich hier nicht setzen (typography, spacing, color und border schon)."
+
+msgid "%1$s: \"%2$s\" is not a property or value that can be set here."
+msgstr "%1$s: „%2$s“ ist keine Eigenschaft oder kein Wert, der sich hier setzen lässt."
+
+msgid "%1$s: %2$s"
+msgstr "%1$s: %2$s"
+
+msgid "%s (cannot see the channel)"
+msgstr "%s (sieht den Kanal nicht)"
+
+msgid "%s (unknown)"
+msgstr "%s (unbekannt)"
+
+msgid "%s AI assistants"
+msgstr "%s KI-Assistenten"
+
+msgid "%s approved the comment"
+msgstr "%s hat den Kommentar freigegeben"
+
+msgid "%s can read this"
+msgstr "%s liest mit"
+
+msgid "%s comment awaiting moderation"
+msgid_plural "%s comments awaiting moderation"
+msgstr[0] "%s Kommentar wartet auf Freigabe"
+msgstr[1] "%s Kommentare warten auf Freigabe"
+
+msgid "%s comment is waiting for approval."
+msgid_plural "%s comments are waiting for approval."
+msgstr[0] "%s Kommentar wartet auf Freigabe."
+msgstr[1] "%s Kommentare warten auf Freigabe."
+
+msgid "%s deleted a message"
+msgstr "%s hat eine Nachricht gelöscht"
+
+msgid "%s dismissed the proposal"
+msgstr "%s hat den Vorschlag verworfen"
+
+msgid "%s earlier messages are not shown here."
+msgstr "%s ältere Nachrichten werden hier nicht angezeigt."
+
+msgid "%s gave you a task"
+msgstr "%s hat dir eine Aufgabe gegeben"
+
+msgid "%s has a question about a task"
+msgstr "%s hat eine Rückfrage zu einer Aufgabe"
+
+msgid "%s has a question about this"
+msgstr "%s hat eine Rückfrage"
+
+msgid "%s is thinking"
+msgstr "%s denkt nach"
+
+msgid "%s is working on this"
+msgstr "%s arbeitet daran"
+
+msgid "%s marked the comment as spam"
+msgstr "%s hat den Kommentar als Spam markiert"
+
+msgid "%s marked this as done"
+msgstr "%s hat das als erledigt markiert"
+
+msgid "%s mentioned you"
+msgstr "%s hat dich erwähnt"
+
+msgid "%s messages in this thread."
+msgstr "%s Nachrichten in diesem Thread."
+
+msgid "%s more files"
+msgstr "%s weitere Dateien"
+
+msgid "%s moved it back to draft."
+msgstr "%s hat ihn zurück in den Entwurf gesetzt."
+
+msgid "%s moved it to the trash."
+msgstr "%s hat den Beitrag in den Papierkorb gelegt."
+
+msgid "%s moved the comment to the trash"
+msgstr "%s hat den Kommentar in den Papierkorb gelegt"
+
+msgid "%s must be an object."
+msgstr "%s muss ein Objekt sein."
+
+msgid "%s new"
+msgstr "%s neu"
+
+msgid "%s new messages"
+msgstr "%s neue Nachrichten"
+
+msgid "%s new messages since your last visit."
+msgstr "%s neue Nachrichten seit deinem letzten Besuch."
+
+msgid "%s new threads"
+msgstr "%s neue Threads"
+
+msgid "%s overdue"
+msgstr "%s überfällig"
+
+msgid "%s published it."
+msgstr "%s hat ihn veröffentlicht."
+
+msgid "%s ran the proposal"
+msgstr "%s hat den Vorschlag ausgeführt"
+
+msgid "%s removed the due date"
+msgstr "%s hat die Fälligkeit entfernt"
+
+msgid "%s removed the task"
+msgstr "%s hat die Aufgabe entfernt"
+
+msgid "%s reopened this"
+msgstr "%s hat das wieder geöffnet"
+
+msgid "%s replies"
+msgstr "%s Antworten"
+
+msgid "%s scheduled it."
+msgstr "%s hat ihn eingeplant."
+
+msgid "%s submitted it for review again."
+msgstr "%s hat ihn erneut zur Prüfung eingereicht."
+
+msgid "%s submitted this for review. Please take a look."
+msgstr "%s hat das zur Prüfung eingereicht. Bitte einmal draufschauen."
+
+msgid "%s ticked off a task"
+msgstr "%s hat eine Aufgabe abgehakt"
+
+msgid "%s undid the changes"
+msgstr "%s hat die Änderungen rückgängig gemacht"
+
+msgid "%s wrote"
+msgstr "%s schreibt"
+
+msgid "(Note: 80 % of my budget for this month is used.)"
+msgstr "(Hinweis: 80 % meines Budgets für diesen Monat sind verbraucht.)"
+
+msgid "(edited)"
+msgstr "(bearbeitet)"
+
+msgid "(house rules; read wherever no guests read along – tick to remove)"
+msgstr "(Hausregeln; gelten überall, wo keine Gäste mitlesen – zum Entfernen ankreuzen)"
+
+msgid "(module is off)"
+msgstr "(Modul ist aus)"
+
+msgid "(no title)"
+msgstr "(ohne Titel)"
+
+msgid "(not active)"
+msgstr "(nicht aktiv)"
+
+msgid "(removed on request)"
+msgstr "(auf Wunsch entfernt)"
+
+msgid "(tick to remove)"
+msgstr "(anhaken zum Löschen)"
+
+msgid "/comment inserts a comment as a card, with buttons to approve it, mark it as spam or move it to the trash. For people who may moderate comments."
+msgstr "/kommentar fügt einen Kommentar als Karte ein, mit Knöpfen zum Freigeben, als Spam markieren oder in den Papierkorb legen. Für alle, die Kommentare moderieren dürfen."
+
+msgid "1 AI assistant"
+msgstr "1 KI-Assistent"
+
+msgid "1 hour"
+msgstr "1 Std."
+
+msgid "1 new message"
+msgstr "1 neue Nachricht"
+
+msgid "1 new thread"
+msgstr "1 neuer Thread"
+
+msgid "1 reply"
+msgstr "1 Antwort"
+
+msgid "3 hours"
+msgstr "3 Std."
+
+msgid "A #general channel is waiting. Set the name, logo and colours, decide who counts as team and who as guest, and add channels in the settings."
+msgstr "Ein Kanal #general wartet schon. In den Einstellungen legst du Name, Logo und Farben fest, wer zum Team gehört und wer Gast ist, und weitere Kanäle."
+
+msgid "A Flurfunk capability needs a name of lower-case letters, digits, _ and - that is not one of Flurfunk's own."
+msgstr "Ein Flurfunk-Recht braucht einen Namen aus Kleinbuchstaben, Ziffern, _ und -, der nicht zu Flurfunks eigenen gehört."
+
+msgid "A Flurfunk module needs an ID like \"vendor/name\", a label and a load callback."
+msgstr "Ein Flurfunk-Modul braucht eine ID wie „anbieter/name“, eine Bezeichnung und eine Lade-Funktion."
+
+msgid "A Flurfunk module setting needs a key and one of the types channel, checkbox, number, text, select, roles or users."
+msgstr "Eine Flurfunk-Moduleinstellung braucht einen Schlüssel und einen der Typen channel, checkbox, number, text, select, roles oder users."
+
+msgid "A Flurfunk provider needs a command and a snapshot callback."
+msgstr "Ein Flurfunk-Anbieter braucht einen Befehl und eine snapshot-Funktion."
+
+msgid "A Flurfunk target type needs an info callback."
+msgstr "Eine Flurfunk-Zielart braucht eine info-Funktion."
+
+msgid "A check-in has to be in the future, at most %d days ahead."
+msgstr "Ein Nachhaken muss in der Zukunft liegen, höchstens %d Tage voraus."
+
+msgid "A color: #hex, rgb(), hsl() or var(--wp--preset--color--slug)."
+msgstr "Eine Farbe: #hex, rgb(), hsl() oder var(--wp--preset--color--slug)."
+
+msgid "A comment, with buttons to moderate it"
+msgstr "Ein Kommentar, mit Knöpfen zum Moderieren"
+
+msgid "A content and SEO check of the published posts and pages: missing excerpts or meta descriptions (SEO plugins count), titles too long or short, no featured image, images without alt text, under 300 words, duplicate titles, no internal links, not updated for two years – with counts and examples."
+msgstr "Ein Inhalts- und SEO-Check der veröffentlichten Beiträge und Seiten: fehlende Auszüge oder Meta-Beschreibungen (SEO-Plugins zählen mit), zu lange oder kurze Titel, kein Beitragsbild, Bilder ohne Alt-Text, unter 300 Wörter, doppelte Titel, keine internen Links, seit zwei Jahren nicht aktualisiert – mit Anzahl und Beispielen."
+
+msgid "A new pattern needs a title and its block markup."
+msgstr "Ein neues Muster braucht einen Titel und sein Block-Markup."
+
+msgid "A new template needs a short name (slug) and its block markup."
+msgstr "Eine neue Vorlage braucht einen Kurznamen (slug) und ihr Block-Markup."
+
+msgid "A plugin or a theme."
+msgstr "Ein Plugin oder ein Theme."
+
+msgid "A post submitted for review becomes a task for the people who may publish it; publishing it ticks the task off."
+msgstr "Ein zur Prüfung eingereichter Artikel wird zur Aufgabe für alle, die ihn veröffentlichen dürfen; mit dem Veröffentlichen ist sie erledigt."
+
+msgid "A quick check decides; most threads get nothing. Every new thread here is then sent to the AI provider for that check."
+msgstr "Eine Vorprüfung entscheidet; die meisten Threads bekommen nichts. Dafür wird jeder neue Thread hier an den KI-Anbieter geschickt."
+
+msgid "A registered pattern, e.g. \"twentytwentyfive/banner-intro\"."
+msgstr "Ein registriertes Muster, z. B. „twentytwentyfive/banner-intro“."
+
+msgid "A routine needs days, a time (HH:MM) and what to do."
+msgstr "Eine Routine braucht Tage, eine Uhrzeit (HH:MM) und was zu tun ist."
+
+msgid "A short name, e.g. \"Friday round-up\"."
+msgstr "Ein kurzer Name, z. B. „Freitagsrückblick“."
+
+msgid "A short summary from the AI assistant, only for you"
+msgstr "Eine kurze Zusammenfassung vom KI-Assistenten, nur für dich"
+
+msgid "A template with this name exists already: change it instead (flurfunk/update-template)."
+msgstr "Eine Vorlage mit diesem Namen gibt es schon: stattdessen sie ändern (flurfunk/update-template)."
+
+msgid "A thread without a target"
+msgstr "Ein Thread ohne Bezug"
+
+msgid "AI"
+msgstr "KI"
+
+msgid "AI answers new threads: %s"
+msgstr "KI antwortet auf neue Threads: %s"
+
+msgid "AI assistant"
+msgstr "KI-Assistent"
+
+msgid "AI assistants"
+msgstr "KI-Assistenten"
+
+msgid "AI on mention: %s"
+msgstr "KI auf Erwähnung: %s"
+
+msgid "Abilities that change something. The assistant never runs them: it puts a card under its answer, and a person runs it with a button – with their own rights, within the limit above. What the person asking may not do is not proposed."
+msgstr "Fähigkeiten, die etwas ändern. Der Assistent führt sie nie selbst aus: Er legt eine Karte unter seine Antwort, und eine Person führt sie per Knopf aus – mit ihren eigenen Rechten, innerhalb der Grenze oben. Was die fragende Person nicht darf, schlägt er gar nicht erst vor."
+
+msgid "About"
+msgstr "Zu"
+
+msgid "Accent colour"
+msgstr "Akzentfarbe"
+
+msgid "Accounts for agents and scripts. They take part like the team, have no editing rights in WordPress and are marked \"Assistant\" in conversations. Agents connect with an application password from the account's profile page."
+msgstr "Konten für Agenten und Skripte. Sie nehmen teil wie das Team, haben in WordPress keine Bearbeitungsrechte und sind im Gespräch als „Assistent“ markiert. Agenten verbinden sich mit einem Anwendungspasswort aus dem Profil des Kontos."
+
+msgid "Actions"
+msgstr "Aktionen"
+
+msgid "Active"
+msgstr "Aktiv"
+
+msgid "Add"
+msgstr "Hinzufügen"
+
+msgid "Add a template"
+msgstr "Eine Vorlage hinzufügen"
+
+msgid "Add reaction"
+msgstr "Reaktion hinzufügen"
+
+msgid "Add the pattern \"%s\""
+msgstr "Das Muster „%s“ hinzufügen"
+
+msgid "Add the template \"%s\""
+msgstr "Die Vorlage „%s“ hinzufügen"
+
+msgid "Add the template part \"%s\""
+msgstr "Den Vorlagenteil „%s“ hinzufügen"
+
+msgid "Add to media library"
+msgstr "In die Mediathek übernehmen"
+
+msgid "Added at the end"
+msgstr "Am Ende ergänzt"
+
+msgid "Adding images to posts needs the right to upload files."
+msgstr "Bilder in Beiträge einzufügen braucht das Recht, Dateien hochzuladen."
+
+msgid "Adds \"%s\""
+msgstr "Fügt „%s“ hinzu"
+
+msgid "Adds a new template (e.g. a page template \"landing page\") or template part to the active block theme – the site's own, as in the Site Editor – and can give a page template to pages right away (assign). A template named \"page-<page slug>\" is used for that page by itself. Can be undone. Scripts are filtered out."
+msgstr "Fügt dem aktiven Block-Theme eine neue Vorlage (z. B. eine Seitenvorlage „Landingpage“) oder einen Vorlagenteil hinzu – als eigene der Website, wie im Website-Editor – und kann eine Seitenvorlage gleich Seiten zuweisen (assign). Eine Vorlage namens „page-<Seiten-Slug>“ gilt für diese Seite von selbst. Lässt sich rückgängig machen. Skripte werden herausgefiltert."
+
+msgid "Adds a reply to a conversation as the current user, if they may write there. Mentions as <@user ID>."
+msgstr "Fügt als angemeldete Person eine Antwort hinzu, wenn sie dort schreiben darf. Erwähnungen als <@Nutzer-ID>."
+
+msgid "Administrators always keep this."
+msgstr "Administrator:innen behalten das immer."
+
+msgid "All channels"
+msgstr "Alle Kanäle"
+
+msgid "All channels, threads, messages, tasks and cards in one file, for a backup or for moving to another site. People are matched by their email address."
+msgstr "Alle Kanäle, Threads, Nachrichten, Aufgaben und Karten in einer Datei – als Sicherung oder für den Umzug auf eine andere Seite. Personen werden über ihre E-Mail-Adresse zugeordnet."
+
+msgid "All conversations about this post, from every channel"
+msgstr "Alle Gespräche zu diesem Artikel, aus allen Kanälen"
+
+msgid "All done"
+msgstr "Alles erledigt"
+
+msgid "All threads"
+msgstr "Alle Threads"
+
+msgid "Also its block markup (for changes to the layout; only for those who may edit it)."
+msgstr "Auch sein Block-Markup (für Änderungen am Layout; nur für Leute, die ihn bearbeiten dürfen)."
+
+msgid "Also requires"
+msgstr "Zusätzlich nötig"
+
+msgid "Alt and arrow keys move a card to the next or previous column."
+msgstr "Alt und Pfeiltasten verschieben eine Karte in die nächste oder vorige Spalte."
+
+msgid "Alt texts for images without a description"
+msgstr "Alt-Texte für Bilder ohne Beschreibung"
+
+msgid "An AI assistant sets itself a check-in in a conversation: at that time it looks at the conversation again and follows up there (asks whether something is done, mentions who should answer). Or cancels its check-ins in that conversation."
+msgstr "Ein KI-Assistent plant sich in einem Gespräch ein Nachhaken: Zu dieser Zeit schaut er wieder hinein und fragt dort nach (ob etwas erledigt ist, erwähnt, wer antworten soll). Oder er streicht sein Nachhaken in diesem Gespräch."
+
+msgid "An assistant with an AI profile answers in the thread when someone mentions it, in the channels ticked here. It reads that thread (and, if allowed below, the post it is about and what its tools find) and changes nothing on the site by itself – apart from drafts, if it may write them. The AI provider and its key are set up under Settings → Connectors; what the assistant reads is sent to that provider."
+msgstr "Ein Assistent mit KI-Profil antwortet im Thread, wenn jemand ihn erwähnt – in den hier angehakten Kanälen. Er liest diesen Thread (und, wenn unten erlaubt, den Beitrag, um den es geht, und was seine Werkzeuge finden) und ändert von sich aus nichts auf der Website – außer Entwürfen, wenn er welche schreiben darf. Anbieter und Schlüssel werden unter Einstellungen → Konnektoren eingerichtet; was der Assistent liest, geht an diesen Anbieter."
+
+msgid "Anonymous"
+msgstr "Anonym"
+
+msgid "Answers a comment on the site as the current user; a comment waiting for approval is approved with it."
+msgstr "Beantwortet einen Kommentar der Website als die aktuelle Person; ein wartender Kommentar wird dabei freigegeben."
+
+msgid "Answers every new thread, without a mention, in"
+msgstr "Beantwortet jeden neuen Thread, auch ohne Erwähnung, in"
+
+msgid "Answers with AI when mentioned"
+msgstr "Antwortet mit KI, wenn er erwähnt wird"
+
+msgid "Any thread can be a task: tick \"Task\", set a due date and who is responsible. The Board shows all tasks by state, \"My tasks\" your own."
+msgstr "Jeder Thread kann eine Aufgabe sein: „Aufgabe“ ankreuzen, Fälligkeit und Zuständige festlegen. Das Board zeigt alle Aufgaben nach Stand, „Meine Aufgaben“ deine eigenen."
+
+msgid "Anything that concerns everyone"
+msgstr "Alles, was alle betrifft"
+
+msgid "Appearance"
+msgstr "Erscheinungsbild"
+
+msgid "Application passwords"
+msgstr "Anwendungspasswörter"
+
+msgid "Applied by %s"
+msgstr "Übernommen von %s"
+
+msgid "Apply"
+msgstr "Übernehmen"
+
+msgid "Apply to %s"
+msgstr "Für %s übernehmen"
+
+msgid "Approve"
+msgstr "Freigeben"
+
+msgid "Approved"
+msgstr "Freigegeben"
+
+msgid "As a task"
+msgstr "Als Aufgabe"
+
+msgid "As the role says (%s)"
+msgstr "Wie die Rolle (%s)"
+
+msgid "Ask AI assistants"
+msgstr "KI-Assistenten fragen"
+
+msgid "Asked by"
+msgstr "Gefragt von"
+
+msgid "Assign"
+msgstr "Zuständige wählen"
+
+msgid "Assign everyone who may publish"
+msgstr "Alle zuständig machen, die veröffentlichen dürfen"
+
+msgid "Assigned to you, by due date"
+msgstr "Dir zugewiesen, nach Fälligkeit"
+
+msgid "Assistant"
+msgstr "Assistent"
+
+msgid "Assistants"
+msgstr "Assistenten"
+
+msgid "Assistants answer new threads here unasked when they clearly can help"
+msgstr "Assistenten antworten hier ungefragt auf neue Threads, wenn sie eindeutig helfen können"
+
+msgid "Assistants with an AI profile answer in the thread when someone mentions them, with the AI provider from Settings → Connectors (WordPress 7.0 or newer). Profiles, channels and budgets are set below."
+msgstr "Assistenten mit KI-Profil antworten im Thread, wenn jemand sie erwähnt – mit dem Anbieter aus Einstellungen → Konnektoren (ab WordPress 7.0). Profile, Kanäle und Budgets weiter unten."
+
+msgid "At most as"
+msgstr "Höchstens wie"
+
+msgid "At most as: %s"
+msgstr "Höchstens wie: %s"
+
+msgid "Attach"
+msgstr "Anhängen"
+
+msgid "Attach file"
+msgstr "Datei anhängen"
+
+msgid "Attach from the media library"
+msgstr "Aus der Mediathek anhängen"
+
+msgid "Attached to"
+msgstr "Hängt an"
+
+msgid "Attached to: nothing"
+msgstr "Hängt an: nichts"
+
+msgid "Automatic"
+msgstr "Automatisch"
+
+msgid "Back"
+msgstr "Zurück"
+
+msgid "Back to WordPress"
+msgstr "Zurück zu WordPress"
+
+msgid "Back to how it was before, unless someone changed a post since"
+msgstr "Zurück zum Stand vorher – außer bei Beiträgen, die seitdem jemand geändert hat"
+
+msgid "Background"
+msgstr "Hintergrund"
+
+msgid "Badge"
+msgstr "Zahl am Symbol"
+
+msgid "Block markup"
+msgstr "Block-Markup"
+
+msgid "Block markup to add at the end (e.g. a new section)."
+msgstr "Block-Markup, das am Ende ergänzt wird (z. B. ein neuer Abschnitt)."
+
+msgid "Block themes, as in theme.json \"styles\": groups typography (fontFamily, fontSize, fontWeight, fontStyle, lineHeight, letterSpacing, textTransform, textDecoration), spacing (blockGap, padding, margin – a value or top/right/bottom/left), color (background, text), border (radius, width, style, color) – for the whole site, under elements (link, heading, h1–h6, button, caption, cite) or under blocks (e.g. core/button). Values: sizes, numbers or presets such as var(--wp--preset--font-family--inter). Only what changes."
+msgstr "Block-Themes, wie „styles“ in der theme.json: Gruppen typography (fontFamily, fontSize, fontWeight, fontStyle, lineHeight, letterSpacing, textTransform, textDecoration), spacing (blockGap, padding, margin – ein Wert oder top/right/bottom/left), color (background, text), border (radius, width, style, color) – für die ganze Website, unter elements (link, heading, h1–h6, button, caption, cite) oder unter blocks (z. B. core/button). Werte: Größen, Zahlen oder Vorgaben wie var(--wp--preset--font-family--inter). Nur, was sich ändert."
+
+msgid "Block themes: contentSize and wideSize, e.g. \"720px\"."
+msgstr "Block-Themes: contentSize und wideSize, z. B. „720px“."
+
+msgid "Board"
+msgstr "Board"
+
+msgid "Browser"
+msgstr "Browser"
+
+msgid "Buttons"
+msgstr "Buttons"
+
+msgid "CSS"
+msgstr "CSS"
+
+msgid "Cancel"
+msgstr "Abbrechen"
+
+msgid "Cancel the check-ins in this conversation instead."
+msgstr "Stattdessen das Nachhaken in diesem Gespräch streichen."
+
+msgid "Cancelled the check-ins"
+msgstr "Das Nachhaken gestrichen"
+
+msgid "Capability"
+msgstr "Recht"
+
+msgid "Captions"
+msgstr "Bildunterschriften"
+
+msgid "Card"
+msgstr "Karte"
+
+msgid "Categories"
+msgstr "Kategorien"
+
+msgid "Change"
+msgstr "Ändern"
+
+msgid "Change %d post"
+msgid_plural "Change %d posts"
+msgstr[0] "%d Beitrag ändern"
+msgstr[1] "%d Beiträge ändern"
+
+msgid "Change a draft written here"
+msgstr "Hier geschriebenen Entwurf ändern"
+
+msgid "Change a template"
+msgstr "Eine Vorlage ändern"
+
+msgid "Change posts"
+msgstr "Beiträge ändern"
+
+msgid "Change posts and pages"
+msgstr "Beiträge und Seiten ändern"
+
+msgid "Change the menu \"%s\""
+msgstr "Das Menü „%s“ ändern"
+
+msgid "Change the pattern \"%s\""
+msgstr "Das Muster „%s“ ändern"
+
+msgid "Change the site's look"
+msgstr "Das Aussehen der Website ändern"
+
+msgid "Change the template \"%s\""
+msgstr "Die Vorlage „%s“ ändern"
+
+msgid "Changed"
+msgstr "Geändert"
+
+msgid "Changed the draft \"%s\""
+msgstr "Den Entwurf „%s“ geändert"
+
+msgid "Changes a draft made with flurfunk/create-draft, as long as nobody else has saved it since: title, text (replaces it), excerpt, images. Never publishes."
+msgstr "Ändert einen mit flurfunk/create-draft angelegten Entwurf, solange niemand anderes ihn seitdem gespeichert hat: Titel, Text (ersetzt ihn), Auszug, Bilder. Veröffentlicht nie."
+
+msgid "Changes a template, template part or navigation menu of the active block theme: an exact replacement in its block markup (find, replace), or new markup (content). Saves the site's own copy, as the Site Editor does; can be undone. Scripts are filtered out."
+msgstr "Ändert eine Vorlage, einen Vorlagenteil oder ein Navigationsmenü des aktiven Block-Themes: eine genaue Ersetzung im Block-Markup (find, replace) oder neues Markup (content). Speichert die eigene Kopie der Website wie der Website-Editor; lässt sich rückgängig machen. Skripte werden herausgefiltert."
+
+msgid "Changes existing posts and pages, several at once: corrections in the text (exact replacements, only in text), the layout (exact replacements in the block markup, blocks, or new blocks at the end, append), title, excerpt, categories, tags, featured image. A post changed since unchanged_since is skipped, as is one whose markup saving would lose."
+msgstr "Ändert bestehende Beiträge und Seiten, mehrere auf einmal: Korrekturen im Text (genaue Ersetzungen, nur im Text), das Layout (genaue Ersetzungen im Block-Markup, blocks, oder neue Blöcke am Ende, append), Titel, Auszug, Kategorien, Schlagwörter, Beitragsbild. Ein seit unchanged_since geänderter Beitrag wird übersprungen, ebenso einer, dessen Markup beim Speichern verloren ginge."
+
+msgid "Changes the active theme's look for the whole site: additional CSS (added, or replacing all of it), for block themes also the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). Can be undone."
+msgstr "Ändert das Aussehen des aktiven Themes für die ganze Website: zusätzliches CSS (ergänzt oder alles ersetzt), bei Block-Themes auch Hintergrund-, Text- und Linkfarbe, Farben der Palette, Schriften, Schriftgrößen, Abstände und Rahmen (styles, wie in der theme.json – für die Website, Elemente wie Überschriften und Buttons oder Blöcke) und die Inhaltsbreiten (layout). Lässt sich rückgängig machen."
+
+msgid "Changes to posts"
+msgstr "Änderungen an Beiträgen"
+
+msgid "Changes to the layout: find (block markup exactly as in the post, from flurfunk/get-post with markup) and with (the new block markup)."
+msgstr "Änderungen am Layout: find (Block-Markup genau wie im Beitrag, aus flurfunk/get-post mit markup) und with (das neue Block-Markup)."
+
+msgid "Channel"
+msgstr "Kanal"
+
+msgid "Channel short name, e.g. general."
+msgstr "Kurzname des Kanals, z. B. general."
+
+msgid "Channels"
+msgstr "Kanäle"
+
+msgid "Check back later"
+msgstr "Später nachhaken"
+
+msgid "Check the content for SEO gaps, read the site's numbers (statistics plugins add visits) and keep them per channel to see later whether a measure helped"
+msgstr "Die Inhalte auf SEO-Lücken prüfen, die Kennzahlen der Website lesen (Statistik-Plugins ergänzen Besuche) und sie pro Kanal festhalten, um später zu sehen, ob eine Maßnahme etwas gebracht hat"
+
+msgid "Check the site's content"
+msgstr "Die Inhalte der Website prüfen"
+
+msgid "Checked back as asked"
+msgstr "Wie gebeten nachgehakt"
+
+msgid "Checked the content"
+msgstr "Inhalte geprüft"
+
+msgid "Choose logo"
+msgstr "Logo wählen"
+
+msgid "Close"
+msgstr "Schließen"
+
+msgid "Close summary"
+msgstr "Zusammenfassung schließen"
+
+msgid "Close thread"
+msgstr "Thread schließen"
+
+msgid "Code"
+msgstr "Code"
+
+msgid "Column in the posts list"
+msgstr "Spalte in der Beitragsliste"
+
+msgid "Comment"
+msgstr "Kommentar"
+
+msgid "Comment by %s"
+msgstr "Kommentar von %s"
+
+msgid "Comment cards"
+msgstr "Kommentar-Karten"
+
+msgid "Comments"
+msgstr "Kommentare"
+
+msgid "Comments awaiting moderation"
+msgstr "Kommentare warten auf Freigabe"
+
+msgid "Comments on the site that the current user may moderate, newest first – by default those waiting for approval: ID, post, the commenter's public name, date, state, how many links and the text (no email or IP addresses)."
+msgstr "Kommentare der Website, die die aktuelle Person moderieren darf, neueste zuerst – standardmäßig die auf Freigabe wartenden: ID, Beitrag, der öffentliche Name, Datum, Status, Anzahl der Links und der Text (keine E-Mail- oder IP-Adressen)."
+
+msgid "Compared the numbers"
+msgstr "Kennzahlen verglichen"
+
+msgid "Content width"
+msgstr "Inhaltsbreite"
+
+msgid "Conversation"
+msgstr "Gespräch"
+
+msgid "Conversations"
+msgstr "Gespräche"
+
+msgid "Conversations about"
+msgstr "Gespräche zu"
+
+msgid "Conversations about this"
+msgstr "Gespräche dazu"
+
+msgid "Conversations about this post"
+msgstr "Gespräche zu diesem Artikel"
+
+msgid "Conversations about your posts appear here, as soon as the team or you start one."
+msgstr "Hier erscheinen Gespräche über deine Artikel, sobald jemand aus dem Team oder du selbst eines beginnt."
+
+msgid "Conversations in Flurfunk the current user can read, newest activity first. Filter by channel (leave it out to search all channels), by view (all, mine = my tasks, tasks = open tasks, mentions) or by search words."
+msgstr "Gespräche in Flurfunk, die die angemeldete Person lesen darf, neueste Aktivität zuerst. Filter nach Kanal (weglassen, um alle Kanäle zu durchsuchen), Ansicht (all, mine = meine Aufgaben, tasks = offene Aufgaben, mentions) oder Suchwörtern."
+
+msgid "Conversations panel in the editor"
+msgstr "Leiste „Gespräche“ im Editor"
+
+msgid "Core"
+msgstr "Kern"
+
+msgid "Corrections in the text: find (exactly as written in the post, within one paragraph) and with (the new text)."
+msgstr "Korrekturen im Text: find (genau wie im Beitrag, innerhalb eines Absatzes) und with (der neue Text)."
+
+msgid "Could not save the conversation."
+msgstr "Das Gespräch konnte nicht gespeichert werden."
+
+msgid "Could not save the message."
+msgstr "Die Nachricht konnte nicht gespeichert werden."
+
+msgid "Could not send"
+msgstr "Konnte nicht senden"
+
+msgid "Could not send."
+msgstr "Konnte nicht senden."
+
+msgid "Create an assistant above first."
+msgstr "Lege oben zuerst einen Assistenten an."
+
+msgid "Create an assistant above, then open \"Application passwords\" next to it and add one. WordPress offers application passwords only on sites with HTTPS."
+msgstr "Lege oben einen Assistenten an, öffne daneben „Anwendungspasswörter“ und füge eines hinzu. WordPress bietet Anwendungspasswörter nur auf Websites mit HTTPS an."
+
+msgid "Create task"
+msgstr "Aufgabe anlegen"
+
+msgid "Creates a draft (never published) with the current user as its author. Images from Flurfunk conversations can go along."
+msgstr "Legt einen Entwurf an (nie veröffentlicht), Autor ist die aktuelle Person. Bilder aus Flurfunk-Gesprächen können mit."
+
+msgid "Daily moderation thread"
+msgstr "Täglicher Moderations-Thread"
+
+msgid "Daily summary and task reminders at"
+msgstr "Zusammenfassung und Erinnerungen um"
+
+msgid "Dark"
+msgstr "Dunkel"
+
+msgid "Data"
+msgstr "Daten"
+
+msgid "Date"
+msgstr "Datum"
+
+msgid "Date and time in the site's time zone: YYYY-MM-DD HH:MM."
+msgstr "Datum und Uhrzeit in der Zeitzone der Website: JJJJ-MM-TT HH:MM."
+
+msgid "Delete"
+msgstr "Löschen"
+
+msgid "Delete this message?"
+msgstr "Diese Nachricht löschen?"
+
+msgid "Deleted user"
+msgstr "Gelöschte Person"
+
+msgid "Devices with push: %s"
+msgstr "Geräte mit Push: %s"
+
+msgid "Differing now:"
+msgstr "Abweichend gerade:"
+
+msgid "Dismiss"
+msgstr "Ausblenden"
+
+msgid "Dismissed by %s"
+msgstr "Verworfen von %s"
+
+msgid "Done"
+msgstr "Erledigt"
+
+msgid "Done by %s"
+msgstr "Erledigt von %s"
+
+msgid "Download"
+msgstr "Herunterladen"
+
+msgid "Download export"
+msgstr "Export herunterladen"
+
+msgid "Drafts"
+msgstr "Entwürfe"
+
+msgid "Drag to make the sidebar wider or narrower"
+msgstr "Ziehen, um die Seitenleiste breiter oder schmaler zu machen"
+
+msgid "Drag to make the thread wider or narrower"
+msgstr "Ziehen, um den Thread breiter oder schmaler zu machen"
+
+msgid "Due"
+msgstr "Fällig"
+
+msgid "Due date of the task, YYYY-MM-DD."
+msgstr "Fälligkeit der Aufgabe, JJJJ-MM-TT."
+
+msgid "Edit"
+msgstr "Bearbeiten"
+
+msgid "Edit other people's posts"
+msgstr "Beiträge anderer bearbeiten"
+
+msgid "Edits and deletes other people's messages and threads."
+msgstr "Bearbeitet und löscht Nachrichten und Unterhaltungen anderer."
+
+msgid "Email addresses and phone numbers are removed first."
+msgstr "E-Mail-Adressen und Telefonnummern werden vorher entfernt."
+
+msgid "Email me"
+msgstr "Mail an mich"
+
+msgid "Every new message I can see"
+msgstr "Bei jeder neuen Nachricht, die ich sehen darf"
+
+msgid "Every palette color needs a short name (slug) and a color."
+msgstr "Jede Farbe der Palette braucht einen Kurznamen (slug) und eine Farbe."
+
+msgid "Everyone"
+msgstr "Alle"
+
+msgid "Everything"
+msgstr "Alles"
+
+msgid "Everything not ticked off yet"
+msgstr "Alles, was noch nicht abgehakt ist"
+
+msgid "Excerpt"
+msgstr "Auszug"
+
+msgid "Explain errors and the state of the site"
+msgstr "Fehler und den Zustand der Website erklären"
+
+msgid "Export and import"
+msgstr "Export und Import"
+
+msgid "Export and import are below; on the command line: wp flurfunk export / wp flurfunk import."
+msgstr "Export und Import findest du weiter unten; auf der Kommandozeile: wp flurfunk export / wp flurfunk import."
+
+msgid "Featured image"
+msgstr "Beitragsbild"
+
+msgid "Fields: channel (short name, required), title, body (mentions as <@user ID>), task, due, assignees, target {type, id}, ref_key. Replies go to /threads/<thread ID>/messages with a body. More in the %s."
+msgstr "Felder: channel (Kurzname, Pflicht), title, body (Erwähnungen als <@Benutzer-ID>), task, due, assignees, target {type, id}, ref_key. Antworten gehen mit einem body an /threads/<Thread-ID>/messages. Mehr in der %s."
+
+msgid "File"
+msgstr "Datei"
+
+msgid "File %d is not an image."
+msgstr "Datei %d ist kein Bild."
+
+msgid "Find"
+msgstr "Suchen"
+
+msgid "Find and read posts (the one a thread is about, the latest ones, drafts of the person asking) and point out errors and missing sources"
+msgstr "Beiträge finden und lesen (den, um den es geht, die neuesten, Entwürfe der fragenden Person) und Fehler und fehlende Belege nennen"
+
+msgid "Find and read posts, and search other conversations in its channels"
+msgstr "Beiträge finden und lesen und in anderen Gesprächen seiner Kanäle suchen"
+
+msgid "Find comments"
+msgstr "Kommentare finden"
+
+msgid "Find comments waiting for approval – they appear as cards to approve or mark as spam – and suggest replies"
+msgstr "Kommentare finden, die auf Freigabe warten – sie erscheinen als Karten zum Freigeben oder als Spam markieren –, und Antworten vorschlagen"
+
+msgid "Find posts"
+msgstr "Beiträge finden"
+
+msgid "Flurfunk"
+msgstr "Flurfunk"
+
+msgid "Flurfunk AI assistants"
+msgstr "Flurfunk: KI-Assistenten"
+
+msgid "Flurfunk conversations"
+msgstr "Flurfunk-Gespräche"
+
+msgid "Flurfunk is ready."
+msgstr "Flurfunk ist bereit."
+
+msgid "Flurfunk settings for this site"
+msgstr "Flurfunk-Einstellungen dieser Website"
+
+msgid "Flurfunk works"
+msgstr "Flurfunk funktioniert"
+
+msgid "Follow"
+msgstr "Folgen"
+
+msgid "Follow: get notified about every reply"
+msgstr "Folgen: bei jeder Antwort benachrichtigt werden"
+
+msgid "Following"
+msgstr "Folge ich"
+
+msgid "Following – notified about every reply"
+msgstr "Du folgst – Benachrichtigung bei jeder Antwort"
+
+msgid "For a channel like #ask-ai. Only channels ticked above count; in a thread it answers the follow-ups of the person who asked, anyone else needs to mention it."
+msgstr "Für einen Kanal wie #frag-die-ki. Es zählen nur die oben angehakten Kanäle; im Thread beantwortet er die Nachfragen der Person, die gefragt hat – alle anderen erwähnen ihn."
+
+msgid "For a template part: where it belongs."
+msgstr "Für einen Vorlagenteil: wohin er gehört."
+
+msgid "For two days after its last answer. A quick check with a small model decides whether a message is for it – a few tokens per message, counted in its budget."
+msgstr "Zwei Tage nach seiner letzten Antwort. Eine kurze Vorprüfung mit einem kleinen Modell entscheidet, ob eine Nachricht an ihn geht – wenige Tokens pro Nachricht, im Budget mitgezählt."
+
+msgid "Frequently used"
+msgstr "Häufig benutzt"
+
+msgid "Fri"
+msgstr "Fr"
+
+msgid "From"
+msgstr "Von"
+
+msgid "From every channel, the newest at the bottom"
+msgstr "Aus allen Kanälen, das Neueste unten"
+
+msgid "From media library"
+msgstr "Aus Mediathek"
+
+msgid "General"
+msgstr "Allgemein"
+
+msgid "Get notified about every reply"
+msgstr "Bei jeder Antwort benachrichtigen"
+
+msgid "Give the time as YYYY-MM-DD HH:MM."
+msgstr "Gib die Zeit als JJJJ-MM-TT HH:MM an."
+
+msgid "Go to the dashboard"
+msgstr "Zum Dashboard"
+
+msgid "Guest"
+msgstr "Gast"
+
+msgid "Guests"
+msgstr "Gäste"
+
+msgid "Guests may ask it too"
+msgstr "Auch Gäste dürfen ihn fragen"
+
+msgid "Guests see"
+msgstr "Gäste sehen"
+
+msgid "HH:MM in the site's time zone."
+msgstr "HH:MM in der Zeitzone der Website."
+
+msgid "Handed over by %s"
+msgstr "Übergeben von %s"
+
+msgid "Headings"
+msgstr "Überschriften"
+
+msgid "Headings %s"
+msgstr "Überschriften %s"
+
+msgid "How an agent posts as an assistant"
+msgstr "So schreibt ein Agent als Assistent"
+
+msgid "I looked things up but did not get to an answer. Please ask more specifically."
+msgstr "Ich habe nachgeschaut, bin aber zu keiner Antwort gekommen. Frag bitte genauer."
+
+msgid "ID of an image (e.g. a file from the conversation) to use as the featured image."
+msgstr "ID eines Bildes (z. B. einer Datei aus dem Gespräch) als Beitragsbild."
+
+msgid "IDs of images (e.g. files from the conversation) to place at the end of the text."
+msgstr "IDs von Bildern (z. B. Dateien aus dem Gespräch), die ans Ende des Textes kommen."
+
+msgid "IDs of pages that get the new page template."
+msgstr "IDs der Seiten, die die neue Seitenvorlage bekommen."
+
+msgid "Image"
+msgstr "Bild"
+
+msgid "Image %d does not exist or you may not use it."
+msgstr "Bild %d gibt es nicht, oder du darfst es nicht verwenden."
+
+msgid "Images"
+msgstr "Bilder"
+
+msgid "Import"
+msgstr "Importieren"
+
+msgid "Import an export file (.json or .zip):"
+msgstr "Exportdatei importieren (.json oder .zip):"
+
+msgid "Imported: %1$d threads, %2$d messages, %3$d files. %4$d threads were already there and were skipped."
+msgstr "Importiert: %1$d Threads, %2$d Nachrichten, %3$d Dateien. %4$d Threads waren schon da und wurden übersprungen."
+
+msgid "In a few words, what it does"
+msgstr "In wenigen Worten, wofür er da ist"
+
+msgid "In a few words, what it does – e.g. proofreads, checks sources"
+msgstr "In wenigen Worten, wofür er da ist – z. B. liest gegen, prüft Belege"
+
+msgid "In an hour"
+msgstr "In einer Stunde"
+
+msgid "In progress"
+msgstr "In Arbeit"
+
+msgid "In reply to"
+msgstr "Antwort an"
+
+msgid "In the media library"
+msgstr "In der Mediathek"
+
+msgid "In the trash"
+msgstr "Im Papierkorb"
+
+msgid "Include all files (a ZIP; can be large)"
+msgstr "Alle Dateien mitnehmen (ZIP, kann groß werden)"
+
+msgid "Include the additional CSS."
+msgstr "Das zusätzliche CSS mitliefern."
+
+msgid "Initials"
+msgstr "Initialen"
+
+msgid "Insert a card"
+msgstr "Karte einfügen"
+
+msgid "Insert a post as a card"
+msgstr "Artikel als Karte einfügen"
+
+msgid "Instructions"
+msgstr "Anweisungen"
+
+msgid "Instructions are added to each assistant's own in that channel. A limit caps every assistant there, on top of its own – e.g. in a channel guest authors read, so it cannot quote internal drafts. The budget counts all assistants in the channel together."
+msgstr "Anweisungen kommen in diesem Kanal zu denen jedes Assistenten dazu. Eine Grenze begrenzt dort jeden Assistenten zusätzlich zu seiner eigenen – z. B. in einem Kanal, den Gastautoren lesen, damit er keine internen Entwürfe zitiert. Das Budget zählt alle Assistenten im Kanal zusammen."
+
+msgid "Its folder name, e.g. \"akismet\"."
+msgstr "Sein Ordnername, z. B. „akismet“."
+
+msgid "Keep a log of the last 100 answers (who asked, where, model, tokens – no content)"
+msgstr "Protokoll der letzten 100 Antworten führen (wer gefragt hat, wo, Modell, Tokens – ohne Inhalte)"
+
+msgid "Keep and compare the numbers"
+msgstr "Kennzahlen festhalten und vergleichen"
+
+msgid "Keep conversations when the plugin is deleted"
+msgstr "Gespräche behalten, wenn das Plugin gelöscht wird"
+
+msgid "Keeps a short note (a rule, a fact the team wants kept) for the channel of a conversation – or, with scope site, for all channels – or removes one by its number. Every AI assistant there reads the notes."
+msgstr "Merkt sich eine kurze Notiz (eine Regel, eine Tatsache, die das Team festhalten will) für den Kanal eines Gesprächs – oder mit scope site für alle Kanäle – oder entfernt eine per Nummer. Jeder KI-Assistent dort liest die Notizen."
+
+msgid "Keeps the site's numbers of now with a note for the channel of a conversation (take), lists the kept ones (list), or compares the numbers of now with one of them (compare, by default the latest) – to see whether a measure helped."
+msgstr "Hält die Kennzahlen von jetzt mit einer Notiz für den Kanal eines Gesprächs fest (take), listet die festgehaltenen (list) oder vergleicht die von jetzt mit einem davon (compare, standardmäßig dem letzten) – um zu sehen, ob eine Maßnahme etwas gebracht hat."
+
+msgid "Kept the numbers"
+msgstr "Kennzahlen festgehalten"
+
+msgid "Latest"
+msgstr "Neueste"
+
+msgid "Latest activity first"
+msgstr "Neueste Aktivität zuerst"
+
+msgid "Layout"
+msgstr "Layout"
+
+msgid "Light"
+msgstr "Hell"
+
+msgid "Link color"
+msgstr "Linkfarbe"
+
+msgid "Linked"
+msgstr "Verknüpft"
+
+msgid "Links"
+msgstr "Links"
+
+msgid "List channels"
+msgstr "Kanäle auflisten"
+
+msgid "List conversations"
+msgstr "Gespräche auflisten"
+
+msgid "List plugins, themes and their files"
+msgstr "Plugins, Themes und ihre Dateien auflisten"
+
+msgid "Load older notifications"
+msgstr "Ältere Benachrichtigungen laden"
+
+msgid "Load older threads"
+msgstr "Ältere Threads laden"
+
+msgid "Loading …"
+msgstr "Lädt …"
+
+msgid "Log (%s)"
+msgstr "Protokoll (%s)"
+
+msgid "Log in"
+msgstr "Anmelden"
+
+msgid "Logo"
+msgstr "Logo"
+
+msgid "Look"
+msgstr "Aussehen"
+
+msgid "Looked at the files of %s"
+msgstr "Dateien von %s angesehen"
+
+msgid "Looked at the kept numbers"
+msgstr "Festgehaltene Kennzahlen angesehen"
+
+msgid "Looked at the latest posts"
+msgstr "Die neuesten Beiträge angesehen"
+
+msgid "Looked at the numbers"
+msgstr "Kennzahlen angesehen"
+
+msgid "Looked at the patterns"
+msgstr "Die Muster angesehen"
+
+msgid "Looked at the plugins and themes"
+msgstr "Plugins und Themes angesehen"
+
+msgid "Looked at the site's look"
+msgstr "Das Aussehen der Website angesehen"
+
+msgid "Looked at the theme's templates"
+msgstr "Die Vorlagen des Themes angesehen"
+
+msgid "Looked through conversations"
+msgstr "Gespräche durchgesehen"
+
+msgid "Looked through the comments"
+msgstr "Kommentare durchgesehen"
+
+msgid "Looked up: %s"
+msgstr "Nachgeschlagen: %s"
+
+msgid "Looking things up"
+msgstr "Nachschlagen"
+
+msgid "Make it a task"
+msgstr "Zur Aufgabe machen"
+
+msgid "Manage"
+msgstr "Verwalten"
+
+msgid "Manage options"
+msgstr "Optionen verwalten"
+
+msgid "Mark all as read"
+msgstr "Alle als gelesen markieren"
+
+msgid "Mark this comment as spam?"
+msgstr "Diesen Kommentar als Spam markieren?"
+
+msgid "May at most act as"
+msgstr "Darf höchstens wie"
+
+msgid "May read the text of the post a thread is about (only if the person asking may read it)"
+msgstr "Darf den Text des Beitrags lesen, um den es im Thread geht (nur wenn die fragende Person ihn lesen darf)"
+
+msgid "Me"
+msgstr "Ich"
+
+msgid "Mention an AI assistant to get an answer, and get private thread summaries. Guests also need the assistant to allow guests."
+msgstr "Einen KI-Assistenten erwähnen und eine Antwort bekommen, private Zusammenfassungen von Threads. Gäste brauchen zusätzlich einen Assistenten, der Gäste zulässt."
+
+msgid "Mention someone"
+msgstr "Jemanden erwähnen"
+
+msgid "Mentions"
+msgstr "Erwähnungen"
+
+msgid "Mentions, tasks, replies"
+msgstr "Erwähnungen, Aufgaben, Antworten"
+
+msgid "Mentions, unread counts, links."
+msgstr "Erwähnungen, Zahlen für Ungelesenes, Links."
+
+msgid "Message"
+msgstr "Nachricht"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Model IDs separated by commas, the first available one is used."
+msgstr "Modell-IDs mit Komma getrennt; das erste verfügbare wird genommen."
+
+msgid "Models for the quick check"
+msgstr "Modelle für die Vorprüfung"
+
+msgid "Moderate"
+msgstr "Moderieren"
+
+msgid "Moderate comments"
+msgstr "Kommentare moderieren"
+
+msgid "Modules"
+msgstr "Module"
+
+msgid "Modules saved."
+msgstr "Module gespeichert."
+
+msgid "Mon"
+msgstr "Mo"
+
+msgid "Monthly budget"
+msgstr "Monatsbudget"
+
+msgid "Move this comment to the trash?"
+msgstr "Diesen Kommentar in den Papierkorb legen?"
+
+msgid "Moved to %s"
+msgstr "Verschoben nach %s"
+
+msgid "Mute"
+msgstr "Stummschalten"
+
+msgid "Mute: only mentions and tasks"
+msgstr "Stummschalten: nur Erwähnungen und Aufgaben"
+
+msgid "Muted"
+msgstr "Stumm"
+
+msgid "Muted – only mentions and tasks"
+msgstr "Stumm – nur Erwähnungen und Aufgaben"
+
+msgid "My budget for this month is used up. An administrator can raise it under Settings → Flurfunk → AI assistants."
+msgstr "Mein Budget für diesen Monat ist aufgebraucht. Ein Admin kann es unter Einstellungen → Flurfunk → KI-Assistenten erhöhen."
+
+msgid "My posts"
+msgstr "Meine Artikel"
+
+msgid "My settings"
+msgstr "Meine Einstellungen"
+
+msgid "My tasks"
+msgstr "Meine Aufgaben"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Navigation"
+msgstr "Navigation"
+
+msgid "Needs SEOPress or the WordPress plugin \"AI\"."
+msgstr "Braucht SEOPress oder das WordPress-Plugin „AI“."
+
+msgid "Needs abilities that read the site's state."
+msgstr "Braucht Fähigkeiten, die den Zustand der Website lesen."
+
+msgid "Needs the WordPress plugin \"AI\" with alt texts switched on."
+msgstr "Braucht das WordPress-Plugin „AI“ mit eingeschalteten Alt-Texten."
+
+msgid "Needs the module \"Comment cards\"."
+msgstr "Braucht das Modul „Kommentar-Karten“."
+
+msgid "Never more than the person asking, and never anything that administers the site (users, plugins, settings, unfiltered HTML). A role sets a ceiling on top: an assistant limited to Author does not see others' drafts, even when an editor asks. Applies to what it reads and to what it proposes; its own account stays as it is."
+msgstr "Nie mehr als die fragende Person und nie etwas, das die Website verwaltet (Benutzer, Plugins, Einstellungen, ungefiltertes HTML). Eine Rolle setzt zusätzlich eine Obergrenze: Ein Assistent mit der Grenze Autor sieht keine fremden Entwürfe, auch wenn ein Redakteur fragt. Gilt für das, was er liest, und für das, was er vorschlägt; sein eigenes Konto bleibt, wie es ist."
+
+msgid "Never – I check myself"
+msgstr "Nie – ich schaue selbst rein"
+
+msgid "New"
+msgstr "Neu"
+
+msgid "New assistant"
+msgstr "Neuer Assistent"
+
+msgid "New conversation about this post"
+msgstr "Neues Gespräch zu diesem Artikel"
+
+msgid "New conversation with %s …"
+msgstr "Neues Gespräch mit %s …"
+
+msgid "New conversation: %s"
+msgstr "Neues Gespräch: %s"
+
+msgid "New item"
+msgstr "Neuer Eintrag"
+
+msgid "New markup"
+msgstr "Neues Markup"
+
+msgid "New markup for the whole template"
+msgstr "Neues Markup für die ganze Vorlage"
+
+msgid "New thread in #%s … (@name, / for cards)"
+msgstr "Neuer Thread in #%s … (@Name, / für Karten)"
+
+msgid "New thread … (@name, / for cards)"
+msgstr "Neuer Thread … (@Name, / für Karten)"
+
+msgid "Next Monday, %s"
+msgstr "Nächsten Montag, %s"
+
+msgid "Next image"
+msgstr "Nächstes Bild"
+
+msgid "No AI assistant takes part in this channel."
+msgstr "In diesem Kanal macht kein KI-Assistent mit."
+
+msgid "No AI provider is set up yet. Add one under %s."
+msgstr "Noch kein KI-Anbieter eingerichtet. Das geht unter %s."
+
+msgid "No access"
+msgstr "Kein Zugang"
+
+msgid "No connection – trying again …"
+msgstr "Keine Verbindung – versuche es weiter …"
+
+msgid "No conversations about this post yet."
+msgstr "Zu diesem Artikel gibt es noch keine Gespräche."
+
+msgid "No conversations yet. Write below to start one – a new conversation starts fresh."
+msgstr "Noch keine Gespräche. Schreib unten, um eins zu beginnen – ein neues Gespräch fängt frisch an."
+
+msgid "No emoji found"
+msgstr "Kein Emoji gefunden"
+
+msgid "No modules are installed."
+msgstr "Es sind keine Module installiert."
+
+msgid "No notifications yet."
+msgstr "Noch keine Benachrichtigungen."
+
+msgid "No reminder"
+msgstr "Keine Erinnerung"
+
+msgid "No replies yet"
+msgstr "Noch keine Antwort"
+
+msgid "No suitable AI model is available. An administrator can check the provider under Settings → Connectors and the preferred models of this assistant."
+msgstr "Kein passendes KI-Modell verfügbar. Ein Admin kann den Anbieter unter Einstellungen → Konnektoren und die bevorzugten Modelle dieses Assistenten prüfen."
+
+msgid "Not applied"
+msgstr "Nicht übernommen"
+
+msgid "Not possible: %s"
+msgstr "Nicht möglich: %s"
+
+msgid "Noted it for all channels"
+msgstr "Für alle Kanäle notiert"
+
+msgid "Noted it for the channel"
+msgstr "Für den Kanal notiert"
+
+msgid "Notes"
+msgstr "Notizen"
+
+msgid "Notes are kept per channel; this conversation has none."
+msgstr "Notizen gibt es pro Kanal; dieses Gespräch hat keine."
+
+msgid "Notes for all channels"
+msgstr "Notizen für alle Kanäle"
+
+msgid "Notes per channel: an assistant remembers what someone asks it to remember there (shown and removable per channel below; never in private conversations)"
+msgstr "Notizen pro Kanal: Ein Assistent merkt sich, worum ihn jemand dort bittet (unten pro Kanal sichtbar und löschbar; nie in privaten Gesprächen)"
+
+msgid "Nothing"
+msgstr "Nichts"
+
+msgid "Nothing else"
+msgstr "Nichts weiter"
+
+msgid "Nothing found."
+msgstr "Nichts gefunden."
+
+msgid "Nothing here"
+msgstr "Nichts hier"
+
+msgid "Nothing here yet."
+msgstr "Hier ist noch nichts."
+
+msgid "Nothing here yet. Start a thread below."
+msgstr "Hier ist noch nichts. Fang unten einen Thread an."
+
+msgid "Nothing to change."
+msgstr "Nichts zu ändern."
+
+msgid "Nothing would change in post %d."
+msgstr "In Beitrag %d würde sich nichts ändern."
+
+msgid "Notifications"
+msgstr "Benachrichtigungen"
+
+msgid "Notifications (%s new)"
+msgstr "Benachrichtigungen (%s neu)"
+
+msgid "Notifications are blocked in this browser. Allow them in the site settings of your browser."
+msgstr "Benachrichtigungen sind in diesem Browser gesperrt. Erlaube sie in den Website-Einstellungen deines Browsers."
+
+msgid "Notifications for this channel"
+msgstr "Benachrichtigungen für diesen Kanal"
+
+msgid "Notifications on this device are on."
+msgstr "Benachrichtigungen auf diesem Gerät sind an."
+
+msgid "Notify: as usual"
+msgstr "Benachrichtigung: Standard"
+
+msgid "Notify: every new post"
+msgstr "Benachrichtigung: alle Beiträge"
+
+msgid "Notify: only mentions"
+msgstr "Benachrichtigung: nur Erwähnungen"
+
+msgid "Number of a note to remove (to correct one: remove it and add the new one)."
+msgstr "Nummer einer zu entfernenden Notiz (zum Korrigieren: entfernen und die neue hinzufügen)."
+
+msgid "Number of the snapshot to compare with (from list)."
+msgstr "Nummer des Schnappschusses, mit dem verglichen wird (aus list)."
+
+msgid "Numbers and site check"
+msgstr "Kennzahlen und Inhalts-Check"
+
+msgid "Off for this device"
+msgstr "Auf diesem Gerät aus"
+
+msgid "Offer \"Summarize\" in threads (a private summary, only for the person who asks)"
+msgstr "„Zusammenfassen“ in Threads anbieten (privat, nur für die Person, die fragt)"
+
+msgid "Oldest from"
+msgstr "Ältester vom"
+
+msgid "On"
+msgstr "An"
+
+msgid "On for this device"
+msgstr "Auf diesem Gerät an"
+
+msgid "Once a day, if comments are waiting for approval, a thread lists them. By default in its own channel #comments, which only people who may moderate comments see."
+msgstr "Einmal am Tag listet ein Thread die Kommentare auf, die auf Freigabe warten. Standardmäßig im eigenen Kanal #comments, den nur sieht, wer Kommentare moderieren darf."
+
+msgid "Once a day: a summary at %s"
+msgstr "Einmal am Tag: eine Zusammenfassung um %s"
+
+msgid "One conversation with its messages (newest 100), if the current user may read it."
+msgstr "Ein Gespräch mit seinen Nachrichten (die neuesten 100), wenn die angemeldete Person es lesen darf."
+
+msgid "Only a page template can be given to pages."
+msgstr "Nur eine Seitenvorlage lässt sich Seiten zuweisen."
+
+msgid "Only in Flurfunk so far. Adding it keeps the file where it is."
+msgstr "Bisher nur im Flurfunk. Beim Übernehmen bleibt die Datei, wo sie ist."
+
+msgid "Only mentions and tasks"
+msgstr "Nur Erwähnungen und Aufgaben"
+
+msgid "Only people who may change user roles (usually administrators) can change these."
+msgstr "Ändern können das nur Personen, die Benutzerrollen vergeben dürfen (meist Administrator:innen)."
+
+msgid "Only people who may change user roles can change this, and not for their own account."
+msgstr "Ändern kann das nur, wer Benutzerrollen ändern darf, und nicht am eigenen Konto."
+
+msgid "Only the markup changes, not the text"
+msgstr "Nur das Markup ändert sich, nicht der Text"
+
+msgid "Only these numbers (keys); leave it out for all."
+msgstr "Nur diese Kennzahlen (Schlüssel); weglassen für alle."
+
+msgid "Only threads about their own posts"
+msgstr "Nur Threads zu eigenen Artikeln"
+
+msgid "Open"
+msgstr "Offen"
+
+msgid "Open Flurfunk"
+msgstr "Flurfunk öffnen"
+
+msgid "Open full screen"
+msgstr "Im Vollbild öffnen"
+
+msgid "Open in Flurfunk"
+msgstr "Im Flurfunk öffnen"
+
+msgid "Open post"
+msgstr "Artikel öffnen"
+
+msgid "Open tasks"
+msgstr "Offene Aufgaben"
+
+msgid "Open the conversation"
+msgstr "Gespräch öffnen"
+
+msgid "Optional parts of Flurfunk and additions from other plugins. Modules that are off are not loaded at all."
+msgstr "Optionale Teile von Flurfunk und Erweiterungen aus anderen Plugins. Ausgeschaltete Module werden gar nicht erst geladen."
+
+msgid "Order"
+msgstr "Reihenfolge"
+
+msgid "Other"
+msgstr "Sonstiges"
+
+msgid "Overdue task"
+msgstr "Überfällige Aufgabe"
+
+msgid "Page %d does not exist or you may not change it."
+msgstr "Die Seite %d gibt es nicht, oder du darfst sie nicht ändern."
+
+msgid "Pages and design"
+msgstr "Seiten und Design"
+
+msgid "Palette"
+msgstr "Palette"
+
+msgid "Path inside the plugin or theme, e.g. \"includes/class-api.php\"."
+msgstr "Pfad im Plugin oder Theme, z. B. „includes/class-api.php“."
+
+msgid "Pause:"
+msgstr "Pausieren:"
+
+msgid "Paused until %s"
+msgstr "Pausiert bis %s"
+
+msgid "Pending"
+msgstr "Wartet"
+
+msgid "Per channel: instructions, limit, budget"
+msgstr "Pro Kanal: Anweisungen, Grenze, Budget"
+
+msgid "Permissions"
+msgstr "Rechte"
+
+msgid "Permissions saved."
+msgstr "Rechte gespeichert."
+
+msgid "Permissions saved. \"Manage\" stayed where it was, so nobody locks themselves out."
+msgstr "Rechte gespeichert. „Verwalten“ ist geblieben, wo es war, damit sich niemand aussperrt."
+
+msgid "Photo"
+msgstr "Foto"
+
+msgid "Please choose a time within the next year."
+msgstr "Bitte wähle einen Zeitpunkt innerhalb des nächsten Jahres."
+
+msgid "Please choose an export file."
+msgstr "Bitte wähle eine Exportdatei."
+
+msgid "Please wait until the upload is finished."
+msgstr "Bitte warte, bis die Datei hochgeladen ist."
+
+msgid "Post"
+msgstr "Artikel"
+
+msgid "Post %d does not exist or you may not see it."
+msgstr "Beitrag %d gibt es nicht, oder du darfst ihn nicht sehen."
+
+msgid "Posts"
+msgstr "Artikel"
+
+msgid "Posts (or, with type page, pages) of this site the current user may see (drafts and scheduled ones only if they may edit them), newest first: the latest ones, or those matching search words. Returns ID, title, status, dates, author, the address of published ones and the first words; read one with flurfunk/get-post."
+msgstr "Beiträge (oder mit type page: Seiten) dieser Website, die die aktuelle Person sehen darf (Entwürfe und geplante nur, wenn sie sie bearbeiten darf), neueste zuerst: die letzten oder die zu Suchwörtern passenden. Liefert ID, Titel, Status, Daten, Autor, die Adresse veröffentlichter Beiträge und die ersten Worte; lesen mit flurfunk/get-post."
+
+msgid "Preferred models"
+msgstr "Bevorzugte Modelle"
+
+msgid "Prepared a suggestion: %s"
+msgstr "Einen Vorschlag vorbereitet: %s"
+
+msgid "Previous image"
+msgstr "Vorheriges Bild"
+
+msgid "Private conversation"
+msgstr "Privates Gespräch"
+
+msgid "Private conversations"
+msgstr "Private Gespräche"
+
+msgid "Private conversations with %s"
+msgstr "Private Gespräche mit %s"
+
+msgid "Private – only you see these conversations"
+msgstr "Privat – nur du siehst diese Gespräche"
+
+msgid "Profile picture"
+msgstr "Profilbild"
+
+msgid "Progress"
+msgstr "Fortschritt"
+
+msgid "Proofreading"
+msgstr "Gegenlesen"
+
+msgid "Proposal of an AI assistant"
+msgstr "Vorschlag eines KI-Assistenten"
+
+msgid "Proposals a person confirms"
+msgstr "Vorschläge, die ein Mensch bestätigt"
+
+msgid "Proposals a person confirms (%s chosen)"
+msgstr "Vorschläge, die eine Person bestätigt (%s gewählt)"
+
+msgid "Publish posts"
+msgstr "Beiträge veröffentlichen"
+
+msgid "Push notifications"
+msgstr "Push-Benachrichtigungen"
+
+msgid "Push notifications are not available in this browser or on this server."
+msgstr "Push-Benachrichtigungen gehen in diesem Browser oder auf diesem Server nicht."
+
+msgid "Push notifications need HTTPS. This site does not use it, so push stays off."
+msgstr "Push-Benachrichtigungen brauchen HTTPS. Diese Website nutzt es nicht, deshalb bleibt Push aus."
+
+msgid "Question"
+msgstr "Rückfrage"
+
+msgid "Quick check: for it"
+msgstr "Vorprüfung: für ihn"
+
+msgid "Quick check: not for it"
+msgstr "Vorprüfung: nicht für ihn"
+
+msgid "Quick check: thanks (reacted)"
+msgstr "Vorprüfung: Dank (mit Reaktion)"
+
+msgid "Quiet hours (no push)"
+msgstr "Ruhezeit (kein Push)"
+
+msgid "Quotes"
+msgstr "Zitate"
+
+msgid "Reaction"
+msgstr "Reaktion"
+
+msgid "Read \"%s\""
+msgstr "„%s“ gelesen"
+
+msgid "Read %s"
+msgstr "%s gelesen"
+
+msgid "Read a code file"
+msgstr "Eine Code-Datei lesen"
+
+msgid "Read a conversation"
+msgstr "Gespräch lesen"
+
+msgid "Read a pattern"
+msgstr "Ein Muster gelesen"
+
+msgid "Read a post"
+msgstr "Beitrag lesen"
+
+msgid "Read the conversation \"%s\""
+msgstr "Das Gespräch „%s“ gelesen"
+
+msgid "Read the menu"
+msgstr "Das Menü gelesen"
+
+msgid "Read the patterns"
+msgstr "Die Muster lesen"
+
+msgid "Read the site's look"
+msgstr "Das Aussehen der Website lesen"
+
+msgid "Read the template %s"
+msgstr "Die Vorlage %s gelesen"
+
+msgid "Read the theme's templates"
+msgstr "Die Vorlagen des Themes lesen"
+
+msgid "Read-only abilities of this site. They run with the rights of the person asking, within the limit above, so the assistant only finds what that person may see (in Flurfunk only in the channels ticked above) – but what it finds is sent to the AI provider."
+msgstr "Nur lesende Fähigkeiten dieser Website. Sie laufen mit den Rechten der fragenden Person, innerhalb der Grenze oben – der Assistent findet also nur, was diese Person sehen darf (in Flurfunk nur in den oben angehakten Kanälen). Was er findet, geht aber an den KI-Anbieter."
+
+msgid "Read: %s"
+msgstr "Gelesen: %s"
+
+msgid "Reads: %1$s · Suggests: %2$s · Changes by itself: %3$s"
+msgstr "Liest: %1$s · Schlägt vor: %2$s · Ändert selbst: %3$s"
+
+msgid "Remember for a channel"
+msgstr "Für einen Kanal merken"
+
+msgid "Remind me about this thread"
+msgstr "An diesen Thread erinnern"
+
+msgid "Remind me …"
+msgstr "Erinnern …"
+
+msgid "Reminder"
+msgstr "Erinnerung"
+
+msgid "Reminder removed"
+msgstr "Erinnerung gelöscht"
+
+msgid "Reminder set"
+msgstr "Erinnerung gesetzt"
+
+msgid "Reminder: %s"
+msgstr "Erinnerung: %s"
+
+msgid "Remove"
+msgstr "Entfernen"
+
+msgid "Remove card"
+msgstr "Karte entfernen"
+
+msgid "Remove due date"
+msgstr "Fälligkeit entfernen"
+
+msgid "Remove file"
+msgstr "Datei entfernen"
+
+msgid "Removes \"%s\""
+msgstr "Entfernt „%s“"
+
+msgid "Replace email addresses and phone numbers before anything is sent to the AI provider"
+msgstr "E-Mail-Adressen und Telefonnummern ersetzen, bevor etwas an den KI-Anbieter geht"
+
+msgid "Replace with"
+msgstr "Ersetzen durch"
+
+msgid "Reply"
+msgstr "Antworten"
+
+msgid "Reply below to answer in this thread."
+msgstr "Antworte unten, um in diesem Thread zu antworten."
+
+msgid "Reply in Flurfunk: %s"
+msgstr "Im Flurfunk antworten: %s"
+
+msgid "Reply in a conversation"
+msgstr "In einem Gespräch antworten"
+
+msgid "Reply to %1$s on \"%2$s\""
+msgstr "Antwort an %1$s zu „%2$s“"
+
+msgid "Reply to a comment"
+msgstr "Auf einen Kommentar antworten"
+
+msgid "Reply … (@name, / for cards)"
+msgstr "Antworten … (@Name, / für Karten)"
+
+msgid "Responsible"
+msgstr "Zuständig"
+
+msgid "Responsible: %s"
+msgstr "Zuständig: %s"
+
+msgid "Result"
+msgstr "Ergebnis"
+
+msgid "Resume"
+msgstr "Fortsetzen"
+
+msgid "Review requests"
+msgstr "Prüfaufträge"
+
+msgid "Review: %s"
+msgstr "Prüfen: %s"
+
+msgid "Right away: mentions, tasks, replies in my threads"
+msgstr "Sofort: Erwähnungen, Aufgaben, Antworten in meinen Threads"
+
+msgid "Rights"
+msgstr "Rechte"
+
+msgid "Role, tone, what to look out for. E.g.: You help the editors with proofreading. Point out unclear sentences and missing sources."
+msgstr "Rolle, Ton, worauf zu achten ist. Zum Beispiel: Du hilfst der Redaktion beim Gegenlesen. Weise auf unklare Sätze und fehlende Belege hin."
+
+msgid "Routine"
+msgstr "Routine"
+
+msgid "Routines"
+msgstr "Routinen"
+
+msgid "Run"
+msgstr "Ausführen"
+
+msgid "Run by %s"
+msgstr "Ausgeführt von %s"
+
+msgid "Run this now, with your rights?"
+msgstr "Jetzt ausführen, mit deinen Rechten?"
+
+msgid "Runs with your rights"
+msgstr "Läuft mit deinen Rechten"
+
+msgid "Runs with your rights · can be undone"
+msgstr "Läuft mit deinen Rechten · lässt sich rückgängig machen"
+
+msgid "SEO and teasers"
+msgstr "SEO und Teaser"
+
+msgid "Sat"
+msgstr "Sa"
+
+msgid "Save"
+msgstr "Speichern"
+
+msgid "Save AI assistants"
+msgstr "KI-Assistenten speichern"
+
+msgid "Save a pattern"
+msgstr "Ein Muster speichern"
+
+msgid "Save modules"
+msgstr "Module speichern"
+
+msgid "Save permissions"
+msgstr "Rechte speichern"
+
+msgid "Saved"
+msgstr "Gespeichert"
+
+msgid "Saves a pattern of the site's own: a new one (title, content, synced: the same everywhere it is used – else a starting point copied into pages, categories), or a change to one (id; an exact replacement find/replace, or new content; title). A change to a synced pattern shows wherever it is used. Can be undone. Scripts are filtered out."
+msgstr "Speichert ein eigenes Muster der Website: ein neues (Titel, Inhalt, synced: überall gleich, wo es verwendet wird – sonst ein Ausgangspunkt, der in Seiten kopiert wird, Kategorien) oder eine Änderung an einem (id; eine genaue Ersetzung find/replace oder neuer Inhalt; Titel). Eine Änderung an einem synchronisierten Muster zeigt sich überall, wo es verwendet wird. Lässt sich rückgängig machen. Skripte werden herausgefiltert."
+
+msgid "Say what to look for."
+msgstr "Sag, wonach gesucht werden soll."
+
+msgid "Search"
+msgstr "Suchen"
+
+msgid "Search and read the code of plugins and themes – how something works, how to extend it (for administrators)"
+msgstr "Den Code von Plugins und Themes durchsuchen und lesen – wie etwas funktioniert, wie man es erweitert (für Administratoren)"
+
+msgid "Search conversations"
+msgstr "Gespräche durchsuchen"
+
+msgid "Search emoji"
+msgstr "Emoji suchen"
+
+msgid "Search the code"
+msgstr "Im Code suchen"
+
+msgid "Search …"
+msgstr "Suchen …"
+
+msgid "Search: %s"
+msgstr "Suche: %s"
+
+msgid "Searched %2$s for \"%1$s\""
+msgstr "%2$s nach „%1$s“ durchsucht"
+
+msgid "Searched posts for \"%s\""
+msgstr "Beiträge nach „%s“ durchsucht"
+
+msgid "Searches the files of a plugin or theme for a word or a regular expression (e.g. a hook name, function or class) and returns file, line and the line itself – up to 60 hits."
+msgstr "Durchsucht die Dateien eines Plugins oder Themes nach einem Wort oder regulären Ausdruck (z. B. einem Hook, einer Funktion oder Klasse) und liefert Datei, Zeile und die Zeile selbst – bis zu 60 Treffer."
+
+msgid "Send"
+msgstr "Senden"
+
+msgid "Send a test"
+msgstr "Test senden"
+
+msgid "Send reply"
+msgstr "Antwort senden"
+
+msgid "Sent – it should appear shortly"
+msgstr "Gesendet – sollte gleich erscheinen"
+
+msgid "Set a check-in"
+msgstr "Nachhaken geplant"
+
+msgid "Set up the routine"
+msgstr "Die Routine eingerichtet"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Settings saved."
+msgstr "Einstellungen gespeichert."
+
+msgid "Settings → Connectors"
+msgstr "Einstellungen → Konnektoren"
+
+msgid "Settings, channels, permissions, modules, assistants, export and import."
+msgstr "Einstellungen, Kanäle, Rechte, Module, Assistenten, Export und Import."
+
+msgid "Shift+Enter for a new line"
+msgstr "Umschalt+Enter für eine neue Zeile"
+
+msgid "Short name, e.g. \"landing-page\"."
+msgstr "Kurzname, z. B. „landing-page“."
+
+msgid "Show"
+msgstr "Anzeigen"
+
+msgid "Show less"
+msgstr "Weniger anzeigen"
+
+msgid "Show more"
+msgstr "Mehr anzeigen"
+
+msgid "Show notifications while Flurfunk is open in the background"
+msgstr "Hinweise zeigen, wenn Flurfunk im Hintergrund offen ist"
+
+msgid "Show the unread number on the menu icon"
+msgstr "Zahl für Ungelesenes am Menü-Symbol zeigen"
+
+msgid "Shown at the top of the sidebar. Empty: the site title."
+msgstr "Steht oben in der Seitenleiste. Leer: der Name der Website."
+
+msgid "Sidebar colour"
+msgstr "Farbe der Seitenleiste"
+
+msgid "Since"
+msgstr "Seit"
+
+msgid "Single abilities and model …"
+msgstr "Einzelne Fähigkeiten und Modell …"
+
+msgid "Single people can differ from their role – e.g. a trainee in the team, a freelancer as a guest: on their profile under \"Flurfunk\"."
+msgstr "Einzelne Personen können von ihrer Rolle abweichen – z. B. eine Auszubildende im Team, ein freier Mitarbeiter als Gast: in ihrem Profil unter „Flurfunk“."
+
+msgid "Skip the post if it was modified since this time (post_modified_gmt)."
+msgstr "Den Beitrag überspringen, wenn er seit diesem Zeitpunkt geändert wurde (post_modified_gmt)."
+
+msgid "Skipped"
+msgstr "Übersprungen"
+
+msgid "Snapshots are kept per channel; this conversation has none."
+msgstr "Schnappschüsse werden pro Kanal geführt; dieses Gespräch hat keinen."
+
+msgid "Some lines of a file of a plugin or theme (up to 400 at a time), with line numbers. Secrets and files that usually hold them are never shown."
+msgstr "Einige Zeilen einer Datei eines Plugins oder Themes (bis zu 400 auf einmal), mit Zeilennummern. Geheimnisse und Dateien, in denen sie meist stehen, werden nie gezeigt."
+
+msgid "Someone"
+msgstr "Jemand"
+
+msgid "Someone changed this post in the meantime."
+msgstr "Jemand hat diesen Beitrag inzwischen geändert."
+
+msgid "Someone else is working on this card. Please try again in a moment."
+msgstr "Gerade arbeitet jemand anderes mit dieser Karte. Bitte gleich noch einmal versuchen."
+
+msgid "Someone has worked on this draft since it was written here (or it was not written here). It is not changed on its own any more."
+msgstr "Jemand hat seit dem Schreiben an diesem Entwurf gearbeitet (oder er wurde nicht hier geschrieben). Er wird nicht mehr von selbst geändert."
+
+msgid "Sorry, you are not allowed to do that."
+msgstr "Das darfst du leider nicht."
+
+msgid "Spam"
+msgstr "Spam"
+
+msgid "Standing work for an AI assistant on a schedule (e.g. every Friday at 15:00 a summary of what is open in this channel): add, list, pause, resume or remove the routines of a conversation's channel."
+msgstr "Wiederkehrende Aufgaben für einen KI-Assistenten nach Zeitplan (z. B. jeden Freitag um 15:00 eine Übersicht, was in diesem Kanal noch offen ist): Routinen des Kanals eines Gesprächs anlegen, auflisten, pausieren, fortsetzen oder entfernen."
+
+msgid "Start"
+msgstr "Starten"
+
+msgid "Start a conversation"
+msgstr "Gespräch beginnen"
+
+msgid "Start conversation"
+msgstr "Gespräch beginnen"
+
+msgid "Start thread"
+msgstr "Thread starten"
+
+msgid "Starts a conversation in a channel as the current user, optionally as a task."
+msgstr "Beginnt als angemeldete Person ein Gespräch in einem Kanal, auf Wunsch als Aufgabe."
+
+msgid "State"
+msgstr "Status"
+
+msgid "Stays in a thread once it has answered: anyone there can write on without mentioning it again"
+msgstr "Bleibt im Thread, sobald er geantwortet hat: Alle dort können ohne neue Erwähnung weiterschreiben"
+
+msgid "Styles"
+msgstr "Stile"
+
+msgid "Suggest corrections, titles, excerpts, categories and featured images for existing posts – one card with before and after; a person applies it and can undo it"
+msgstr "Korrekturen, Titel, Auszüge, Kategorien und Beitragsbilder für bestehende Beiträge vorschlagen – eine Karte mit Vorher und Nachher; eine Person übernimmt sie und kann sie rückgängig machen"
+
+msgid "Suggest tasks and new conversations from the talk"
+msgstr "Aufgaben und neue Gespräche aus der Unterhaltung vorschlagen"
+
+msgid "Suggest titles, excerpts and descriptions"
+msgstr "Titel, Auszüge und Beschreibungen vorschlagen"
+
+msgid "Suggestion · waiting for you"
+msgstr "Vorschlag · wartet auf dich"
+
+msgid "Summaries are switched off on this site."
+msgstr "Zusammenfassungen sind auf dieser Website ausgeschaltet."
+
+msgid "Summarize"
+msgstr "Zusammenfassen"
+
+msgid "Summarize briefly, only for you?"
+msgstr "Kurz zusammenfassen, nur für dich?"
+
+msgid "Summarize – only for you"
+msgstr "Zusammenfassen – nur für dich"
+
+msgid "Summarizing"
+msgstr "Fasse zusammen"
+
+msgid "Summary"
+msgstr "Zusammenfassung"
+
+msgid "Sun"
+msgstr "So"
+
+msgid "Table"
+msgstr "Tabelle"
+
+msgid "Tags"
+msgstr "Schlagwörter"
+
+msgid "Takes part as"
+msgstr "Nimmt teil als"
+
+msgid "Takes part as a guest and sees channels according to their guest setting, e.g. only threads about their own posts. Team wins if someone has both."
+msgstr "Macht als Gast mit und sieht Kanäle nach deren Einstellung für Gäste, z. B. nur Unterhaltungen zu eigenen Beiträgen. Wer beides hat, zählt zum Team."
+
+msgid "Takes part fully and sees channels according to their team setting."
+msgstr "Macht voll mit und sieht Kanäle nach deren Einstellung fürs Team."
+
+msgid "Task"
+msgstr "Aufgabe"
+
+msgid "Task due today"
+msgstr "Aufgabe heute fällig"
+
+msgid "Task: %s"
+msgstr "Aufgabe: %s"
+
+msgid "Tasks"
+msgstr "Aufgaben"
+
+msgid "Tasks by state. Drag cards to move them."
+msgstr "Aufgaben nach Stand. Karten zum Verschieben ziehen."
+
+msgid "Team"
+msgstr "Team"
+
+msgid "Team conversations, tasks and channels."
+msgstr "Gespräche, Aufgaben und Kanäle des Teams."
+
+msgid "Team sees"
+msgstr "Team sieht"
+
+msgid "Team sees channels by their setting for the team, guests by the one for guests. For one person, e.g. a trainee in the team although their role is \"Contributor\", or a freelancer as a guest."
+msgstr "Das Team sieht Kanäle nach ihrer Einstellung fürs Team, Gäste nach der für Gäste. Für eine einzelne Person, z. B. eine Auszubildende im Team, obwohl ihre Rolle „Mitarbeiter“ ist, oder einen freien Mitarbeiter als Gast."
+
+msgid "Tech"
+msgstr "Technik"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Text color"
+msgstr "Textfarbe"
+
+msgid "That did not work."
+msgstr "Das hat nicht geklappt."
+
+msgid "That did not work: %s"
+msgstr "Das hat nicht geklappt: %s"
+
+msgid "That is not an emoji."
+msgstr "Das ist kein Emoji."
+
+msgid "That pattern does not work."
+msgstr "Dieses Suchmuster funktioniert nicht."
+
+msgid "That was a lot at once. Please wait a minute."
+msgstr "Das war viel auf einmal. Bitte warte eine Minute."
+
+msgid "The AI budget for #%s is used up for this month. An administrator can raise it under Settings → Flurfunk → AI assistants."
+msgstr "Das KI-Budget für #%s ist für diesen Monat aufgebraucht. Ein Administrator kann es unter Einstellungen → Flurfunk → KI-Assistenten erhöhen."
+
+msgid "The AI budget for this month is used up."
+msgstr "Das KI-Budget für diesen Monat ist aufgebraucht."
+
+msgid "The AI provider did not answer in time. Please try again, maybe with a shorter question."
+msgstr "Der KI-Anbieter hat nicht rechtzeitig geantwortet. Versuch es bitte noch einmal, vielleicht mit einer kürzeren Frage."
+
+msgid "The AI provider does not accept the key. An administrator can check it under Settings → Connectors."
+msgstr "Der KI-Anbieter nimmt den Schlüssel nicht an. Ein Admin kann ihn unter Einstellungen → Konnektoren prüfen."
+
+msgid "The AI provider is busy right now. Please mention me again in a minute."
+msgstr "Der KI-Anbieter ist gerade ausgelastet. Erwähne mich bitte in einer Minute noch einmal."
+
+msgid "The Flurfunk channels the current user can read: short name, name and topic."
+msgstr "Die Flurfunk-Kanäle, die die angemeldete Person lesen darf: Kurzname, Name und Thema."
+
+msgid "The active theme, whether it is a block theme, its base colors, color palette, fonts and font and spacing sizes (with the values to use), the content widths, the typography and spacing set for the site and its elements, and the site's additional CSS."
+msgstr "Das aktive Theme, ob es ein Block-Theme ist, seine Grundfarben, Farbpalette, Schriften sowie Schrift- und Abstandsgrößen (mit den zu verwendenden Werten), die Inhaltsbreiten, die für die Website und ihre Elemente gesetzte Typografie und Abstände sowie das zusätzliche CSS der Website."
+
+msgid "The agent sends the login name and that password with every request to the REST API, for example to start a thread:"
+msgstr "Der Agent schickt Benutzername und dieses Passwort bei jeder Anfrage an die REST-API mit, zum Beispiel für einen neuen Thread:"
+
+msgid "The bell collects your notifications. Under your name at the bottom of the sidebar you choose mail, push and quiet hours."
+msgstr "Die Glocke sammelt deine Benachrichtigungen. Unter deinem Namen unten in der Seitenleiste wählst du Mail, Push und Ruhezeiten."
+
+msgid "The comment could not be changed."
+msgstr "Der Kommentar konnte nicht geändert werden."
+
+msgid "The conversation is empty."
+msgstr "Das Gespräch ist leer."
+
+msgid "The file is empty."
+msgstr "Die Datei ist leer."
+
+msgid "The file is larger than %s."
+msgstr "Die Datei ist größer als %s."
+
+msgid "The look was changed again since; nothing was undone."
+msgstr "Das Aussehen wurde seitdem wieder geändert; nichts wurde rückgängig gemacht."
+
+msgid "The markup \"%s\" is not in the post (any more)."
+msgstr "Das Markup „%s“ steht (nicht mehr) im Beitrag."
+
+msgid "The markup \"%s\" is not in the post (copy it exactly from flurfunk/get-post with markup)."
+msgstr "Das Markup „%s“ steht nicht im Beitrag (genau aus flurfunk/get-post mit markup übernehmen)."
+
+msgid "The message is empty."
+msgstr "Die Nachricht ist leer."
+
+msgid "The numbers right now: posts and comments from WordPress, the results of the site check, and visits and the like from statistics plugins that provide them."
+msgstr "Die Kennzahlen von jetzt: Beiträge und Kommentare aus WordPress, die Ergebnisse des Inhalts-Checks und Besuche und Ähnliches von Statistik-Plugins, die sie liefern."
+
+msgid "The pattern could not be removed."
+msgstr "Das Muster ließ sich nicht entfernen."
+
+msgid "The pattern was changed again since; nothing was undone."
+msgstr "Das Muster wurde seitdem wieder geändert; nichts wurde rückgängig gemacht."
+
+msgid "The post was deleted."
+msgstr "Der Beitrag wurde gelöscht."
+
+msgid "The quick check decides whether a message without a mention is for an assistant. A small, fast model is enough; the first available one is used."
+msgstr "Die Vorprüfung entscheidet, ob eine Nachricht ohne Erwähnung an einen Assistenten geht. Ein kleines, schnelles Modell reicht; das erste verfügbare wird genommen."
+
+msgid "The routine to pause, resume or remove (from list)."
+msgstr "Die Routine, die pausiert, fortgesetzt oder entfernt werden soll (aus list)."
+
+msgid "The site's numbers"
+msgstr "Die Kennzahlen der Website"
+
+msgid "The template was changed again since; nothing was undone."
+msgstr "Die Vorlage wurde seitdem wieder geändert; nichts wurde rückgängig gemacht."
+
+msgid "The template's ID, e.g. \"twentytwentyfive//footer\", or a navigation menu's post ID."
+msgstr "Die ID der Vorlage, z. B. „twentytwentyfive//footer“, oder die Beitrags-ID eines Navigationsmenüs."
+
+msgid "The text \"%s\" is not in the post (quote it exactly as it is written, within one paragraph)."
+msgstr "Der Text „%s“ steht nicht im Beitrag (genau so zitieren, wie er dasteht, innerhalb eines Absatzes)."
+
+msgid "The text of one post or page (as plain text, without markup), if the current user may see it – drafts only for those who may edit them."
+msgstr "Der Text eines Beitrags oder einer Seite (als reiner Text, ohne Auszeichnung), wenn die aktuelle Person ihn sehen darf – Entwürfe nur für Leute, die sie bearbeiten dürfen."
+
+msgid "The text to replace is not in this pattern (exactly as written)."
+msgstr "Der zu ersetzende Text steht so nicht in diesem Muster (genau wie geschrieben)."
+
+msgid "The text to replace is not in this template (exactly as written)."
+msgstr "Der zu ersetzende Text steht so nicht in dieser Vorlage (genau wie geschrieben)."
+
+msgid "The text: paragraphs separated by a blank line; \"- \" for lists, \"## \" for headings, *bold*. Or, for a page with a layout, WordPress block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator); it is filtered like anyone's without \"unfiltered_html\"."
+msgstr "Der Text: Absätze durch eine Leerzeile getrennt; „- “ für Listen, „## “ für Überschriften, *fett*. Oder, für eine Seite mit Layout, WordPress-Block-Markup aus Kern-Blöcken (Gruppe, Spalten, Cover, Buttons, Überschrift, Absatz, Bild, Trenner); es wird gefiltert wie bei allen ohne „unfiltered_html“."
+
+msgid "The theme's styles could not be changed."
+msgstr "Die Stile des Themes konnten nicht geändert werden."
+
+msgid "There are already enough check-ins in this conversation."
+msgstr "In diesem Gespräch ist schon genug Nachhaken geplant."
+
+msgid "There are already enough routines here. Remove one first."
+msgstr "Hier gibt es schon genug Routinen. Entferne zuerst eine."
+
+msgid "There are already many different reactions here."
+msgstr "Hier gibt es schon sehr viele verschiedene Reaktionen."
+
+msgid "There is no block \"%s\" (e.g. core/button)."
+msgstr "Einen Block „%s“ gibt es nicht (z. B. core/button)."
+
+msgid "There is no element \"%s\" (link, heading, h1–h6, button, caption, cite)."
+msgstr "Ein Element „%s“ gibt es nicht (link, heading, h1–h6, button, caption, cite)."
+
+msgid "There is no note %d."
+msgstr "Es gibt keine Notiz %d."
+
+msgid "There is no snapshot in this channel yet to compare with."
+msgstr "In diesem Kanal gibt es noch keinen Schnappschuss zum Vergleichen."
+
+msgid "There is no such routine here."
+msgstr "Diese Routine gibt es hier nicht."
+
+msgid "This CSS cannot be saved: no markup, no @import and no scripts."
+msgstr "Dieses CSS kann nicht gespeichert werden: kein Markup, kein @import und keine Skripte."
+
+msgid "This action is no longer available on the site."
+msgstr "Diese Aktion gibt es auf der Website nicht mehr."
+
+msgid "This browser sent an invalid push subscription."
+msgstr "Dieser Browser hat ein ungültiges Push-Abo geschickt."
+
+msgid "This browser uses a push service Flurfunk does not know."
+msgstr "Dieser Browser nutzt einen Push-Dienst, den Flurfunk nicht kennt."
+
+msgid "This card cannot be updated (any more)."
+msgstr "Diese Karte lässt sich nicht (mehr) aktualisieren."
+
+msgid "This channel does not exist."
+msgstr "Diesen Kanal gibt es nicht."
+
+msgid "This comment no longer exists."
+msgstr "Diesen Kommentar gibt es nicht mehr."
+
+msgid "This conversation does not exist."
+msgstr "Dieses Gespräch gibt es nicht."
+
+msgid "This file does not exist, or it may not be read."
+msgstr "Diese Datei gibt es nicht, oder sie darf nicht gelesen werden."
+
+msgid "This file is not a Flurfunk file."
+msgstr "Das ist keine Flurfunk-Datei."
+
+msgid "This is a thread: a topic with its replies underneath, so a conversation stays in one place."
+msgstr "Das ist ein Thread: ein Thema mit den Antworten darunter, damit ein Gespräch an einem Ort bleibt."
+
+msgid "This is no longer possible. The card shows the current state."
+msgstr "Das geht nicht mehr. Die Karte zeigt jetzt den aktuellen Stand."
+
+msgid "This is not a Flurfunk export (format flurfunk/1)."
+msgstr "Das ist kein Flurfunk-Export (Format flurfunk/1)."
+
+msgid "This message does not exist."
+msgstr "Diese Nachricht gibt es nicht."
+
+msgid "This month: %1$s tokens in %2$s answers."
+msgstr "Diesen Monat: %1$s Tokens in %2$s Antworten."
+
+msgid "This pattern does not exist."
+msgstr "Dieses Muster gibt es nicht."
+
+msgid "This plugin or theme does not exist, or you may not read its code."
+msgstr "Dieses Plugin oder Theme gibt es nicht, oder du darfst seinen Code nicht lesen."
+
+msgid "This post contains markup that would be lost when saving here. Please change it by hand."
+msgstr "Dieser Beitrag enthält Markup, das beim Speichern hier verloren ginge. Bitte von Hand ändern."
+
+msgid "This post does not exist or you may not see it."
+msgstr "Diesen Beitrag gibt es nicht, oder du darfst ihn nicht sehen."
+
+msgid "This post is no longer a draft. Changes to it need a person."
+msgstr "Dieser Beitrag ist kein Entwurf mehr. Änderungen daran braucht eine Person."
+
+msgid "This server cannot open ZIP files. Import the JSON file instead."
+msgstr "Dieser Server kann keine ZIP-Dateien öffnen. Importiere stattdessen die JSON-Datei."
+
+msgid "This site has no AI client (WordPress 7.0 or newer is needed)."
+msgstr "Diese Website hat keinen KI-Client (nötig ist WordPress 7.0 oder neuer)."
+
+msgid "This template does not exist."
+msgstr "Diese Vorlage gibt es nicht."
+
+msgid "This theme is not a block theme: its templates are files, which cannot be changed here."
+msgstr "Dieses Theme ist kein Block-Theme: Seine Vorlagen sind Dateien, die sich hier nicht ändern lassen."
+
+msgid "This theme is not a block theme: only additional CSS can be changed here."
+msgstr "Dieses Theme ist kein Block-Theme: Hier lässt sich nur zusätzliches CSS ändern."
+
+msgid "Thread"
+msgstr "Thread"
+
+msgid "Threads and replies that contain it"
+msgstr "Threads und Antworten, in denen es vorkommt"
+
+msgid "Threads can belong to a post. They then show up in the editor's Conversations panel and in the posts list."
+msgstr "Threads können zu einem Artikel gehören. Sie erscheinen dann in der Leiste „Gespräche“ im Editor und in der Beitragsliste."
+
+msgid "Threads that were imported before are skipped, so importing twice does no harm."
+msgstr "Schon importierte Threads werden übersprungen – doppelt importieren schadet nicht."
+
+msgid "Thu"
+msgstr "Do"
+
+msgid "Tick at least one post."
+msgstr "Hake mindestens einen Beitrag an."
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "To"
+msgstr "Bis"
+
+msgid "Tokens"
+msgstr "Tokens"
+
+msgid "Tomorrow, %s"
+msgstr "Morgen, %s"
+
+msgid "Tools to look things up"
+msgstr "Werkzeuge zum Nachschlagen"
+
+msgid "Tools to look things up (%s chosen)"
+msgstr "Werkzeuge zum Nachschlagen (%s gewählt)"
+
+msgid "Topic"
+msgstr "Thema"
+
+msgid "Trash"
+msgstr "Papierkorb"
+
+msgid "Tue"
+msgstr "Di"
+
+msgid "Turn off"
+msgstr "Ausschalten"
+
+msgid "Turn on"
+msgstr "Einschalten"
+
+msgid "Type"
+msgstr "Art"
+
+msgid "Type / in a message to insert a card: a post, or whatever other plugins offer."
+msgstr "Tippe / in eine Nachricht, um eine Karte einzufügen: einen Artikel oder was andere Plugins anbieten."
+
+msgid "Type @ and a name to mention someone. They get a notification."
+msgstr "Tippe @ und einen Namen, um jemanden zu erwähnen. Die Person bekommt eine Benachrichtigung."
+
+msgid "Undo"
+msgstr "Rückgängig"
+
+msgid "Undo these changes, with your rights?"
+msgstr "Diese Änderungen mit deinen Rechten rückgängig machen?"
+
+msgid "Undone"
+msgstr "Rückgängig gemacht"
+
+msgid "Undone by %s"
+msgstr "Rückgängig gemacht von %s"
+
+msgid "Uninstall"
+msgstr "Deinstallieren"
+
+msgid "Unknown action."
+msgstr "Unbekannte Aktion."
+
+msgid "Unknown command."
+msgstr "Unbekannter Befehl."
+
+msgid "Update"
+msgstr "Aktualisieren"
+
+msgid "Used: %s"
+msgstr "Genutzt: %s"
+
+msgid "Waiting"
+msgstr "Wartend"
+
+msgid "Waiting for a person"
+msgstr "Wartet auf eine Person"
+
+msgid "Wed"
+msgstr "Mi"
+
+msgid "Welcome to Flurfunk"
+msgstr "Willkommen bei Flurfunk"
+
+msgid "What an assistant reads goes to the AI provider of this site."
+msgstr "Was ein Assistent liest, geht an den KI-Anbieter dieser Website."
+
+msgid "What happened for you"
+msgstr "Was für dich passiert ist"
+
+msgid "What happened or is planned, e.g. \"excerpts added to all posts\"."
+msgstr "Was passiert ist oder geplant ist, z. B. „Auszüge für alle Beiträge ergänzt“."
+
+msgid "What is it about? (@name, / for cards)"
+msgstr "Worum geht’s? (@Name, / für Karten)"
+
+msgid "What should it be able to do?"
+msgstr "Was soll er können?"
+
+msgid "What to check, in a few words."
+msgstr "Was zu prüfen ist, in wenigen Worten."
+
+msgid "What to do each time, in a sentence or two."
+msgstr "Was jedes Mal zu tun ist, in ein, zwei Sätzen."
+
+msgid "When"
+msgstr "Wann"
+
+msgid "When someone mentions an AI assistant in a Flurfunk conversation or talks to it in a private conversation, the text of that conversation (names, messages, titles of linked posts and files and, if the site allows it, the text of posts the assistant reads) is sent to the AI provider set up under Settings → Connectors, so the assistant can answer. Only conversations in which an assistant takes part are sent. The answer is stored as a message in the conversation. Private conversations with an assistant are seen only by the person who started them (and the assistant), not by other users or the site's administrators in Flurfunk. If the site keeps notes per channel, what someone asks an assistant to remember is stored with that channel and sent along with the assistant's requests there. In channels where assistants answer unasked, every new thread is sent to the AI provider for a quick check whether an assistant should answer."
+msgstr "Wenn jemand in einem Flurfunk-Gespräch einen KI-Assistenten erwähnt oder privat mit ihm spricht, wird der Text dieses Gesprächs (Namen, Nachrichten, Titel verknüpfter Beiträge und Dateien und, wenn die Website es erlaubt, der Text von Beiträgen, die der Assistent liest) an den unter Einstellungen → Konnektoren eingerichteten KI-Anbieter geschickt, damit der Assistent antworten kann. Nur Gespräche, an denen ein Assistent teilnimmt, werden geschickt. Die Antwort wird als Nachricht im Gespräch gespeichert. Private Gespräche mit einem Assistenten sieht in Flurfunk nur die Person, die sie begonnen hat (und der Assistent), keine anderen Nutzer und keine Administratoren der Website. Wenn die Website Notizen pro Kanal führt, wird gespeichert, was sich ein Assistent auf Bitte merken soll, und bei seinen Anfragen in diesem Kanal mitgeschickt. In Kanälen, in denen Assistenten ungefragt antworten, wird jeder neue Thread für eine kurze Vorprüfung an den KI-Anbieter geschickt, ob ein Assistent antworten sollte."
+
+msgid "When someone mentions an AI assistant in a Flurfunk conversation, the text of that conversation (names, messages, titles of linked posts and files and, if the site allows it, the text of the post the conversation is about) is sent to the AI provider set up under Settings → Connectors, so the assistant can answer. Only conversations in which an assistant is mentioned are sent. The answer is stored as a message in the conversation."
+msgstr "Wenn jemand in einem Flurfunk-Gespräch einen KI-Assistenten erwähnt, wird der Text dieses Gesprächs (Namen, Nachrichten, Titel verknüpfter Beiträge und Dateien und, wenn die Website es erlaubt, der Text des Beitrags, um den es geht) an den unter Einstellungen → Konnektoren eingerichteten KI-Anbieter geschickt, damit der Assistent antworten kann. Nur Gespräche, in denen ein Assistent erwähnt wird, werden geschickt. Die Antwort wird als Nachricht im Gespräch gespeichert."
+
+msgid "Where and how much?"
+msgstr "Wo und wie viel?"
+
+msgid "Where someone mentioned you"
+msgstr "Wo dich jemand erwähnt hat"
+
+msgid "Which roles may do what in Flurfunk. Team members see channels according to their team setting, guests according to their guest setting. Assistants always count as team. These are normal WordPress capabilities, so role editor plugins (e.g. Members or User Role Editor) can manage them as well, also for single users."
+msgstr "Welche Rolle in Flurfunk was darf. Das Team sieht Kanäle nach deren Einstellung fürs Team, Gäste nach der für Gäste. Assistenten zählen immer zum Team. Es sind normale WordPress-Rechte (Capabilities), daher können Plugins zur Rollenverwaltung (z. B. Members oder User Role Editor) sie ebenso vergeben, auch an einzelne Personen."
+
+msgid "Who counts as team and who as guest is set under %s."
+msgstr "Wer zum Team gehört und wer Gast ist, legst du unter %s fest."
+
+msgid "Who is responsible for the task: names as shown in Flurfunk. Only people who can see the channel can be assigned."
+msgstr "Wer für die Aufgabe zuständig ist: Namen wie in Flurfunk angezeigt. Zuständig sein kann nur, wer den Kanal sieht."
+
+msgid "Whole site"
+msgstr "Ganze Website"
+
+msgid "Why"
+msgstr "Warum"
+
+msgid "Wide width"
+msgstr "Breite Ausrichtung"
+
+msgid "Without a slug: the installed plugins and themes (slug, name, version, active). With one: the files of that plugin or theme (without vendor folders unless asked)."
+msgstr "Ohne slug: die installierten Plugins und Themes (Ordner, Name, Version, aktiv). Mit slug: die Dateien dieses Plugins oder Themes (ohne vendor-Ordner, außer auf Wunsch)."
+
+msgid "Without an ID: the templates and template parts (header, footer, …) of the active block theme, with where each comes from (the theme, or the site's own copy), and the navigation menus (a navigation block without \"ref\" shows the newest; a page list in it adds every published page by itself). With an ID: its block markup."
+msgstr "Ohne ID: die Vorlagen und Vorlagenteile (Kopf-, Fußbereich …) des aktiven Block-Themes, jeweils mit Herkunft (das Theme oder die eigene Kopie der Website), und die Navigationsmenüs (ein Navigationsblock ohne „ref“ zeigt das neueste; eine Seitenliste darin nimmt jede veröffentlichte Seite von selbst auf). Mit ID: ihr Block-Markup."
+
+msgid "Without id or name: the site's own patterns (id, title, whether synced, categories) and those the theme and WordPress register (name, title, categories), optionally matching search words. With id (own) or name (registered): its block markup – a starting point for a page or a template."
+msgstr "Ohne id oder name: die eigenen Muster der Website (ID, Titel, ob synchronisiert, Kategorien) und die von Theme und WordPress registrierten (Name, Titel, Kategorien), auf Wunsch passend zu Suchwörtern. Mit id (eigenes) oder name (registriertes): sein Block-Markup – ein Ausgangspunkt für eine Seite oder Vorlage."
+
+msgid "WordPress"
+msgstr "WordPress"
+
+msgid "Words in the title or text; leave it out for the latest posts."
+msgstr "Wörter im Titel oder Text; weglassen für die neuesten Beiträge."
+
+msgid "Write a draft"
+msgstr "Entwurf schreiben"
+
+msgid "Write drafts from the conversation, with its images, and change them until someone else works on them – never publishes; the person asking is the author"
+msgstr "Entwürfe aus dem Gespräch schreiben, mit seinen Bildern, und sie ändern, bis jemand anderes daran arbeitet – veröffentlicht nie; Autor ist die fragende Person"
+
+msgid "Write page drafts with layouts; read and suggest changes to the theme's look, fonts and spacing, its templates, menus and patterns – as a card you apply and can undo (for administrators)"
+msgstr "Seitenentwürfe mit Layouts schreiben; Aussehen, Schriften und Abstände des Themes, seine Vorlagen, Menüs und Muster lesen und Änderungen vorschlagen – als Karte, die du übernimmst und rückgängig machen kannst (für Administratoren)"
+
+msgid "Write … (@name, / for cards)"
+msgstr "Schreiben … (@Name, / für Karten)"
+
+msgid "Written"
+msgstr "Geschrieben"
+
+msgid "Wrote the draft \"%s\""
+msgstr "Den Entwurf „%s“ geschrieben"
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "You are logged in, but Flurfunk is not available for your account. Please ask an administrator if you need access."
+msgstr "Du bist angemeldet, aber Flurfunk ist für dein Konto nicht freigeschaltet. Wenn du Zugang brauchst, wende dich bitte an die Administration der Website."
+
+msgid "You are not allowed to do this."
+msgstr "Das darfst du nicht."
+
+msgid "You can change which mails you get under your name at the bottom of the Flurfunk sidebar."
+msgstr "Welche Mails du bekommst, stellst du unten in der Flurfunk-Leiste unter deinem Namen ein."
+
+msgid "You can start conversations about your own posts. As soon as you have one, you can start here."
+msgstr "Du kannst Gespräche zu deinen eigenen Artikeln anfangen. Sobald du einen hast, geht das hier."
+
+msgid "You cannot change this."
+msgstr "Das kannst du hier nicht ändern."
+
+msgid "You cannot do this."
+msgstr "Das darfst du nicht."
+
+msgid "You cannot moderate this comment."
+msgstr "Diesen Kommentar darfst du nicht moderieren."
+
+msgid "You cannot start a conversation here."
+msgstr "Hier kannst du kein Gespräch anfangen."
+
+msgid "You cannot start threads here."
+msgstr "Hier kannst du keine Threads anfangen."
+
+msgid "You cannot upload files."
+msgstr "Du darfst keine Dateien hochladen."
+
+msgid "You may not change its categories or tags."
+msgstr "Du darfst seine Kategorien oder Schlagwörter nicht ändern."
+
+msgid "You may not edit this post."
+msgstr "Du darfst diesen Beitrag nicht bearbeiten."
+
+msgid "Your picture from your profile or Gravatar. Without one, your initials show."
+msgstr "Dein Bild aus dem Profil oder von Gravatar. Ohne Bild erscheinen deine Initialen."
+
+msgid "Your session has ended. Please log in again."
+msgstr "Deine Anmeldung ist abgelaufen. Bitte melde dich neu an."
+
+msgid "[%1$s] %2$d new notification"
+msgid_plural "[%1$s] %2$d new notifications"
+msgstr[0] "[%1$s] %2$d neue Benachrichtigung"
+msgstr[1] "[%1$s] %2$d neue Benachrichtigungen"
+
+msgid "[%1$s] %2$s (private): %3$s"
+msgstr "[%1$s] %2$s (privat): %3$s"
+
+msgid "[%1$s] %2$s in #%3$s: %4$s"
+msgstr "[%1$s] %2$s in #%3$s: %4$s"
+
+msgid "a conversation"
+msgstr "ein Gespräch"
+
+msgid "a post"
+msgstr "ein Beitrag"
+
+msgid "about %s answers"
+msgstr "etwa %s Antworten"
+
+msgid "add %d lines of CSS"
+msgstr "%d Zeilen CSS ergänzen"
+
+msgid "answers every new thread here and your follow-ups"
+msgstr "antwortet hier auf jeden neuen Thread und auf deine Nachfragen"
+
+msgid "answers when you mention it, and then your follow-ups"
+msgstr "antwortet, wenn du ihn erwähnst, und dann auf deine Nachfragen"
+
+msgid "background"
+msgstr "Hintergrund"
+
+msgid "background %s"
+msgstr "Hintergrund %s"
+
+msgid "border color"
+msgstr "Rahmenfarbe"
+
+msgid "border style"
+msgstr "Rahmenart"
+
+msgid "border width"
+msgstr "Rahmenbreite"
+
+msgid "capitals"
+msgstr "Großschreibung"
+
+msgid "channel: for this channel; site: a house rule for all channels (only from a channel without guests)."
+msgstr "channel: für diesen Kanal; site: eine Hausregel für alle Kanäle (nur aus einem Kanal ohne Gäste)."
+
+msgid "daily"
+msgstr "täglich"
+
+msgid "date: newest by publication date; modified: last edited first."
+msgstr "date: neueste nach Veröffentlichungsdatum; modified: zuletzt bearbeitete zuerst."
+
+msgid "default for wp flurfunk post"
+msgstr "Standard für wp flurfunk post"
+
+msgid "deleted"
+msgstr "gelöscht"
+
+msgid "developer documentation"
+msgstr "Entwicklerdokumentation"
+
+msgid "done"
+msgstr "erledigt"
+
+msgid "drafts only, never published"
+msgstr "nur Entwürfe, veröffentlicht nie"
+
+msgid "due %s"
+msgstr "fällig %s"
+
+msgid "due today"
+msgstr "heute fällig"
+
+msgid "email"
+msgstr "E-Mail"
+
+msgid "empty: a small model of your provider (Haiku, Flash Lite, GPT mini)"
+msgstr "leer: ein kleines Modell deines Anbieters (Haiku, Flash Lite, GPT mini)"
+
+msgid "empty: the provider's default"
+msgstr "leer: Standard des Anbieters"
+
+msgid "font"
+msgstr "Schrift"
+
+msgid "font size"
+msgstr "Schriftgröße"
+
+msgid "font style"
+msgstr "Schriftschnitt"
+
+msgid "font weight"
+msgstr "Schriftstärke"
+
+msgid "for: %s"
+msgstr "für: %s"
+
+msgid "image"
+msgstr "Bild"
+
+msgid "in #%s"
+msgstr "in #%s"
+
+msgid "in progress"
+msgstr "in Arbeit"
+
+msgid "inner spacing"
+msgstr "Innenabstand"
+
+msgid "is looking things up"
+msgstr "schlägt nach …"
+
+msgid "is reading the thread"
+msgstr "liest den Thread …"
+
+msgid "is writing the answer"
+msgstr "schreibt die Antwort …"
+
+msgid "just now"
+msgstr "gerade eben"
+
+msgid "last: %1$s, %2$s"
+msgstr "zuletzt %1$s, %2$s"
+
+msgid "layout.%s cannot be set (contentSize and wideSize can)."
+msgstr "layout.%s lässt sich nicht setzen (contentSize und wideSize schon)."
+
+msgid "letter spacing"
+msgstr "Zeichenabstand"
+
+msgid "line height"
+msgstr "Zeilenhöhe"
+
+msgid "link color %s"
+msgstr "Linkfarbe %s"
+
+msgid "looks things up in its channels"
+msgstr "schlägt in seinen Kanälen nach"
+
+msgid "needs a plugin that is not active"
+msgstr "braucht ein Plugin, das nicht aktiv ist"
+
+msgid "no"
+msgstr "nein"
+
+msgid "no limit of its own"
+msgstr "keine eigene Grenze"
+
+msgid "no longer available"
+msgstr "nicht mehr vorhanden"
+
+msgid "nobody yet"
+msgstr "noch niemand"
+
+msgid "nothing"
+msgstr "nichts"
+
+msgid "only %s was notified"
+msgstr "nur %s wurde benachrichtigt"
+
+msgid "only for you · by %s"
+msgstr "nur für dich · von %s"
+
+msgid "only you were notified"
+msgstr "nur du wurdest benachrichtigt"
+
+msgid "open"
+msgstr "offen"
+
+msgid "outer spacing"
+msgstr "Außenabstand"
+
+msgid "overdue since %s"
+msgstr "überfällig seit %s"
+
+msgid "page: the site's pages instead of its posts (e.g. their addresses for a menu or a link)."
+msgstr "page: die Seiten der Website statt ihrer Beiträge (z. B. ihre Adressen für ein Menü oder einen Link)."
+
+msgid "palette: %s"
+msgstr "Palette: %s"
+
+msgid "paused"
+msgstr "pausiert"
+
+msgid "phone"
+msgstr "Telefon"
+
+msgid "posts"
+msgstr "Beiträge"
+
+msgid "question"
+msgstr "Rückfrage"
+
+msgid "reads"
+msgstr "liest"
+
+msgid "reads the thread"
+msgstr "liest den Thread"
+
+msgid "reads the thread and finds and reads posts"
+msgstr "liest den Thread und findet und liest Beiträge"
+
+msgid "replace the additional CSS (%d lines)"
+msgstr "das zusätzliche CSS ersetzen (%d Zeilen)"
+
+msgid "rounded corners"
+msgstr "abgerundete Ecken"
+
+msgctxt "routine date"
+msgid "M j"
+msgstr "j.n."
+
+msgctxt "slash command"
+msgid "comment"
+msgstr "kommentar"
+
+msgctxt "slash command"
+msgid "post"
+msgstr "artikel"
+
+msgid "space between blocks"
+msgstr "Abstand zwischen Blöcken"
+
+msgid "suggests"
+msgstr "schlägt vor"
+
+msgid "suggests: %s – nothing happens without your click"
+msgstr "schlägt vor: %s – nichts passiert ohne deinen Klick"
+
+msgid "synced: it shows the same wherever it is used"
+msgstr "synchronisiert: es sieht überall gleich aus, wo es verwendet wird"
+
+msgid "text color"
+msgstr "Textfarbe"
+
+msgid "text color %s"
+msgstr "Textfarbe %s"
+
+msgid "the person asking"
+msgstr "die fragende Person"
+
+msgid "the post %s"
+msgstr "Beitrag %s"
+
+msgid "the thread"
+msgstr "Thread"
+
+msgid "thread: report in this conversation; channel: start a new thread in the channel each time."
+msgstr "thread: im selben Gespräch berichten; channel: jedes Mal einen neuen Thread im Kanal beginnen."
+
+msgid "tokens (0 = no limit)"
+msgstr "Tokens (0 = ohne Grenze)"
+
+msgid "underline"
+msgstr "Unterstreichung"
+
+msgid "until tomorrow"
+msgstr "bis morgen"
+
+msgid "uploading …"
+msgstr "lädt hoch …"
+
+msgid "weekdays"
+msgstr "werktags"
+
+msgid "what its tools find"
+msgstr "was seine Werkzeuge finden"
+
+msgid "with %s"
+msgstr "mit %s"
+
+msgid "writes drafts"
+msgstr "schreibt Entwürfe"
+
+msgid "yes"
+msgstr "ja"
+
+msgid "you"
+msgstr "du"
+
+msgid "“%s”"
+msgstr "„%s“"
+
+msgid "… and %s more"
+msgstr "… und %s weitere"

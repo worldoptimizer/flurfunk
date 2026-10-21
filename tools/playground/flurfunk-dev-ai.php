@@ -24,6 +24,18 @@ add_filter(
 );
 add_filter( 'auto_update_plugin', static fn ( $update, $item ) => str_contains( (string) ( $item->plugin ?? '' ), 'flurfunk/' ) ? false : $update, 99, 2 );
 
+/*
+ * The German translation from the working copy, found the way a language pack is – also after a
+ * switch of language, e.g. for a mail (the plugin ships none; on WordPress.org it comes as a language
+ * pack, elsewhere the file goes to wp-content/languages/plugins/).
+ */
+add_filter(
+	'lang_dir_for_domain',
+	static fn ( $path, $domain ) => 'flurfunk' === $domain ? WP_PLUGIN_DIR . '/flurfunk/tools/translations/build/' : $path,
+	10,
+	2
+);
+
 if ( ! defined( 'FLURFUNK_DEV_AI_PROXY' ) || ! FLURFUNK_DEV_AI_PROXY ) {
 	return;
 }

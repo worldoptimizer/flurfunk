@@ -10,7 +10,6 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       flurfunk
- * Domain Path:       /languages
  *
  * Layout:
  *   inc/schema.php     own tables (versioned, upgrade steps)
@@ -100,15 +99,6 @@ register_deactivation_hook(
 	}
 );
 
-// The German translation ships with the plugin (languages/); language packs from
-// translate.wordpress.org take precedence once they exist.
-add_action(
-	'init',
-	static function (): void {
-		load_plugin_textdomain( 'flurfunk', false, dirname( plugin_basename( FLURFUNK_FILE ) ) . '/languages' );
-	},
-	1
-);
 
 /**
  * Register a provider for slash commands and cards (see inc/providers.php and README.md).

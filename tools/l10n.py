@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Build languages/flurfunk-<locale>.l10n.php (WordPress 6.5+ PHP translation files) from
-tools/translations/<locale>.json. Context strings use "context\u0004text" as key."""
+"""Build tools/translations/build/flurfunk-<locale>.l10n.php (WordPress 6.5+ PHP translation file)
+and flurfunk-<locale>.po (to import at translate.wordpress.org) from tools/translations/<locale>.json.
+Context strings use "context\u0004text" as key, plurals "singular\u0000plural".
+
+The plugin ships no translations: on WordPress.org they come as language packs. Until then a site
+gets one by copying the .l10n.php file to wp-content/languages/plugins/ – WordPress loads it there
+by itself."""
 import json, pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 q = lambda s: "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
@@ -21,5 +26,20 @@ return array(
 \t),
 );
 """
-    (root / 'languages' / f'flurfunk-{loc}.l10n.php').write_text(out)
+    build = root / 'tools' / 'translations' / 'build'
+    build.mkdir(exist_ok=True)
+    (build / f'flurfunk-{loc}.l10n.php').write_text(out)
+    po = lambda s: '"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') + '"'
+    lines = ['msgid ""', 'msgstr ""', '"Project-Id-Version: Flurfunk\\n"', f'"Language: {loc}\\n"', '"MIME-Version: 1.0\\n"', '"Content-Type: text/plain; charset=UTF-8\\n"', '"Content-Transfer-Encoding: 8bit\\n"', '"Plural-Forms: nplurals=2; plural=(n != 1);\\n"', '']
+    for k, v in sorted(data.items()):
+        ctx, _, key = k.rpartition(chr(4))
+        if ctx:
+            lines.append('msgctxt ' + po(ctx))
+        if chr(0) in key:
+            one, many = key.split(chr(0), 1)
+            t1, t2 = (v.split(chr(0), 1) + [''])[:2]
+            lines += ['msgid ' + po(one), 'msgid_plural ' + po(many), 'msgstr[0] ' + po(t1), 'msgstr[1] ' + po(t2), '']
+        else:
+            lines += ['msgid ' + po(key), 'msgstr ' + po(v), '']
+    (build / f'flurfunk-{loc}.po').write_text('\n'.join(lines))
     print(loc, len(data))

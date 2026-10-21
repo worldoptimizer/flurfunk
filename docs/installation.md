@@ -56,6 +56,14 @@ If you download the repository as a zip from GitHub instead, rename the extracte
 Replace the plugin files (upload, `git pull`, rsync). The database tables are brought up to date
 automatically on the next request, even without reactivating the plugin.
 
+### Languages
+
+The plugin ships no translation files: installed from WordPress.org, it gets its translations as
+language packs from translate.wordpress.org, like WordPress itself. Until a language is there – or
+for a copy from GitHub – put the file from `tools/translations/build/` (e.g.
+`flurfunk-de_DE.l10n.php`, German) into `wp-content/languages/plugins/`. WordPress loads it from
+there by itself and keeps it through plugin updates; a language pack replaces it later.
+
 ### What activation does
 
 - creates the tables `{prefix}flurfunk_channels`, `_threads`, `_messages`, `_mentions`,

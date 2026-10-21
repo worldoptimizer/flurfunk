@@ -326,15 +326,21 @@ function in_locale( string $locale, callable $fn ) {
 			restore_previous_locale();
 		}
 	}
-	// The site does not have that language installed: Flurfunk brings its own translation, so at
-	// least Flurfunk's texts follow.
-	$load = static function ( string $l ): void {
+	// The site does not have that language installed, but Flurfunk's translation for it is there
+	// (a language pack, or the file in wp-content/languages/plugins/): at least Flurfunk's texts
+	// follow.
+	$file = static function ( string $l ): string {
+		global $wp_textdomain_registry;
+		$dir = $wp_textdomain_registry instanceof \WP_Textdomain_Registry ? $wp_textdomain_registry->get( 'flurfunk', $l ) : false;
+		return $dir ? trailingslashit( $dir ) . 'flurfunk-' . $l . '.mo' : '';
+	};
+	$load = static function ( string $l ) use ( $file ): void {
 		unload_textdomain( 'flurfunk', true );
-		if ( 'en_US' !== $l ) {
-			load_textdomain( 'flurfunk', FLURFUNK_DIR . 'languages/flurfunk-' . $l . '.mo', $l );
+		if ( 'en_US' !== $l && '' !== $file( $l ) ) {
+			load_textdomain( 'flurfunk', $file( $l ), $l ); // WordPress prefers the .l10n.php file next to it.
 		}
 	};
-	if ( 'en_US' !== $locale && ! is_readable( FLURFUNK_DIR . 'languages/flurfunk-' . $locale . '.l10n.php' ) ) {
+	if ( 'en_US' !== $locale && '' === $file( $locale ) ) {
 		return $fn();
 	}
 	$load( $locale );

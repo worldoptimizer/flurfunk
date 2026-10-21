@@ -1479,7 +1479,7 @@ More complete scripts (a GitHub Action, a daily report) are on the [examples](ex
 | Formatter | `node tests/format.test.cjs` |
 | Load test (2000 threads, 20000 messages) | `wp eval-file tests/load.php` |
 | Collect JavaScript strings | `python3 tools/strings.py` (writes `inc/strings.php`) |
-| Build translations | `python3 tools/l10n.py` (from `tools/translations/*.json` to `languages/*.l10n.php`) |
+| Build translations | `python3 tools/l10n.py` (from `tools/translations/*.json` to `tools/translations/build/`: a `.l10n.php` file and a `.po` to import at translate.wordpress.org; the plugin ships no translation files) |
 | Card gallery of the website | `node tools/docs-cards.mjs` (from `assets/app.js` and `assets/app.css` to `docs/_includes/card-gallery.html` and `docs/assets/cards.css`) |
 | Release zip | `tools/build-zip.sh` |
 
