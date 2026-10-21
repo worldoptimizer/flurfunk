@@ -69,6 +69,36 @@ async function watch( tid, after, { timeout = 150000, quiet = 0 } = {} ) {
 }
 const said = ( r ) => r.msgs.map( ( m ) => NAMES[ m.author ] + ': ' + clip( m.text, 400 ) ).join( ' | ' );
 const cardOf = ( r ) => r.msgs.flatMap( ( m ) => m.attachments || [] ).find( ( c ) => /ai-proposal|draft/.test( c.provider ) );
+// Apply the first card of an answer in the thread, look at the result, then undo it.
+async function useCard( r, between ) {
+	await app( 'thread:' + r.id );
+	await max.waitForSelector( '.ff-pane .ff-card', { timeout: 20000 } );
+	await max.locator( '.ff-pane .ff-card button', { hasText: /Übernehmen|Apply/ } ).first().click();
+	await sleep( 1500 );
+	const confirm = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Übernehmen|Apply|Ausführen|Run|Ja|Yes/ } ).last();
+	if ( await confirm.count() ) {
+		await confirm.click();
+	}
+	await sleep( 4000 );
+	const applied = clip( await max.locator( '.ff-pane .ff-card' ).first().innerText(), 200 );
+	const seen = between ? await between() : null;
+	const undoBtn = max.locator( '.ff-pane .ff-card button', { hasText: /Rückgängig|Undo/ } ).first();
+	let undone = '';
+	if ( await undoBtn.count() ) {
+		await undoBtn.click();
+		await sleep( 1500 );
+		const c2 = max.locator( '.ff-pane .ff-card-confirm button', { hasText: /Rückgängig|Undo|Ja|Yes/ } ).last();
+		if ( await c2.count() ) {
+			await c2.click();
+		}
+		await sleep( 4000 );
+		undone = clip( await max.locator( '.ff-pane .ff-card' ).first().innerText(), 200 );
+	}
+	await app();
+	return { applied, seen, undone };
+}
+const page = ( path ) => max.evaluate( async ( p ) => ( await fetch( p ) ).text(), path );
+const aboutPage = async () => ( ( await wp( 'pages?status=publish&search=' + encodeURIComponent( 'Über uns' ) + '&orderby=date&order=desc&context=edit' ) ) || [] )[ 0 ];
 async function step( title, fn ) {
 	if ( ONLY && ! ONLY.test( title ) ) {
 		return;
@@ -345,6 +375,85 @@ await step( 'The menu: only two chosen links instead of all pages, as a card –
 	await app();
 	const links = ( after.match( /"label":"[^"]+"/g ) || [] ).join( ', ' );
 	return { ok: /wp:navigation-link|wp:home-link/.test( after ) && ! /wp:page-list/.test( after ) && back === menu?.content?.raw ? true : 'warn', note: said( r ) + ' · applied: ' + applied + ' · menu: ' + ( links || clip( after, 160 ) ) + ' · undone: ' + ( undone ? 'yes, back to: ' + clip( back, 80 ) : 'no undo button' ) };
+} );
+await step( 'A published page changed: a section with dates added at the end, as a card – applied, then undone', async () => {
+	const about = await aboutPage();
+	if ( ! about ) {
+		return { ok: false, note: 'no published "about us" page (the page and menu steps make it)' };
+	}
+	const r = await ask( 'inhalte', 'Ergänze auf der Seite "Über uns" am Ende einen Abschnitt "Termine" mit einer kurzen Liste: Mitgliederversammlung am 12. März, Sommerfest am 21. Juni.', 0, { timeout: 240000 } );
+	if ( ! cardOf( r ) ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const u = await useCard( r, async () => ( await wp( 'pages/' + about.id + '?context=edit' ) )?.content?.raw || '' );
+	const back = ( await wp( 'pages/' + about.id + '?context=edit' ) )?.content?.raw || '';
+	const ok = /Termine/.test( u.seen ) && /21\. Juni/.test( u.seen ) && ! /Termine/.test( back );
+	return { ok: ok ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · on the page: ' + ( /Termine/.test( u.seen ) ? 'yes' : 'no' ) + ' · undone: ' + ( /Termine/.test( back ) ? 'no' : 'yes' ) };
+} );
+await step( 'A word on a published page: the button label, as a card – applied, then undone', async () => {
+	const about = await aboutPage();
+	if ( ! about ) {
+		return { ok: false, note: 'no published "about us" page (the page and menu steps make it)' };
+	}
+	const r = await ask( 'inhalte', 'Ändere auf der Seite "Über uns" den Button-Text "Mitglied werden" in "Jetzt Mitglied werden".', 0, { timeout: 240000 } );
+	if ( ! cardOf( r ) ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const u = await useCard( r, async () => ( await wp( 'pages/' + about.id + '?context=edit' ) )?.content?.raw || '' );
+	const back = ( await wp( 'pages/' + about.id + '?context=edit' ) )?.content?.raw || '';
+	return { ok: /Jetzt Mitglied werden/.test( u.seen ) && ! /Jetzt Mitglied werden/.test( back ) ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · on the page: ' + ( /Jetzt Mitglied werden/.test( u.seen ) ? 'yes' : 'no' ) + ' · undone: ' + ( /Jetzt Mitglied werden/.test( back ) ? 'no' : 'yes' ) };
+} );
+await step( 'The single post template: date and author under the title, as a card – applied, then undone', async () => {
+	const single = async () => ( ( await wp( 'templates?context=edit' ) ) || [] ).find( ( t ) => 'single' === t.slug );
+	const before = await single();
+	const r = await ask( 'inhalte', 'In einzelnen Beiträgen sollen direkt unter dem Titel das Datum und der Autor stehen, klein und grau.', 0, { timeout: 240000 } );
+	if ( ! cardOf( r ) ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const u = await useCard( r, single );
+	const back = await single();
+	const has = ( t ) => /wp:post-date/.test( t?.content?.raw || '' ) && /wp:post-author/.test( t?.content?.raw || '' );
+	return { ok: has( u.seen ) && 'custom' === u.seen?.source && ( back?.content?.raw || '' ) === ( before?.content?.raw || '' ) ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · template: ' + ( u.seen?.source || '–' ) + ', date and author: ' + ( has( u.seen ) ? 'yes' : 'no' ) + ' · undone: ' + ( ( back?.content?.raw || '' ) === ( before?.content?.raw || '' ) ? 'yes (back to ' + ( back?.source || '–' ) + ')' : 'no' ) };
+} );
+await step( 'Typography: larger headings, more line height, a narrower content – as a card, applied, then undone', async () => {
+	const r = await ask( 'inhalte', 'Mach bitte die Überschriften etwas größer, die Zeilenhöhe im Fließtext luftiger und den Inhaltsbereich schmaler, etwa 680px.', 0, { timeout: 240000 } );
+	const c = cardOf( r );
+	if ( ! c ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const width = /--wp--style--global--content-size:\s*680px/;
+	const u = await useCard( r, () => page( '/' ) );
+	const back = await page( '/' );
+	const input = JSON.stringify( c.snapshot || {} );
+	return { ok: width.test( u.seen ) && ! width.test( back ) && /lineHeight|line height|Zeilenh/i.test( input + u.applied ) ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · content 680px on the site: ' + ( width.test( u.seen ) ? 'yes' : 'no' ) + ' · undone: ' + ( width.test( back ) ? 'no' : 'yes' ) };
+} );
+await step( 'A new page template "landing page", given to the about page – as a card, applied, then undone', async () => {
+	const about = await aboutPage();
+	const r = await ask( 'inhalte', 'Leg bitte eine Seitenvorlage "Landingpage" an: oben nur der Seitentitel der Website ohne Menü, dann der Inhalt in voller Breite, unten der normale Fußbereich. Gib sie gleich der Seite "Über uns".', 0, { timeout: 240000 } );
+	if ( ! cardOf( r ) ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const u = await useCard( r, async () => ( {
+		tpl: ( ( await wp( 'templates?context=edit' ) ) || [] ).find( ( t ) => /landing/i.test( t.slug ) ),
+		given: about ? ( await wp( 'pages/' + about.id + '?context=edit' ) )?.template || '' : '',
+	} ) );
+	const gone = ! ( ( await wp( 'templates?context=edit' ) ) || [] ).some( ( t ) => /landing/i.test( t.slug ) );
+	const given = about ? ( await wp( 'pages/' + about.id + '?context=edit' ) )?.template || '' : '';
+	const ok = u.seen?.tpl && u.seen.given === u.seen.tpl.slug && gone && '' === given;
+	return { ok: ok ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · template: ' + ( u.seen?.tpl?.slug || '–' ) + ' (blocks: ' + [ ...new Set( ( ( u.seen?.tpl?.content?.raw || '' ).match( /wp:[a-z-]+/g ) || [] ) ) ].join( ', ' ) + ') · about page uses it: ' + ( u.seen?.given || '–' ) + ' · undone: ' + ( gone && '' === given ? 'yes' : 'no' ) };
+} );
+await step( 'A pattern to reuse: the contact box of the about page, synced – as a card, applied, then undone', async () => {
+	const r = await ask( 'inhalte', 'Speicher bitte den Kontakt-Block von der Seite "Über uns" als Muster, das überall gleich aussieht, wo ich es wiederverwende.', 0, { timeout: 240000 } );
+	if ( ! cardOf( r ) ) {
+		return { ok: r.msgs.length ? 'warn' : false, note: said( r ) + ' · no card' };
+	}
+	const mine = async () => ( ( await wp( 'blocks?context=edit&per_page=50' ) ) || [] ).filter( ( b ) => /kontakt|contact/i.test( b.title?.raw || '' ) );
+	const before = ( await mine() ).length;
+	const u = await useCard( r, mine );
+	const after = ( await mine() ).length;
+	const made = ( u.seen || [] )[ 0 ];
+	const during = ( u.seen || [] ).length;
+	return { ok: during > before && after === before ? true : 'warn', note: said( r ) + ' · applied: ' + u.applied + ' · pattern: ' + ( made ? made.title.raw + ' (' + ( made.wp_pattern_sync_status || 'synced' ) + ')' : '–' ) + ' · undone: ' + ( during > before && after === before ? 'yes' : 'no' ) };
 } );
 await step( 'SEO: the site check, the numbers kept with a note', async () => {
 	const r = await ask( 'seo', 'Mach bitte einen SEO-Check der Website und halte die aktuellen Zahlen fest – wir fangen jetzt an, fehlende Auszüge zu ergänzen.', 0, { timeout: 200000 } );

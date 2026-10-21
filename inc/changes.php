@@ -230,12 +230,45 @@ function layout_row( string $find, string $with ): array {
 	$text   = static fn ( string $s ) => mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $s ) ) ), 0, 120 );
 	$before = $text( $find );
 	$after  = $text( $with );
-	return array(
-		'field'  => 'layout',
-		'label'  => '' === $find ? __( 'Added at the end', 'flurfunk' ) : __( 'Layout', 'flurfunk' ),
-		'before' => $before,
-		'after'  => $after === $before ? __( 'Only the markup changes, not the text', 'flurfunk' ) : $after,
+	return relabel(
+		array(
+			array(
+				'field'  => 'layout',
+				'added'  => '' === $find,
+				'same'   => $after === $before,
+				'before' => $before,
+				'after'  => $after,
+			),
+		)
+	)[0];
+}
+
+/**
+ * The rows of a card in the language of whoever looks at it (they are kept with the proposal, made
+ * while the assistant worked).
+ *
+ * @param array $rows Rows of plan().
+ */
+function relabel( array $rows ): array {
+	$labels = array(
+		'title'    => __( 'Title', 'flurfunk' ),
+		'excerpt'  => __( 'Excerpt', 'flurfunk' ),
+		'text'     => __( 'Text', 'flurfunk' ),
+		'category' => __( 'Categories', 'flurfunk' ),
+		'post_tag' => __( 'Tags', 'flurfunk' ),
+		'image'    => __( 'Featured image', 'flurfunk' ),
+		'layout'   => __( 'Layout', 'flurfunk' ),
 	);
+	foreach ( $rows as $i => $r ) {
+		if ( ! is_array( $r ) || ! isset( $r['field'] ) ) {
+			continue;
+		}
+		$rows[ $i ]['label'] = 'layout' === $r['field'] && ! empty( $r['added'] ) ? __( 'Added at the end', 'flurfunk' ) : ( $labels[ $r['field'] ] ?? (string) ( $r['label'] ?? '' ) );
+		if ( 'layout' === $r['field'] && ! empty( $r['same'] ) ) {
+			$rows[ $i ]['after'] = __( 'Only the markup changes, not the text', 'flurfunk' );
+		}
+	}
+	return $rows;
 }
 
 /**

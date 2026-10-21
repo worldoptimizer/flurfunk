@@ -2239,6 +2239,8 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Changes\NAM
 	$pg_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $pg_pid ), array(), $team );
 	$pg_back = (string) get_post( $pg_id )->post_content;
 	$check( 'a page: a heading added in the block markup and buttons at the end by the card (no script), undone; the card shows the visible text', true === $pg_ok && is_wp_error( $pg_miss ) && 2 === count( (array) $pg_plan ) && 'Wer wir sind Wir sind ein Verein.' === ( $pg_plan[0]['after'] ?? '' ) && str_contains( (string) ( $pg_mk['markup'] ?? '' ), 'wp:paragraph' ) && null === $pg_run && str_contains( $pg_now, 'Wer wir sind' ) && str_contains( $pg_now, 'Mitglied werden' ) && ! str_contains( $pg_now, '<script' ) && null === $pg_undo && ! str_contains( $pg_back, 'Wer wir sind' ), array( $pg_ok, $pg_plan, $pg_run, $pg_undo ) );
+	$pg_rl = Flurfunk\Changes\relabel( array( array( 'field' => 'layout', 'added' => true, 'label' => 'kept from the assistant\'s run' ), array( 'field' => 'title', 'label' => 'x' ) ) );
+	$check( '… the rows are labeled when the card is shown, in the viewer\'s language (not in the one of the assistant\'s run)', __( 'Added at the end', 'flurfunk' ) === $pg_rl[0]['label'] && __( 'Title', 'flurfunk' ) === $pg_rl[1]['label'], $pg_rl );
 	$as( $guest );
 	$pg_gm = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $pg_id, 'markup' => true ) );
 	$check( '… a guest reads the published page, but not its markup', is_array( $pg_gm ) && ! isset( $pg_gm['markup'] ), $pg_gm );

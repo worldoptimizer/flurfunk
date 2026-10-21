@@ -453,7 +453,7 @@ function changes_snapshot( array $p ): array {
 			'id'      => $id,
 			'title'   => $post ? html_entity_decode( get_the_title( $post ), ENT_QUOTES, 'UTF-8' ) : '#' . $id,
 			'url'     => $post ? (string) get_edit_post_link( $id, 'raw' ) : '',
-			'changes' => is_wp_error( $plan ) ? (array) ( $p['preview'][ $id ] ?? array() ) : $plan,
+			'changes' => \Flurfunk\Changes\relabel( is_wp_error( $plan ) ? (array) ( $p['preview'][ $id ] ?? array() ) : $plan ),
 			'note'    => is_wp_error( $plan ) ? $plan->get_error_message() : '',
 		);
 		if ( 'open' !== $p['state'] && 'dismissed' !== $p['state'] ) {
