@@ -182,6 +182,7 @@ add_action(
 function enqueue(): void {
 	wp_enqueue_media();
 	wp_enqueue_script( 'flurfunk-settings', FLURFUNK_URL . 'assets/settings.js', array( 'media-editor' ), (string) filemtime( FLURFUNK_DIR . 'assets/settings.js' ), true );
+	wp_enqueue_style( 'flurfunk-settings', FLURFUNK_URL . 'assets/settings.css', array(), (string) filemtime( FLURFUNK_DIR . 'assets/settings.css' ) );
 }
 
 // "Settings" next to Deactivate in the plugins list.

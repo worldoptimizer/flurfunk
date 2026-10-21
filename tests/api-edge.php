@@ -190,6 +190,29 @@ $r1 = Flurfunk\Transfer\import( $data );
 $r2 = Flurfunk\Transfer\import( $data );
 $check( 'import adds threads once, a second run skips them', $r1['threads'] > 0 && 0 === $r2['threads'] && $r2['skipped'] >= $r1['threads'], array( $r1, $r2 ) );
 $check( 'import never sends mails', ! array_filter( $mails, fn ( $m ) => false === $m ) );
+// A ZIP bundle is only opened as far as an export goes: flurfunk.json and files of allowed types –
+// a PHP file in it is not written anywhere, and a path out of the folder stops the whole archive.
+if ( class_exists( 'ZipArchive' ) ) {
+	$zb_make = static function ( array $entries ): string {
+		$f = wp_tempnam( 'ff-test-bundle' ) . '.zip';
+		$z = new ZipArchive();
+		$z->open( $f, ZipArchive::CREATE | ZipArchive::OVERWRITE );
+		foreach ( $entries as $name => $body ) {
+			$z->addFromString( $name, $body );
+		}
+		$z->close();
+		return $f;
+	};
+	$zb_ok   = $zb_make( array( 'flurfunk.json' => '{"format":"flurfunk/1"}', 'files/1-bild.png' => 'png', 'files/2-boese.php' => '<?php echo 1;', 'notes.txt' => 'x' ) );
+	$zb_open = Flurfunk\Data\open_bundle( $zb_ok );
+	$zb_bad  = $zb_make( array( 'flurfunk.json' => '{"format":"flurfunk/1"}', '../ff-test-raus.txt' => 'x' ) );
+	$zb_out  = Flurfunk\Data\open_bundle( $zb_bad );
+	$check( 'a ZIP bundle: flurfunk.json and allowed files are unpacked, a PHP file and stray files are not; a path out of the folder stops the archive', '{"format":"flurfunk/1"}' === $zb_open['json'] && file_exists( $zb_open['dir'] . '/files/1-bild.png' ) && ! file_exists( $zb_open['dir'] . '/files/2-boese.php' ) && ! file_exists( $zb_open['dir'] . '/notes.txt' ) && '' === $zb_out['json'] && ! file_exists( dirname( $zb_out['dir'] ) . '/ff-test-raus.txt' ), array( $zb_open['json'], $zb_out['json'] ) );
+	Flurfunk\Data\remove_dir( $zb_open['dir'] );
+	Flurfunk\Data\remove_dir( $zb_out['dir'] );
+	wp_delete_file( $zb_ok );
+	wp_delete_file( $zb_bad );
+}
 $r3 = Flurfunk\Transfer\import(
 	array(
 		'format'   => 'flurfunk/1',

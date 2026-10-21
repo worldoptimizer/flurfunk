@@ -60,6 +60,64 @@ function check(): void {
 	}
 }
 
+/**
+ * Everything as a ZIP bundle (flurfunk.json and files/), built in a temporary folder.
+ *
+ * @return string The ZIP file; the caller deletes it.
+ */
+function bundle(): string {
+	$dir = temp_dir();
+	file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- our own temporary folder.
+	$zip_file = $dir . '.zip';
+	$zip      = new \ZipArchive();
+	$zip->open( $zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
+	$items = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) );
+	foreach ( $items as $item ) {
+		$zip->addFile( $item->getPathname(), ltrim( substr( $item->getPathname(), strlen( $dir ) ), '/' ) );
+	}
+	$zip->close();
+	remove_dir( $dir );
+	return $zip_file;
+}
+
+/**
+ * Open a ZIP bundle in a temporary folder – only what an export contains: flurfunk.json and, in
+ * files/, files of types WordPress allows to upload (others are left out). Nothing executable is
+ * written, and an archive with a path that would leave the folder is not opened at all.
+ *
+ * @param string $file The ZIP file.
+ * @return array{dir: string, json: string} The folder (the caller removes it) and the JSON ('' if
+ *                                          it is not a Flurfunk bundle).
+ */
+function open_bundle( string $file ): array {
+	$dir = temp_dir();
+	$zip = new \ZipArchive();
+	if ( true !== $zip->open( $file ) ) {
+		return array(
+			'dir'  => $dir,
+			'json' => '',
+		);
+	}
+	$take = array();
+	$ok   = true;
+	for ( $i = 0; $ok && $i < $zip->numFiles; $i++ ) {
+		$entry = (string) $zip->getNameIndex( $i );
+		$ok    = ! str_contains( $entry, '..' ) && ! str_contains( $entry, '\\' ) && ! str_starts_with( $entry, '/' );
+		$file  = str_starts_with( $entry, 'files/' ) && 1 === substr_count( $entry, '/' ) && '' !== wp_basename( $entry ) && false !== wp_check_filetype( wp_basename( $entry ) )['ext'];
+		if ( $ok && ( 'flurfunk.json' === $entry || $file ) ) {
+			$take[] = $entry;
+		}
+	}
+	if ( $ok && in_array( 'flurfunk.json', $take, true ) ) {
+		$zip->extractTo( $dir, $take );
+	}
+	$zip->close();
+	return array(
+		'dir'  => $dir,
+		'json' => $ok && is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : '', // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file in our temporary folder.
+	);
+}
+
 /*
  * Export: download JSON or a ZIP bundle.
  */
@@ -77,17 +135,7 @@ add_action(
 			echo wp_json_encode( Transfer\export(), $flags ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- a JSON download, not HTML.
 			exit;
 		}
-		$dir = temp_dir();
-		file_put_contents( $dir . '/flurfunk.json', (string) wp_json_encode( Transfer\export( $dir ), $flags ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- our own temporary folder.
-		$zip_file = $dir . '.zip';
-		$zip      = new \ZipArchive();
-		$zip->open( $zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE );
-		$items = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ) );
-		foreach ( $items as $item ) {
-			$zip->addFile( $item->getPathname(), ltrim( substr( $item->getPathname(), strlen( $dir ) ), '/' ) );
-		}
-		$zip->close();
-		remove_dir( $dir );
+		$zip_file = bundle();
 		nocache_headers();
 		header( 'Content-Type: application/zip' );
 		header( 'Content-Disposition: attachment; filename="' . $name . '.zip"' );
@@ -122,19 +170,7 @@ add_action(
 				wp_safe_redirect( $back );
 				exit;
 			}
-			$dir = temp_dir();
-			$zip = new \ZipArchive();
-			$ok  = true === $zip->open( $file['tmp_name'] );
-			// Only plain paths: nothing may land outside the temporary folder.
-			for ( $i = 0; $ok && $i < $zip->numFiles; $i++ ) {
-				$entry = (string) $zip->getNameIndex( $i );
-				$ok    = ! str_contains( $entry, '..' ) && ! str_starts_with( $entry, '/' );
-			}
-			if ( $ok ) {
-				$zip->extractTo( $dir );
-				$zip->close();
-				$json = is_readable( $dir . '/flurfunk.json' ) ? (string) file_get_contents( $dir . '/flurfunk.json' ) : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a local file in our temporary folder.
-			}
+			list( 'dir' => $dir, 'json' => $json ) = open_bundle( (string) $file['tmp_name'] );
 		} else {
 			$json = (string) file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- the uploaded file.
 		}

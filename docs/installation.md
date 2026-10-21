@@ -474,13 +474,13 @@ export.
 
 ```bash
 # Everything as one JSON file; files stay links to this site
-wp flurfunk export backup.json
+wp flurfunk export > backup.json
 
-# A folder with flurfunk.json and files/, for moving to another site
-wp flurfunk export bundle/ --files
+# A ZIP with flurfunk.json and files/, for moving to another site
+wp flurfunk export --files > bundle.zip
 
 # On the new site
-wp flurfunk import bundle/        # or: wp flurfunk import backup.json
+wp flurfunk import bundle.zip     # or: wp flurfunk import backup.json
 ```
 
 What the import does:
@@ -488,9 +488,10 @@ What the import does:
 - Creates missing channels with their name, topic, access levels, order and archive state.
 - Matches people by email address. Authors that do not exist on the new site appear as
   "Deleted user", mentions of them as `@?`.
-- With a bundle folder, stores the files again as Flurfunk files on the new site (and adds them
-  to the media library if they were there before). Without a folder, files remain links to the
-  old site.
+- With a ZIP bundle (or a bundle folder of an older version), stores the files again as Flurfunk
+  files on the new site (and adds them to the media library if they were there before). Only
+  `flurfunk.json` and files of types WordPress allows to upload are taken from the ZIP. Without a
+  bundle, files remain links to the old site.
 - Skips threads it imported before, so running it twice is safe.
 - Marks everything imported as read for everyone, so nobody gets a wall of "new".
 
@@ -498,7 +499,7 @@ What is not carried over: follow and mute settings, reminders, the notification 
 subscriptions and personal preferences. The task history lines in a thread ("… set the due date
 to …") are not imported either; due dates, responsible people and status are.
 
-Run the import as an administrator (`wp flurfunk import bundle/ --user=admin`). Without `--user`,
+Run the import as an administrator (`wp flurfunk import bundle.zip --user=admin`). Without `--user`,
 the command picks the first administrator, because imported files need an owner.
 
 The export contains names and email addresses of everyone who wrote something. Treat it as
@@ -530,7 +531,7 @@ the data depends on *Settings → Flurfunk → Data*:
 | on (default) | Tables, settings and preferences stay. Reinstalling brings everything back. |
 | off | All Flurfunk tables are dropped, Flurfunk files that were never added to the media library are deleted, the settings and the personal preferences of all users are removed. Files that were added to the media library stay. |
 
-Export first if you might need the conversations later: `wp flurfunk export bundle/ --files`.
+Export first if you might need the conversations later: `wp flurfunk export --files > bundle.zip`.
 
 ## Troubleshooting
 

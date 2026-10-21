@@ -1284,13 +1284,15 @@ All commands live under `wp flurfunk`.
 ### `wp flurfunk export`
 
 ```
-wp flurfunk export [<file>] [--files]
+wp flurfunk export [--files] > <file>
 ```
+
+The export goes to the screen; redirect it into a file. Flurfunk itself writes nothing outside its
+temporary folder.
 
 | Option | Meaning |
 | --- | --- |
-| `<file>` | Write to this file instead of the screen. With `--files`: a folder (required). |
-| `--files` | Write a bundle folder with `flurfunk.json` and `files/`, for moving to another site. |
+| `--files` | A ZIP bundle instead of the JSON, with `flurfunk.json` and `files/`, for moving to another site. |
 
 ### `wp flurfunk import`
 
@@ -1300,7 +1302,7 @@ wp flurfunk import <file>
 
 | Option | Meaning |
 | --- | --- |
-| `<file>` | An export file, or a bundle folder from `export --files`. |
+| `<file>` | An export file, a ZIP bundle from `export --files` or the download under Settings, or a bundle folder of an older version. Only `flurfunk.json` and files of allowed types are taken from a ZIP. |
 
 Threads imported before are skipped. People are matched by email. Use the global `--user=<admin>`
 to choose who owns imported files (default: the first administrator).

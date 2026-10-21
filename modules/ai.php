@@ -2310,37 +2310,6 @@ function render_section(): void {
 	$notes    = (array) get_option( CHANNELS, array() );
 	?>
 	<div id="flurfunk-ai" class="ff-ai-section">
-	<style>
-		.ff-ai-section{max-width:52rem}
-		.ff-ai-agent{margin:0 0 1.5em;padding:18px 20px;border:1px solid #c3c4c7;border-radius:12px;background:#fff}
-		.ff-ai-agent.is-on{border-color:#8b5a1b;box-shadow:0 0 0 1px #8b5a1b}
-		.ff-ai-agent h4{margin:18px 0 8px;font-size:13px}
-		.ff-ai-head{display:flex;gap:12px;align-items:center}
-		.ff-ai-ava{width:40px;height:40px;border-radius:50%;background:#f5ece0;color:#8b5a1b;display:grid;place-items:center;flex:none}
-		.ff-ai-ava svg{width:18px;height:18px}
-		.ff-ai-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-		.ff-ai-who strong{font-size:16px}
-		.ff-ai-role{border:0;border-bottom:1px dashed #c3c4c7;border-radius:0;padding:2px 0;width:100%;max-width:30rem;background:none;color:#50575e;box-shadow:none}
-		.ff-ai-role:focus{border-bottom-color:#8b5a1b;box-shadow:none}
-		.ff-ai-switch{display:inline-flex;gap:6px;align-items:center;font-weight:600}
-		.ff-ai-packs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-		@media (max-width:782px){.ff-ai-packs{grid-template-columns:minmax(0,1fr)}}
-		.ff-ai-pack{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid #dcdcde;border-radius:10px;cursor:pointer}
-		.ff-ai-pack.is-on{border:2px solid #8b5a1b;background:#fbf6ef;padding:10px 11px}
-		.ff-ai-pack.is-off{border-style:dashed;color:#646970;cursor:default}
-		.ff-ai-pack input{margin-top:3px}
-		.ff-ai-pack span{display:flex;flex-direction:column;gap:3px;min-width:0}
-		.ff-ai-pack small{color:#50575e;font-size:12px;line-height:1.4}
-		.ff-ai-kind{align-self:flex-start;font-style:normal;font-size:11px;font-weight:700;border-radius:999px;padding:0 8px}
-		.ff-ai-kind.is-read{color:#1f5b9e;background:#e8eff8}
-		.ff-ai-kind.is-propose{color:#8b5a1b;border:1px solid #8b5a1b}
-		.ff-ai-kind.is-write{color:#fff;background:#8b5a1b}
-		.ff-ai-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:6px 0}
-		.ff-ai-chipbox{display:inline-flex;gap:4px;align-items:center;padding:3px 10px;border:1px solid #dcdcde;border-radius:999px}
-		.ff-ai-sum{margin:14px 0 0;padding-top:12px;border-top:1px solid #f0f0f1;color:#50575e;font-size:13px}
-		.ff-ai-more{margin-top:10px}
-		.ff-ai-more summary{cursor:pointer;color:#8b5a1b}
-	</style>
 	<h2><?php esc_html_e( 'AI assistants', 'flurfunk' ); ?></h2>
 	<p class="description" style="max-width:46rem"><?php esc_html_e( 'An assistant with an AI profile answers in the thread when someone mentions it, in the channels ticked here. It reads that thread (and, if allowed below, the post it is about and what its tools find) and changes nothing on the site by itself – apart from drafts, if it may write them. The AI provider and its key are set up under Settings → Connectors; what the assistant reads is sent to that provider.', 'flurfunk' ); ?></p>
 	<?php if ( ! ready() ) : ?>
