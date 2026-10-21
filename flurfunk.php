@@ -73,6 +73,7 @@ require_once FLURFUNK_DIR . 'inc/insights.php'; // Site check, numbers and snaps
 require_once FLURFUNK_DIR . 'inc/stats.php'; // Visits from Koko Analytics or WP Statistics, for the numbers.
 require_once FLURFUNK_DIR . 'inc/styles.php'; // The site's look: colors and CSS (abilities; changes as cards).
 require_once FLURFUNK_DIR . 'inc/templates.php'; // Block theme templates and parts (abilities; changes as cards).
+require_once FLURFUNK_DIR . 'inc/patterns.php'; // The site's patterns (abilities; saved as cards).
 
 require_once FLURFUNK_DIR . 'inc/modules.php'; // Optional parts, incl. modules/ (switchable).
 

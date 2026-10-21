@@ -462,9 +462,14 @@ function register(): void {
 			'input_schema'        => array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'id' => array(
+					'id'     => array(
 						'type'    => 'integer',
 						'minimum' => 1,
+					),
+					'markup' => array(
+						'type'        => 'boolean',
+						'default'     => false,
+						'description' => __( 'Also its block markup (for changes to the layout; only for those who may edit it).', 'flurfunk' ),
 					),
 				),
 				'required'             => array( 'id' ),
@@ -491,7 +496,7 @@ function register(): void {
 					'excerpt'  => html_entity_decode( wp_strip_all_tags( (string) $p->post_excerpt ), ENT_QUOTES, 'UTF-8' ),
 					'url'      => 'publish' === $p->post_status ? (string) get_permalink( $p ) : '',
 					'text'     => mb_strlen( $text ) > $max ? mb_substr( $text, 0, $max ) . ' […]' : $text,
-				);
+				) + ( ! empty( ( (array) $input )['markup'] ) && current_user_can( 'edit_post', $p->ID ) ? array( 'markup' => mb_substr( (string) $p->post_content, 0, 30000 ) ) : array() );
 			},
 			'permission_callback' => __NAMESPACE__ . '\\allowed',
 			'meta'                => array(

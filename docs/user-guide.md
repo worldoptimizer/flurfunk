@@ -203,8 +203,11 @@ their role.
   not want and click **Apply** – it runs with your rights; **Undo** brings the posts back, as long as
   nobody changed them since. A post someone changed in the meantime is skipped.
 - **For administrators – the site itself:** with the packs for it, an assistant builds a page as a
-  draft ("an 'about us' page with two columns and a button"), proposes changes to the look ("square
-  buttons, dark green links"), to a block theme's header, footer or menu, searches a plugin's code
+  draft ("an 'about us' page with two columns and a button"), changes an existing page ("add a
+  section with our dates at the end"), proposes changes to the look ("square buttons, dark green
+  links, larger headings, more space between the paragraphs"), to a block theme's templates, header,
+  footer or menu, a new page template ("a landing page without sidebar for the campaign page"), a
+  pattern to reuse ("keep the contact box as a pattern"), searches a plugin's code
   ("how do I extend this?"), checks the content for SEO gaps and keeps the site's numbers with a note
   – later "did adding excerpts help?" gets an answer with before and after. Every change is a card
   you apply and can undo.

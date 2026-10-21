@@ -1,8 +1,9 @@
 <?php
 /**
- * Changes to existing posts, as one WordPress ability: flurfunk/update-posts corrects text (exact
- * replacements, only in text – never in markup), and sets titles, excerpts, categories, tags and the
- * featured image, for several posts at once. An AI assistant only proposes it: one card with before
+ * Changes to existing posts and pages, as one WordPress ability: flurfunk/update-posts corrects text
+ * (exact replacements, only in text), changes the layout (exact replacements in the block markup,
+ * blocks added at the end – filtered), and sets titles, excerpts, categories, tags and the featured
+ * image, for several posts at once. An AI assistant only proposes it: one card with before
  * and after per post, a person picks the rows and applies them with their own rights (within the
  * assistant's limit), and can undo it afterwards.
  *
@@ -124,7 +125,7 @@ function term_ids( string $taxonomy, array $names, bool $create ) {
  */
 function plan( array $e ) {
 	$p = get_post( (int) $e['id'] );
-	if ( ! $p || ! in_array( $p->post_type, (array) \Flurfunk\Settings\get()['post_types'], true ) ) {
+	if ( ! $p || ! in_array( $p->post_type, \Flurfunk\Drafts\types(), true ) ) {
 		/* translators: %d: ID */
 		return new \WP_Error( 'flurfunk_forbidden', sprintf( __( 'Post %d does not exist or you may not see it.', 'flurfunk' ), (int) $e['id'] ), array( 'status' => 404 ) );
 	}
@@ -165,6 +166,16 @@ function plan( array $e ) {
 			);
 		}
 	}
+	foreach ( blocks( $e ) as $b ) {
+		if ( ! str_contains( (string) $p->post_content, (string) $b['find'] ) ) {
+			/* translators: %s: markup */
+			return new \WP_Error( 'flurfunk_change_text', sprintf( __( 'The markup "%s" is not in the post (copy it exactly from flurfunk/get-post with markup).', 'flurfunk' ), mb_substr( (string) $b['find'], 0, 80 ) ), array( 'status' => 400 ) );
+		}
+		$rows[] = layout_row( (string) $b['find'], (string) ( $b['with'] ?? '' ) );
+	}
+	if ( '' !== trim( (string) ( $e['append'] ?? '' ) ) ) {
+		$rows[] = layout_row( '', (string) $e['append'] );
+	}
 	foreach ( array( 'category' => __( 'Categories', 'flurfunk' ), 'post_tag' => __( 'Tags', 'flurfunk' ) ) as $tax => $label ) {
 		$key  = 'category' === $tax ? 'categories' : 'tags';
 		$add  = (array) ( $e[ 'add_' . $key ] ?? array() );
@@ -198,6 +209,33 @@ function plan( array $e ) {
 		);
 	}
 	return $rows;
+}
+
+/**
+ * The changes to an entry's markup (layout): [ { find, with } ] with something to find.
+ *
+ * @param array $e Entry.
+ */
+function blocks( array $e ): array {
+	return array_values( array_filter( array_map( static fn ( $r ) => (array) $r, array_slice( (array) ( $e['blocks'] ?? array() ), 0, 10 ) ), static fn ( $r ) => '' !== trim( (string) ( $r['find'] ?? '' ) ) ) );
+}
+
+/**
+ * A row of the card for a change to the layout: the visible text before and after.
+ *
+ * @param string $find Markup replaced ('' when blocks are added at the end).
+ * @param string $with The new markup.
+ */
+function layout_row( string $find, string $with ): array {
+	$text   = static fn ( string $s ) => mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $s ) ) ), 0, 120 );
+	$before = $text( $find );
+	$after  = $text( $with );
+	return array(
+		'field'  => 'layout',
+		'label'  => '' === $find ? __( 'Added at the end', 'flurfunk' ) : __( 'Layout', 'flurfunk' ),
+		'before' => $before,
+		'after'  => $after === $before ? __( 'Only the markup changes, not the text', 'flurfunk' ) : $after,
+	);
 }
 
 /**
@@ -290,6 +328,34 @@ function apply( array $input ): array {
 			}
 			// Saving goes through kses for people without unfiltered HTML: if that would lose
 			// markup of this post (an embed, a script), a person has to change it by hand.
+			if ( ! current_user_can( 'unfiltered_html' ) && wp_unslash( wp_filter_post_kses( wp_slash( $new ) ) ) !== $new ) {
+				$out[] = $line + array(
+					'status'  => 'skipped',
+					'message' => __( 'This post contains markup that would be lost when saving here. Please change it by hand.', 'flurfunk' ),
+				);
+				continue;
+			}
+			$data['post_content'] = $new;
+		}
+		// The layout: exact replacements in the markup, blocks at the end – what the assistant wrote is
+		// filtered.
+		$markup = blocks( $e );
+		if ( $markup || '' !== trim( (string) ( $e['append'] ?? '' ) ) ) {
+			$new = (string) ( $data['post_content'] ?? $p->post_content );
+			foreach ( $markup as $b ) {
+				if ( ! str_contains( $new, (string) $b['find'] ) ) {
+					$out[] = $line + array(
+						'status'  => 'skipped',
+						/* translators: %s: markup */
+						'message' => sprintf( __( 'The markup "%s" is not in the post (any more).', 'flurfunk' ), mb_substr( (string) $b['find'], 0, 80 ) ),
+					);
+					continue 2;
+				}
+				$new = str_replace( (string) $b['find'], wp_kses_post( (string) ( $b['with'] ?? '' ) ), $new );
+			}
+			if ( '' !== trim( (string) ( $e['append'] ?? '' ) ) ) {
+				$new = rtrim( $new ) . "\n\n" . trim( wp_kses_post( (string) $e['append'] ) );
+			}
 			if ( ! current_user_can( 'unfiltered_html' ) && wp_unslash( wp_filter_post_kses( wp_slash( $new ) ) ) !== $new ) {
 				$out[] = $line + array(
 					'status'  => 'skipped',
@@ -459,8 +525,8 @@ function register(): void {
 	wp_register_ability(
 		NAME,
 		array(
-			'label'               => __( 'Change posts', 'flurfunk' ),
-			'description'         => __( 'Changes existing posts, several at once: corrections in the text (exact replacements, only in text), title, excerpt, categories, tags, featured image. A post changed since unchanged_since is skipped, as is one whose markup saving would lose.', 'flurfunk' ),
+			'label'               => __( 'Change posts and pages', 'flurfunk' ),
+			'description'         => __( 'Changes existing posts and pages, several at once: corrections in the text (exact replacements, only in text), the layout (exact replacements in the block markup, blocks, or new blocks at the end, append), title, excerpt, categories, tags, featured image. A post changed since unchanged_since is skipped, as is one whose markup saving would lose.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -505,6 +571,27 @@ function register(): void {
 										'required'             => array( 'find', 'with' ),
 										'additionalProperties' => false,
 									),
+								),
+								'blocks'            => array(
+									'type'        => 'array',
+									'maxItems'    => 10,
+									'description' => __( 'Changes to the layout: find (block markup exactly as in the post, from flurfunk/get-post with markup) and with (the new block markup).', 'flurfunk' ),
+									'items'       => array(
+										'type'                 => 'object',
+										'properties'           => array(
+											'find' => array(
+												'type'      => 'string',
+												'minLength' => 1,
+											),
+											'with' => array( 'type' => 'string' ),
+										),
+										'required'             => array( 'find', 'with' ),
+										'additionalProperties' => false,
+									),
+								),
+								'append'            => array(
+									'type'        => 'string',
+									'description' => __( 'Block markup to add at the end (e.g. a new section).', 'flurfunk' ),
 								),
 								'add_categories'    => $names,
 								'remove_categories' => $names,

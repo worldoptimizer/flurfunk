@@ -18,6 +18,7 @@ use Flurfunk\Access;
 defined( 'ABSPATH' ) || exit;
 
 const NAME = 'flurfunk/update-template';
+const ADD  = 'flurfunk/add-template';
 
 add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\\register' );
 
@@ -254,6 +255,137 @@ function undo( array $undo ) {
 }
 
 /**
+ * The pages a new page template is meant for, which the current person may change.
+ *
+ * @param array $input { assign }.
+ * @return int[]|\WP_Error
+ */
+function pages( array $input ) {
+	$ids = array();
+	foreach ( array_slice( (array) ( $input['assign'] ?? array() ), 0, 20 ) as $id ) {
+		$p = get_post( (int) $id );
+		if ( ! $p || 'page' !== $p->post_type || ! current_user_can( 'edit_post', $p->ID ) ) {
+			/* translators: %d: ID */
+			return new \WP_Error( 'flurfunk_templates', sprintf( __( 'Page %d does not exist or you may not change it.', 'flurfunk' ), (int) $id ), array( 'status' => 400 ) );
+		}
+		$ids[] = $p->ID;
+	}
+	return $ids;
+}
+
+/**
+ * Check a new template before it becomes a card: a block theme, a name of its own, some markup.
+ *
+ * @param array $input { type, slug, title, content, area, assign }.
+ * @return true|\WP_Error
+ */
+function validate_new( array $input ) {
+	if ( ! wp_is_block_theme() ) {
+		return new \WP_Error( 'flurfunk_templates', __( 'This theme is not a block theme: its templates are files, which cannot be changed here.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$type = 'wp_template' === ( $input['type'] ?? 'wp_template' ) ? 'wp_template' : 'wp_template_part';
+	$slug = sanitize_title( (string) ( $input['slug'] ?? '' ) );
+	if ( '' === $slug || '' === trim( (string) ( $input['content'] ?? '' ) ) ) {
+		return new \WP_Error( 'flurfunk_templates', __( 'A new template needs a short name (slug) and its block markup.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	if ( one( get_stylesheet() . '//' . $slug, $type ) ) {
+		return new \WP_Error( 'flurfunk_templates', __( 'A template with this name exists already: change it instead (flurfunk/update-template).', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	if ( 'wp_template_part' === $type && ! empty( $input['assign'] ) ) {
+		return new \WP_Error( 'flurfunk_templates', __( 'Only a page template can be given to pages.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	$pages = pages( $input );
+	return is_wp_error( $pages ) ? $pages : true;
+}
+
+/**
+ * Add a template or template part as the current person (the site's own, as in the Site Editor),
+ * and give a page template to the pages named.
+ *
+ * @param array $input { type, slug, title, description, content, area, assign }.
+ * @return array|\WP_Error What was made, and what undo needs.
+ */
+function create( array $input ) {
+	$ok = validate_new( $input );
+	if ( true !== $ok ) {
+		return $ok;
+	}
+	$type  = 'wp_template' === ( $input['type'] ?? 'wp_template' ) ? 'wp_template' : 'wp_template_part';
+	$slug  = sanitize_title( (string) $input['slug'] );
+	$pages = pages( $input );
+	$body  = array(
+		'slug'        => $slug,
+		'title'       => sanitize_text_field( (string) ( $input['title'] ?? $slug ) ),
+		'description' => sanitize_text_field( (string) ( $input['description'] ?? '' ) ),
+		'content'     => trim( wp_kses_post( (string) $input['content'] ) ), // What the assistant wrote is filtered.
+		'status'      => 'publish',
+	);
+	if ( 'wp_template_part' === $type ) {
+		$body['area'] = in_array( $input['area'] ?? '', array( 'header', 'footer', 'uncategorized' ), true ) ? (string) $input['area'] : 'uncategorized';
+	}
+	$req = new \WP_REST_Request( 'POST', rtrim( route( $type ), '/' ) );
+	$req->set_body_params( $body );
+	$res = rest_do_request( $req );
+	if ( $res->is_error() ) {
+		return $res->as_error();
+	}
+	$id     = (string) ( $res->get_data()['id'] ?? get_stylesheet() . '//' . $slug );
+	$before = array();
+	foreach ( $pages as $page ) {
+		$before[ $page ] = (string) get_post_meta( $page, '_wp_page_template', true );
+		update_post_meta( $page, '_wp_page_template', $slug );
+	}
+	$made = one( $id, $type );
+	return array(
+		'id'    => $id,
+		'title' => $made ? (string) $made->title : $body['title'],
+		'pages' => $pages,
+		'undo'  => array(
+			'id'    => $id,
+			'type'  => $type,
+			'slug'  => $slug,
+			'pages' => $before,
+			'after' => md5( (string) ( $made ? $made->content : '' ) ),
+		),
+	);
+}
+
+/**
+ * Remove a template a card added (and give its pages their template from before) – unless someone
+ * changed it since.
+ *
+ * @param array $undo What create() returned under "undo".
+ * @return true|\WP_Error
+ */
+function remove( array $undo ) {
+	if ( ! current_user_can( 'edit_theme_options' ) ) {
+		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot do this.', 'flurfunk' ), array( 'status' => 403 ) );
+	}
+	$t = one( (string) ( $undo['id'] ?? '' ), type( $undo['type'] ?? '' ) );
+	if ( $t && md5( (string) $t->content ) !== (string) ( $undo['after'] ?? '' ) ) {
+		return new \WP_Error( 'flurfunk_templates', __( 'The template was changed again since; nothing was undone.', 'flurfunk' ), array( 'status' => 409 ) );
+	}
+	if ( $t ) {
+		$req = new \WP_REST_Request( 'DELETE', route( type( $undo['type'] ) ) . $t->id );
+		$req->set_param( 'force', true );
+		$res = rest_do_request( $req );
+		if ( $res->is_error() ) {
+			return $res->as_error();
+		}
+	}
+	foreach ( (array) ( $undo['pages'] ?? array() ) as $page => $was ) {
+		if ( current_user_can( 'edit_post', (int) $page ) && (string) $undo['slug'] === (string) get_post_meta( (int) $page, '_wp_page_template', true ) ) {
+			if ( '' === (string) $was ) {
+				delete_post_meta( (int) $page, '_wp_page_template' );
+			} else {
+				update_post_meta( (int) $page, '_wp_page_template', (string) $was );
+			}
+		}
+	}
+	return true;
+}
+
+/**
  * May the current person read or change the templates?
  */
 function may(): bool {
@@ -334,6 +466,71 @@ function register(): void {
 			),
 			'output_schema'       => array( 'type' => 'object' ),
 			'execute_callback'    => static fn ( $input = array() ) => update( (array) $input ),
+			'permission_callback' => __NAMESPACE__ . '\\may',
+			'meta'                => array(
+				'annotations' => array(
+					'readonly'    => false,
+					'destructive' => false,
+					'idempotent'  => false,
+				),
+				'public'      => false,
+			),
+		)
+	);
+	wp_register_ability(
+		ADD,
+		array(
+			'label'               => __( 'Add a template', 'flurfunk' ),
+			'description'         => __( 'Adds a new template (e.g. a page template "landing page") or template part to the active block theme – the site\'s own, as in the Site Editor – and can give a page template to pages right away (assign). A template named "page-<page slug>" is used for that page by itself. Can be undone. Scripts are filtered out.', 'flurfunk' ),
+			'category'            => 'flurfunk',
+			'input_schema'        => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'type'        => array(
+						'type'    => 'string',
+						'enum'    => array( 'wp_template', 'wp_template_part' ),
+						'default' => 'wp_template',
+					),
+					'slug'        => array(
+						'type'        => 'string',
+						'maxLength'   => 80,
+						'description' => __( 'Short name, e.g. "landing-page".', 'flurfunk' ),
+					),
+					'title'       => array(
+						'type'      => 'string',
+						'maxLength' => 100,
+						'title'     => __( 'Title', 'flurfunk' ),
+					),
+					'description' => array(
+						'type'      => 'string',
+						'maxLength' => 300,
+					),
+					'area'        => array(
+						'type'        => 'string',
+						'enum'        => array( 'header', 'footer', 'uncategorized' ),
+						'description' => __( 'For a template part: where it belongs.', 'flurfunk' ),
+					),
+					'content'     => array(
+						'type'  => 'string',
+						'title' => __( 'Block markup', 'flurfunk' ),
+					),
+					'assign'      => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'integer' ),
+						'maxItems'    => 20,
+						'description' => __( 'IDs of pages that get the new page template.', 'flurfunk' ),
+					),
+					'why'         => array(
+						'type'      => 'string',
+						'maxLength' => 300,
+						'title'     => __( 'Why', 'flurfunk' ),
+					),
+				),
+				'required'             => array( 'slug', 'content' ),
+				'additionalProperties' => false,
+			),
+			'output_schema'       => array( 'type' => 'object' ),
+			'execute_callback'    => static fn ( $input = array() ) => create( (array) $input ),
 			'permission_callback' => __NAMESPACE__ . '\\may',
 			'meta'                => array(
 				'annotations' => array(

@@ -2149,6 +2149,103 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Templates\N
 	);
 	$check( 'a template card names what is added, removed or changed in the visible text', array( sprintf( __( 'Adds "%s"', 'flurfunk' ), '© 2026 Verein' ), sprintf( __( '"%1$s" becomes "%2$s"', 'flurfunk' ), 'Alt', 'Neu' ), sprintf( __( 'Removes "%s"', 'flurfunk' ), 'Weg' ), __( 'Only the markup changes, not the text', 'flurfunk' ) ) === $tp_sum, $tp_sum );
 }
+// Building the site, block themes: fonts, sizes and spacing as theme.json styles; a new page template
+// for a page; a pattern of the site's own – each as a card, applied and undone.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Templates\ADD ) && wp_is_block_theme() ) {
+	$as( $team );
+	$bs_in   = array(
+		'styles' => array(
+			'typography' => array( 'lineHeight' => '1.7' ),
+			'elements'   => array( 'h2' => array( 'typography' => array( 'fontSize' => 'var(--wp--preset--font-size--x-large)' ) ) ),
+			'blocks'     => array( 'core/button' => array( 'border' => array( 'radius' => '0' ) ) ),
+		),
+		'layout' => array( 'contentSize' => '720px' ),
+		'why'    => 'Test',
+	);
+	$bs_bad  = array(
+		Flurfunk\Styles\validate( array( 'styles' => array( 'typography' => array( 'fontFamily' => 'x; } body { display:none' ) ) ) ),
+		Flurfunk\Styles\validate( array( 'styles' => array( 'typography' => array( 'fontSize' => 'url(https://evil.example/x)' ) ) ) ),
+		Flurfunk\Styles\validate( array( 'styles' => array( 'position' => array( 'type' => 'fixed' ) ) ) ),
+		Flurfunk\Styles\validate( array( 'styles' => array( 'elements' => array( 'div' => array( 'color' => array( 'text' => '#000' ) ) ) ) ) ),
+		Flurfunk\Styles\validate( array( 'styles' => array( 'blocks' => array( 'core/nope' => array( 'color' => array( 'text' => '#000' ) ) ) ) ) ),
+		Flurfunk\Styles\validate( array( 'layout' => array( 'contentSize' => '100px;}' ) ) ),
+	);
+	$check( 'styles: only known properties with plain values (no URLs, nothing that ends a declaration, no unknown elements or blocks)', true === Flurfunk\Styles\validate( $bs_in ) && 6 === count( array_filter( $bs_bad, 'is_wp_error' ) ), array_map( static fn ( $e ) => is_wp_error( $e ) ? $e->get_error_message() : $e, $bs_bad ) );
+	$bs_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Schriften' ) );
+	$bs_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Styles\NAME, $bs_in, $ai_bot, $bs_t );
+	$bs_snap = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $bs_pid ) );
+	$bs_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $bs_pid ), array(), $team );
+	$bs_now  = json_decode( (string) Flurfunk\Styles\user_post()->post_content, true );
+	$bs_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $bs_pid ), array(), $team );
+	$bs_back = json_decode( (string) Flurfunk\Styles\user_post()->post_content, true );
+	$check( 'a card sets line height, the size of H2, square buttons and the content width – and undo takes it back', null === $bs_run && '1.7' === ( $bs_now['styles']['typography']['lineHeight'] ?? '' ) && 'var(--wp--preset--font-size--x-large)' === ( $bs_now['styles']['elements']['h2']['typography']['fontSize'] ?? '' ) && '0' === ( $bs_now['styles']['blocks']['core/button']['border']['radius'] ?? '' ) && '720px' === ( $bs_now['settings']['layout']['contentSize'] ?? '' ) && null === $bs_undo && ! isset( $bs_back['styles']['typography']['lineHeight'] ) && str_contains( (string) ( $bs_snap['subtitle'] ?? '' ) . wp_json_encode( $bs_snap ), 'x-large' ), array( $bs_run, $bs_undo, $bs_now['styles'] ?? null ) );
+	$check( '… the card says it in words: the site, the H2 headings, the button block, the content width', 4 <= count( Flurfunk\Styles\describe( $bs_in ) ) && str_contains( implode( ' | ', Flurfunk\Styles\describe( $bs_in ) ), '720px' ), Flurfunk\Styles\describe( $bs_in ) );
+	$bs_get = Flurfunk\Styles\get();
+	$check( 'get-styles names the presets with the values to use, and the content width', ! empty( $bs_get['fonts'][0]['value'] ) && str_starts_with( (string) ( $bs_get['sizes']['font'][0]['value'] ?? '' ), 'var(--wp--preset--font-size--' ) && isset( $bs_get['layout']['contentSize'] ), array_keys( $bs_get ) );
+	// A new page template for one page; undo removes it and gives the page its template back.
+	$nt_page = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'FF-Test Landing', 'post_content' => 'x' ) );
+	$nt_in   = array( 'type' => 'wp_template', 'slug' => 'ff-test-landing', 'title' => 'FF-Test Landing', 'content' => '<!-- wp:post-content {"layout":{"type":"constrained"}} /--><script>x</script>', 'assign' => array( $nt_page ), 'why' => 'Test' );
+	$nt_dup  = Flurfunk\Templates\validate_new( array( 'slug' => 'single', 'type' => 'wp_template', 'content' => 'x' ) );
+	$nt_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Vorlage' ) );
+	$nt_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Templates\ADD, $nt_in, $ai_bot, $nt_t );
+	$nt_ok   = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Templates\ADD, $nt_in ) );
+	$nt_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $nt_pid ), array(), $team );
+	$nt_tpl  = Flurfunk\Templates\one( get_stylesheet() . '//ff-test-landing', 'wp_template' );
+	$nt_meta = (string) get_post_meta( $nt_page, '_wp_page_template', true );
+	$nt_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $nt_pid ), array(), $team );
+	$check( 'a new page template, given to a page by the card (without the script); undo removes it and the page\'s template', true === $nt_ok && is_wp_error( $nt_dup ) && null === $nt_run && $nt_tpl && ! str_contains( (string) $nt_tpl->content, '<script' ) && 'ff-test-landing' === $nt_meta && null === $nt_undo && ! Flurfunk\Templates\one( get_stylesheet() . '//ff-test-landing', 'wp_template' ) && '' === (string) get_post_meta( $nt_page, '_wp_page_template', true ), array( $nt_run, $nt_undo, $nt_meta ) );
+	wp_delete_post( $nt_page, true );
+	// A pattern: new (unsynced, with a category), then changed, both undone.
+	$pt_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Muster' ) );
+	$pt_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Patterns\NAME, array( 'title' => 'FF-Test Kontaktbox', 'content' => '<!-- wp:paragraph --><p>Ruf uns an</p><!-- /wp:paragraph --><script>x</script>', 'categories' => array( 'ff-test' ) ), $ai_bot, $pt_t );
+	$pt_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $pt_pid ), array(), $team );
+	$pt_id   = (int) ( Flurfunk\Modules\Ai\proposal( $pt_pid )['outcome']['id'] ?? 0 );
+	$pt_sync = Flurfunk\Patterns\synced( $pt_id );
+	$pt_list = Flurfunk\Patterns\get( array( 'search' => 'FF-Test' ) );
+	$pt_all  = Flurfunk\Patterns\get( array() );
+	$pt_p2   = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Patterns\NAME, array( 'id' => $pt_id, 'find' => 'Ruf uns an', 'replace' => 'Schreib uns' ), $ai_bot, $pt_t );
+	$pt_run2 = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $pt_p2 ), array(), $team );
+	$pt_now  = (string) get_post( $pt_id )->post_content;
+	$pt_un2  = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $pt_p2 ), array(), $team );
+	$pt_back = (string) get_post( $pt_id )->post_content;
+	$pt_un1  = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $pt_pid ), array(), $team );
+	$check( 'a pattern of the site\'s own: added unsynced with its category (no script), listed with the theme\'s, changed, both undone', null === $pt_run && $pt_id && ! $pt_sync && in_array( $pt_id, array_column( (array) ( $pt_list['own'] ?? array() ), 'id' ), true ) && ! empty( $pt_all['registered'] ) && null === $pt_run2 && str_contains( $pt_now, 'Schreib uns' ) && ! str_contains( $pt_now, '<script' ) && null === $pt_un2 && str_contains( $pt_back, 'Ruf uns an' ) && null === $pt_un1 && null === get_post( $pt_id ), array( $pt_run, $pt_run2, $pt_un2, $pt_un1 ) );
+	$extra_threads[] = $bs_t;
+	$extra_threads[] = $nt_t;
+	$extra_threads[] = $pt_t;
+}
+// Pages: the change card works on them too – a section replaced in the block markup, one added at the
+// end (filtered), undone; the markup only for those who may edit the page.
+if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Changes\NAME ) ) {
+	$as( $team );
+	$pg_id   = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'FF-Test Über uns', 'post_content' => "<!-- wp:paragraph -->\n<p>Wir sind ein Verein.</p>\n<!-- /wp:paragraph -->" ) );
+	$pg_in   = array(
+		'posts' => array(
+			array(
+				'id'     => $pg_id,
+				'blocks' => array( array( 'find' => "<!-- wp:paragraph -->\n<p>Wir sind ein Verein.</p>\n<!-- /wp:paragraph -->", 'with' => "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Wer wir sind</h2>\n<!-- /wp:heading -->\n<!-- wp:paragraph -->\n<p>Wir sind ein Verein.</p>\n<!-- /wp:paragraph -->" ) ),
+				'append' => "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\">Mitglied werden</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons --><script>x</script>",
+			),
+		),
+	);
+	$pg_ok   = Flurfunk\Changes\validate( $pg_in );
+	$pg_plan = Flurfunk\Changes\plan( $pg_in['posts'][0] );
+	$pg_miss = Flurfunk\Changes\validate( array( 'posts' => array( array( 'id' => $pg_id, 'blocks' => array( array( 'find' => '<!-- wp:gibt-es-nicht /-->', 'with' => 'x' ) ) ) ) ) );
+	$pg_mk   = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $pg_id, 'markup' => true ) );
+	$pg_t    = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Seite' ) );
+	$pg_pid  = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Changes\NAME, $pg_in, $ai_bot, $pg_t );
+	$pg_run  = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $pg_pid ), array( 'rows' => array( $pg_id ) ), $team );
+	$pg_now  = (string) get_post( $pg_id )->post_content;
+	$pg_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $pg_pid ), array(), $team );
+	$pg_back = (string) get_post( $pg_id )->post_content;
+	$check( 'a page: a heading added in the block markup and buttons at the end by the card (no script), undone; the card shows the visible text', true === $pg_ok && is_wp_error( $pg_miss ) && 2 === count( (array) $pg_plan ) && 'Wer wir sind Wir sind ein Verein.' === ( $pg_plan[0]['after'] ?? '' ) && str_contains( (string) ( $pg_mk['markup'] ?? '' ), 'wp:paragraph' ) && null === $pg_run && str_contains( $pg_now, 'Wer wir sind' ) && str_contains( $pg_now, 'Mitglied werden' ) && ! str_contains( $pg_now, '<script' ) && null === $pg_undo && ! str_contains( $pg_back, 'Wer wir sind' ), array( $pg_ok, $pg_plan, $pg_run, $pg_undo ) );
+	$as( $guest );
+	$pg_gm = wp_get_ability( 'flurfunk/get-post' )->execute( array( 'id' => $pg_id, 'markup' => true ) );
+	$check( '… a guest reads the published page, but not its markup', is_array( $pg_gm ) && ! isset( $pg_gm['markup'] ), $pg_gm );
+	$as( $team );
+	wp_delete_post( $pg_id, true );
+	$extra_threads[] = $pg_t;
+}
 // Every Flurfunk ability describes its input as an object with properties – an empty list would be
 // sent as [] and AI providers refuse the whole request.
 if ( function_exists( 'wp_get_abilities' ) ) {

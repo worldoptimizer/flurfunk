@@ -350,11 +350,16 @@ questions are expected, e.g. in a proofreading or help channel.
 
 **Pages and design** (pack, off by default, for administrators): an assistant writes page drafts –
 with layouts of core blocks if asked – and proposes changes to the look (additional CSS; for block
-themes base colors and palette) as a card. The card runs with the rights of the administrator who
+themes base colors, palette, fonts, font sizes, spacing, borders and content widths – for the whole
+site, for headings, buttons and the like, or for single blocks) as a card. The card runs with the rights of the administrator who
 clicks it, and "Undo" puts the look back as long as nobody changed it again since. For block themes the same
 goes for templates and parts like header and footer and for the navigation menus (saved as the site's
-own copy, as in the Site Editor; undo resets to the theme's own). What an assistant writes is always filtered – no scripts –
-even when an administrator applies it. Assistants themselves never change the theme.
+own copy, as in the Site Editor; undo resets to the theme's own), for new templates and template
+parts (a page template "landing page", given to pages right away; undo removes it) and for the site's
+own patterns (new or changed; a synced one changes wherever it is used). Existing pages are changed
+with the pack "Changes to posts": text, and the layout in the block markup. What an assistant writes
+is always filtered – no scripts – even when an administrator applies it. Only installed fonts can be
+used; new ones are added in the Site Editor. Assistants themselves never change the theme's files.
 
 **Numbers and site check** (pack, off by default): an assistant checks the published content for SEO
 gaps, reads the site's numbers and keeps them per channel with a note, to compare later. WordPress

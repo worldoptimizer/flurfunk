@@ -1,10 +1,11 @@
 <?php
 /**
- * The site's look: colors, fonts and additional CSS of the active theme – read, and changed by a
- * person who may edit the theme's options (an AI assistant only proposes it, as a card, which the
- * person applies and can undo).
+ * The site's look: colors, fonts, sizes, spacing and additional CSS of the active theme – read, and
+ * changed by a person who may edit the theme's options (an AI assistant only proposes it, as a card,
+ * which the person applies and can undo).
  *
- * Block themes keep a site's own choices in its global styles (colors, the palette, CSS); classic
+ * Block themes keep a site's own choices in its global styles (colors, the palette, typography,
+ * spacing, borders, content widths, CSS) – only known properties with plain values are set; classic
  * themes have the "Additional CSS" of the Customizer. Both keep revisions, and "undo" puts back the
  * state before – unless someone changed the look again since.
  *
@@ -60,24 +61,232 @@ function get(): array {
 				}
 			}
 		}
-		$fonts = array();
-		foreach ( (array) ( wp_get_global_settings( array( 'typography', 'fontFamilies' ) ) ?? array() ) as $group ) {
-			foreach ( (array) $group as $f ) {
-				$fonts[] = (string) ( $f['name'] ?? $f['slug'] ?? '' );
+		// The presets, as the values to use: var(--wp--preset--font-family--<slug>) and the like.
+		$presets = static function ( array $path, string $var, string $value ): array {
+			$out = array();
+			foreach ( (array) ( wp_get_global_settings( $path ) ?? array() ) as $group ) {
+				foreach ( (array) $group as $x ) {
+					if ( ! empty( $x['slug'] ) && ! isset( $out[ $x['slug'] ] ) ) {
+						$out[ $x['slug'] ] = array(
+							'name'  => (string) ( $x['name'] ?? $x['slug'] ),
+							'value' => 'var(--wp--preset--' . $var . '--' . $x['slug'] . ')',
+							'is'    => is_scalar( $x[ $value ] ?? null ) ? (string) $x[ $value ] : '',
+						);
+					}
+				}
 			}
-		}
+			return array_values( $out );
+		};
+		$fonts  = $presets( array( 'typography', 'fontFamilies' ), 'font-family', 'fontFamily' );
+		$layout = (array) ( wp_get_global_settings( array( 'layout' ) ) ?? array() );
 		$out['colors']  = array(
 			'background' => (string) ( $styles['color']['background'] ?? '' ),
 			'text'       => (string) ( $styles['color']['text'] ?? '' ),
 			'link'       => (string) ( $styles['elements']['link']['color']['text'] ?? '' ),
 		);
 		$out['palette'] = array_values( $list );
-		$out['fonts']   = array_values( array_unique( array_filter( $fonts ) ) );
+		$out['fonts']   = $fonts;
+		$out['sizes']   = array(
+			'font'    => $presets( array( 'typography', 'fontSizes' ), 'font-size', 'size' ),
+			'spacing' => $presets( array( 'spacing', 'spacingSizes' ), 'spacing', 'size' ),
+		);
+		$out['layout']  = array_intersect_key( $layout, array_flip( array( 'contentSize', 'wideSize' ) ) );
+		$out['styles']  = array_filter(
+			array(
+				'typography' => (array) ( $styles['typography'] ?? array() ),
+				'spacing'    => (array) ( $styles['spacing'] ?? array() ),
+				'elements'   => array_filter( array_map( static fn ( $e ) => array_intersect_key( (array) $e, array_flip( array( 'typography', 'spacing', 'border' ) ) ), array_intersect_key( (array) ( $styles['elements'] ?? array() ), array_flip( ELEMENTS ) ) ) ),
+			)
+		);
 		$post           = user_post();
 		$own            = $post ? json_decode( (string) $post->post_content, true ) : array();
 		$out['css']     = mb_substr( (string) ( $own['styles']['css'] ?? '' ), 0, 6000 );
 	} else {
 		$out['css'] = mb_substr( (string) wp_get_custom_css(), 0, 6000 );
+	}
+	return $out;
+}
+
+/**
+ * The style properties an assistant may set, per group (as in theme.json).
+ */
+const PROPS = array(
+	'typography' => array( 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'textTransform', 'textDecoration' ),
+	'spacing'    => array( 'blockGap', 'padding', 'margin' ),
+	'color'      => array( 'background', 'text' ),
+	'border'     => array( 'radius', 'width', 'style', 'color' ),
+);
+
+/**
+ * The elements whose look can be set (headings, buttons, links, …).
+ */
+const ELEMENTS = array( 'link', 'heading', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'caption', 'cite' );
+
+/**
+ * Is a value a plain CSS value (a size, a number, a font stack, a preset variable)? No URLs, no
+ * markup, nothing that ends a declaration.
+ *
+ * @param mixed $v Value.
+ */
+function value_ok( $v ): bool {
+	if ( is_int( $v ) || is_float( $v ) ) {
+		return true;
+	}
+	if ( ! is_string( $v ) || '' === trim( $v ) || strlen( $v ) > 200 ) {
+		return false;
+	}
+	return (bool) preg_match( '/^[a-z0-9#%.,()\s\/+*\'"-]+$/i', $v ) && ! preg_match( '/url\s*\(|expression|javascript|behavior/i', $v );
+}
+
+/**
+ * One node of styles (the site, an element or a block), checked: only known properties, plain
+ * values.
+ *
+ * @param mixed  $node  Node.
+ * @param string $where For the error.
+ * @return array|\WP_Error
+ */
+function clean_node( $node, string $where ) {
+	$out = array();
+	foreach ( (array) $node as $group => $props ) {
+		if ( ! isset( PROPS[ $group ] ) || ! is_array( $props ) ) {
+			/* translators: 1: e.g. styles.elements.h1, 2: property */
+			return new \WP_Error( 'flurfunk_styles', sprintf( __( '%1$s: "%2$s" cannot be set here (typography, spacing, color and border can).', 'flurfunk' ), $where, (string) $group ), array( 'status' => 400 ) );
+		}
+		foreach ( $props as $k => $v ) {
+			$sides = in_array( $k, array( 'padding', 'margin' ), true ) && is_array( $v );
+			$vals  = $sides ? $v : array( $v );
+			$known = in_array( $k, PROPS[ $group ], true ) && ( ! $sides || ! array_diff( array_keys( $v ), array( 'top', 'right', 'bottom', 'left' ) ) );
+			if ( ! $known || array_filter( $vals, static fn ( $x ) => ! value_ok( $x ) ) ) {
+				/* translators: 1: e.g. styles.elements.h1, 2: property, e.g. typography.fontSize */
+				return new \WP_Error( 'flurfunk_styles', sprintf( __( '%1$s: "%2$s" is not a property or value that can be set here.', 'flurfunk' ), $where, $group . '.' . $k ), array( 'status' => 400 ) );
+			}
+			$out[ $group ][ $k ] = $sides ? array_map( static fn ( $x ) => trim( (string) $x ), $v ) : ( is_string( $v ) ? trim( $v ) : $v );
+		}
+	}
+	return $out;
+}
+
+/**
+ * Styles for the whole site, its elements and blocks, checked.
+ *
+ * @param array $styles { typography, spacing, color, border, elements: { h1: … }, blocks: { core/…: … } }.
+ * @return array|\WP_Error
+ */
+function clean_styles( array $styles ) {
+	$out  = array();
+	$base = array_diff_key( $styles, array_flip( array( 'elements', 'blocks' ) ) );
+	$node = clean_node( $base, 'styles' );
+	if ( is_wp_error( $node ) ) {
+		return $node;
+	}
+	$out = $node;
+	foreach ( (array) ( $styles['elements'] ?? array() ) as $el => $n ) {
+		if ( ! in_array( $el, ELEMENTS, true ) ) {
+			/* translators: %s: element */
+			return new \WP_Error( 'flurfunk_styles', sprintf( __( 'There is no element "%s" (link, heading, h1–h6, button, caption, cite).', 'flurfunk' ), (string) $el ), array( 'status' => 400 ) );
+		}
+		$c = clean_node( $n, 'styles.elements.' . $el );
+		if ( is_wp_error( $c ) ) {
+			return $c;
+		}
+		$out['elements'][ $el ] = $c;
+	}
+	$registry = \WP_Block_Type_Registry::get_instance();
+	foreach ( (array) ( $styles['blocks'] ?? array() ) as $block => $n ) {
+		if ( ! $registry->is_registered( (string) $block ) ) {
+			/* translators: %s: block name */
+			return new \WP_Error( 'flurfunk_styles', sprintf( __( 'There is no block "%s" (e.g. core/button).', 'flurfunk' ), (string) $block ), array( 'status' => 400 ) );
+		}
+		$c = clean_node( $n, 'styles.blocks.' . $block );
+		if ( is_wp_error( $c ) ) {
+			return $c;
+		}
+		$out['blocks'][ $block ] = $c;
+	}
+	return $out;
+}
+
+/**
+ * The widths of the content (contentSize, wideSize), checked.
+ *
+ * @param array $layout { contentSize, wideSize }.
+ * @return array|\WP_Error
+ */
+function clean_layout( array $layout ) {
+	$out = array();
+	foreach ( $layout as $k => $v ) {
+		if ( ! in_array( $k, array( 'contentSize', 'wideSize' ), true ) || ! value_ok( $v ) ) {
+			/* translators: %s: setting */
+			return new \WP_Error( 'flurfunk_styles', sprintf( __( 'layout.%s cannot be set (contentSize and wideSize can).', 'flurfunk' ), (string) $k ), array( 'status' => 400 ) );
+		}
+		$out[ $k ] = trim( (string) $v );
+	}
+	return $out;
+}
+
+/**
+ * What a change does, in words for the card ("Headings: font size 2.5rem").
+ *
+ * @param array $input { styles, layout }.
+ * @return string[]
+ */
+function describe( array $input ): array {
+	$names = array(
+		'fontFamily'     => __( 'font', 'flurfunk' ),
+		'fontSize'       => __( 'font size', 'flurfunk' ),
+		'fontWeight'     => __( 'font weight', 'flurfunk' ),
+		'fontStyle'      => __( 'font style', 'flurfunk' ),
+		'lineHeight'     => __( 'line height', 'flurfunk' ),
+		'letterSpacing'  => __( 'letter spacing', 'flurfunk' ),
+		'textTransform'  => __( 'capitals', 'flurfunk' ),
+		'textDecoration' => __( 'underline', 'flurfunk' ),
+		'blockGap'       => __( 'space between blocks', 'flurfunk' ),
+		'padding'        => __( 'inner spacing', 'flurfunk' ),
+		'margin'         => __( 'outer spacing', 'flurfunk' ),
+		'background'     => __( 'background', 'flurfunk' ),
+		'text'           => __( 'text color', 'flurfunk' ),
+		'radius'         => __( 'rounded corners', 'flurfunk' ),
+		'width'          => __( 'border width', 'flurfunk' ),
+		'style'          => __( 'border style', 'flurfunk' ),
+		'color'          => __( 'border color', 'flurfunk' ),
+	);
+	$where = array(
+		'link'    => __( 'Links', 'flurfunk' ),
+		'heading' => __( 'Headings', 'flurfunk' ),
+		'button'  => __( 'Buttons', 'flurfunk' ),
+		'caption' => __( 'Captions', 'flurfunk' ),
+		'cite'    => __( 'Quotes', 'flurfunk' ),
+	);
+	$value = static function ( $v ): string {
+		$v = is_array( $v ) ? implode( ' ', $v ) : (string) $v;
+		return preg_replace( '/var\(--wp--preset--[a-z-]+--([a-z0-9-]+)\)/i', '$1', $v );
+	};
+	$line = static function ( string $who, array $node ) use ( $names, $value ): string {
+		$bits = array();
+		foreach ( $node as $props ) {
+			foreach ( (array) $props as $k => $v ) {
+				$bits[] = ( $names[ $k ] ?? $k ) . ' ' . $value( $v );
+			}
+		}
+		return $who . ': ' . implode( ', ', $bits );
+	};
+	$styles = (array) ( $input['styles'] ?? array() );
+	$out    = array();
+	$base   = array_diff_key( $styles, array_flip( array( 'elements', 'blocks' ) ) );
+	if ( $base ) {
+		$out[] = $line( __( 'Whole site', 'flurfunk' ), $base );
+	}
+	foreach ( (array) ( $styles['elements'] ?? array() ) as $el => $n ) {
+		/* translators: %s: heading level, e.g. h2 */
+		$out[] = $line( $where[ $el ] ?? sprintf( __( 'Headings %s', 'flurfunk' ), strtoupper( (string) $el ) ), (array) $n );
+	}
+	foreach ( (array) ( $styles['blocks'] ?? array() ) as $block => $n ) {
+		$type  = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block );
+		$out[] = $line( $type && $type->title ? (string) $type->title : (string) $block, (array) $n );
+	}
+	foreach ( (array) ( $input['layout'] ?? array() ) as $k => $v ) {
+		$out[] = ( 'wideSize' === $k ? __( 'Wide width', 'flurfunk' ) : __( 'Content width', 'flurfunk' ) ) . ' ' . $value( $v );
 	}
 	return $out;
 }
@@ -128,7 +337,19 @@ function validate( array $input ) {
 			return new \WP_Error( 'flurfunk_styles', __( 'Every palette color needs a short name (slug) and a color.', 'flurfunk' ), array( 'status' => 400 ) );
 		}
 	}
-	if ( ! wp_is_block_theme() && ( isset( $input['background'] ) || isset( $input['text'] ) || isset( $input['link'] ) || ! empty( $input['palette'] ) ) ) {
+	foreach ( array( 'styles', 'layout' ) as $k ) {
+		if ( ! empty( $input[ $k ] ) ) {
+			if ( ! is_array( $input[ $k ] ) ) {
+				/* translators: %s: styles or layout */
+				return new \WP_Error( 'flurfunk_styles', sprintf( __( '%s must be an object.', 'flurfunk' ), $k ), array( 'status' => 400 ) );
+			}
+			$c = 'styles' === $k ? clean_styles( $input[ $k ] ) : clean_layout( $input[ $k ] );
+			if ( is_wp_error( $c ) ) {
+				return $c;
+			}
+		}
+	}
+	if ( ! wp_is_block_theme() && ( isset( $input['background'] ) || isset( $input['text'] ) || isset( $input['link'] ) || ! empty( $input['palette'] ) || ! empty( $input['styles'] ) || ! empty( $input['layout'] ) ) ) {
 		return new \WP_Error( 'flurfunk_styles', __( 'This theme is not a block theme: only additional CSS can be changed here.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	return true;
@@ -175,6 +396,16 @@ function update( array $input ) {
 			$data['styles']['elements']['link']['color']['text'] = trim( (string) $input['link'] );
 
 			$did[] = 'link';
+		}
+		if ( ! empty( $input['styles'] ) ) {
+			$data['styles'] = array_replace_recursive( (array) ( $data['styles'] ?? array() ), clean_styles( (array) $input['styles'] ) );
+
+			$did[] = 'styles';
+		}
+		if ( ! empty( $input['layout'] ) ) {
+			$data['settings']['layout'] = array_merge( (array) ( $data['settings']['layout'] ?? array() ), clean_layout( (array) $input['layout'] ) );
+
+			$did[] = 'layout';
 		}
 		if ( ! empty( $input['palette'] ) ) {
 			$custom = array();
@@ -286,7 +517,7 @@ function register(): void {
 		'flurfunk/get-styles',
 		array(
 			'label'               => __( 'Read the site\'s look', 'flurfunk' ),
-			'description'         => __( 'The active theme, whether it is a block theme, its base colors, color palette, fonts and the site\'s additional CSS.', 'flurfunk' ),
+			'description'         => __( 'The active theme, whether it is a block theme, its base colors, color palette, fonts and font and spacing sizes (with the values to use), the content widths, the typography and spacing set for the site and its elements, and the site\'s additional CSS.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -320,7 +551,7 @@ function register(): void {
 		NAME,
 		array(
 			'label'               => __( 'Change the site\'s look', 'flurfunk' ),
-			'description'         => __( 'Changes the active theme\'s look for the whole site: additional CSS (added, or replacing all of it), for block themes also the background, text and link colors and colors of the palette. Can be undone.', 'flurfunk' ),
+			'description'         => __( 'Changes the active theme\'s look for the whole site: additional CSS (added, or replacing all of it), for block themes also the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). Can be undone.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
@@ -349,6 +580,20 @@ function register(): void {
 							),
 						),
 						'title' => __( 'Palette', 'flurfunk' ),
+					),
+					'styles'     => array(
+						'type'        => 'object',
+						'title'       => __( 'Styles', 'flurfunk' ),
+						'description' => __( 'Block themes, as in theme.json "styles": groups typography (fontFamily, fontSize, fontWeight, fontStyle, lineHeight, letterSpacing, textTransform, textDecoration), spacing (blockGap, padding, margin – a value or top/right/bottom/left), color (background, text), border (radius, width, style, color) – for the whole site, under elements (link, heading, h1–h6, button, caption, cite) or under blocks (e.g. core/button). Values: sizes, numbers or presets such as var(--wp--preset--font-family--inter). Only what changes.', 'flurfunk' ),
+					),
+					'layout'     => array(
+						'type'        => 'object',
+						'title'       => __( 'Content width', 'flurfunk' ),
+						'description' => __( 'Block themes: contentSize and wideSize, e.g. "720px".', 'flurfunk' ),
+						'properties'  => array(
+							'contentSize' => array( 'type' => 'string' ),
+							'wideSize'    => array( 'type' => 'string' ),
+						),
 					),
 					'why'        => array(
 						'type'      => 'string',

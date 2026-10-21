@@ -326,7 +326,7 @@ function reads_as_admin( string $ability ): bool {
  * @param string $ability Ability name.
  */
 function runs_as_admin( string $ability ): bool {
-	return (bool) apply_filters( 'flurfunk_ai_admin_cards', in_array( $ability, array( \Flurfunk\Styles\NAME, \Flurfunk\Templates\NAME ), true ), $ability );
+	return (bool) apply_filters( 'flurfunk_ai_admin_cards', in_array( $ability, array( \Flurfunk\Styles\NAME, \Flurfunk\Templates\NAME, \Flurfunk\Templates\ADD ), true ), $ability );
 }
 
 /**

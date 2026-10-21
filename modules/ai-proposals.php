@@ -76,11 +76,9 @@ function may_propose( string $ability, array $input ) {
 	if ( true !== $ok ) {
 		return is_wp_error( $ok ) ? $ok : new \WP_Error( 'flurfunk_forbidden', 'Not allowed.' );
 	}
-	if ( \Flurfunk\Styles\NAME === $ability ) {
-		return \Flurfunk\Styles\validate( $input );
-	}
-	if ( \Flurfunk\Templates\NAME === $ability ) {
-		return \Flurfunk\Templates\validate( $input );
+	$cards = undoable_cards();
+	if ( isset( $cards[ $ability ] ) ) {
+		return call_user_func( $cards[ $ability ][0], $input );
 	}
 	// Changes to posts: every post exists, every text to correct is found – else the AI hears why.
 	return \Flurfunk\Changes\NAME === $ability ? \Flurfunk\Changes\validate( $input ) : true;
@@ -345,6 +343,7 @@ function build_snapshot( array $p ): array {
 			/* translators: %s: color names */
 			$what[] = sprintf( __( 'palette: %s', 'flurfunk' ), implode( ', ', array_map( static fn ( $c ) => (string) ( $c['name'] ?? $c['slug'] ?? '' ) . ' ' . (string) ( $c['color'] ?? '' ), (array) $in['palette'] ) ) );
 		}
+		$what = array_merge( $what, \Flurfunk\Styles\describe( $in ) );
 		$kind  = 'action';
 		$line  = __( 'Change the site\'s look', 'flurfunk' );
 		$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), implode( '; ', $what ) ) ) );
@@ -364,7 +363,33 @@ function build_snapshot( array $p ): array {
 		$extra = isset( $in['content'] ) ? (string) $in['content'] : (string) ( $in['replace'] ?? '' );
 
 		$fields = array();
-	} elseif ( 'flurfunk/reply-comment' === $p['ability'] ) {
+	} elseif ( \Flurfunk\Templates\ADD === $p['ability'] ) {
+	$part  = 'wp_template_part' === ( $in['type'] ?? '' );
+	$kind  = 'action';
+	$title = (string) ( $in['title'] ?? $in['slug'] ?? '' );
+	/* translators: %s: template name */
+	$line  = sprintf( $part ? __( 'Add the template part "%s"', 'flurfunk' ) : /* translators: %s: template name */ __( 'Add the template "%s"', 'flurfunk' ), $title );
+	$pages = array_filter( array_map( static fn ( $id ) => html_entity_decode( get_the_title( (int) $id ), ENT_QUOTES, 'UTF-8' ), (array) ( $in['assign'] ?? array() ) ) );
+	/* translators: %s: page titles */
+	$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), $pages ? sprintf( __( 'for: %s', 'flurfunk' ), implode( ', ', $pages ) ) : '' ) ) );
+	$run   = __( 'Apply', 'flurfunk' );
+	$extra = (string) ( $in['content'] ?? '' );
+
+	$fields = array();
+} elseif ( \Flurfunk\Patterns\NAME === $p['ability'] ) {
+	$pat   = empty( $in['id'] ) ? null : \Flurfunk\Patterns\own( (int) $in['id'] );
+	$kind  = 'action';
+	$title = (string) ( $in['title'] ?? ( $pat ? $pat->post_title : '' ) );
+	/* translators: %s: pattern name */
+	$line  = sprintf( $pat ? __( 'Change the pattern "%s"', 'flurfunk' ) : /* translators: %s: pattern name */ __( 'Add the pattern "%s"', 'flurfunk' ), $title );
+	$sync  = $pat ? \Flurfunk\Patterns\synced( $pat->ID ) : ! empty( $in['synced'] );
+	$what  = $pat && isset( $in['find'] ) ? \Flurfunk\Templates\summary( $in ) : '';
+	$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), $what, $sync ? __( 'synced: it shows the same wherever it is used', 'flurfunk' ) : '' ) ) );
+	$run   = __( 'Apply', 'flurfunk' );
+	$extra = (string) ( $in['content'] ?? $in['replace'] ?? '' );
+
+	$fields = array();
+} elseif ( 'flurfunk/reply-comment' === $p['ability'] ) {
 		$c     = get_comment( (int) ( $in['comment'] ?? 0 ) );
 		$kind  = 'reply';
 		/* translators: 1: commenter, 2: post title */
@@ -586,10 +611,10 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 				(int) $p['agent'],
 				$user_id,
 				static function () use ( $p ) {
-					admin_read( true );
+					admin_read( runs_as_admin( (string) $p['ability'] ) );
 					admin_css( \Flurfunk\Styles\NAME === $p['ability'] );
 					try {
-						return \Flurfunk\Templates\NAME === $p['ability'] ? \Flurfunk\Templates\undo( (array) ( $p['outcome']['undo'] ?? array() ) ) : \Flurfunk\Styles\undo( (array) ( $p['outcome']['undo'] ?? array() ) );
+						return call_user_func( undoable_cards()[ $p['ability'] ][1], (array) ( $p['outcome']['undo'] ?? array() ) );
 					} finally {
 						admin_read( false );
 						admin_css( false );
@@ -620,12 +645,27 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 }
 
 /**
- * Is this a change to the site's look (styles, templates) – run with the clicker's rights, undoable?
+ * The cards that build the site (look, templates, patterns): ability => [ check before it becomes a
+ * card, undo ]. They keep what undo needs in their outcome.
+ *
+ * @return array<string, callable[]>
+ */
+function undoable_cards(): array {
+	return array(
+		\Flurfunk\Styles\NAME    => array( '\Flurfunk\Styles\validate', '\Flurfunk\Styles\undo' ),
+		\Flurfunk\Templates\NAME => array( '\Flurfunk\Templates\validate', '\Flurfunk\Templates\undo' ),
+		\Flurfunk\Templates\ADD  => array( '\Flurfunk\Templates\validate_new', '\Flurfunk\Templates\remove' ),
+		\Flurfunk\Patterns\NAME  => array( '\Flurfunk\Patterns\validate', '\Flurfunk\Patterns\undo' ),
+	);
+}
+
+/**
+ * Is this a card that builds the site (look, templates, patterns) – undoable as a whole?
  *
  * @param string $ability Ability name.
  */
 function looks( string $ability ): bool {
-	return in_array( $ability, array( \Flurfunk\Styles\NAME, \Flurfunk\Templates\NAME ), true );
+	return isset( undoable_cards()[ $ability ] );
 }
 
 /**
