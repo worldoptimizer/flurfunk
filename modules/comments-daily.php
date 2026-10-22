@@ -1,9 +1,10 @@
 <?php
 /**
- * Module "Daily moderation thread": once a day, if comments are waiting for approval, one
- * thread lists them (author, post, since when) with their number and a link to the comments
- * screen. Nothing is posted on days without waiting comments; running it again on the same
- * day updates that day's card instead of posting again.
+ * Module "Daily moderation thread": once a day it looks whether comments wait for approval. The
+ * first time one thread lists them, with a card that always shows the current queue (author,
+ * post, since when) and a link to the comments screen. Later only new comments come as a reply in
+ * that thread – the same comments never post again; once none waits, the thread is ticked off.
+ * If they wait for days, a reminder in the thread (setting "remind", default 7 days, 0 = never).
  *
  * The channel is the module's setting (Settings → Flurfunk → Modules), by default its own channel
  * #comments that only people with moderate_comments see (created when the module is switched on,
@@ -16,14 +17,14 @@
 namespace Flurfunk\Modules\CommentsDaily;
 
 use Flurfunk\Access;
-use Flurfunk\Store;
-use function Flurfunk\Schema\table;
+use Flurfunk\Watch;
 
 defined( 'ABSPATH' ) || exit;
 
 const MODULE   = 'flurfunk/comments-daily';
 const PROVIDER = 'flurfunk/comment-queue';
 const HOOK     = 'flurfunk_comments_daily';
+const STATE    = 'flurfunk_comments_watch'; // The open thread and the comments it knows.
 
 add_action( 'init', __NAMESPACE__ . '\\register', 20 );
 add_action( HOOK, __NAMESPACE__ . '\\run' );
@@ -130,49 +131,42 @@ function snapshot(): array {
 }
 
 /**
- * Post today's thread, or update today's card. Returns the thread ID (0 = nothing waiting).
- *
- * @return int|\WP_Error
+ * Look at the queue: a thread the first time, a reply for new comments, ticked off when none
+ * waits. Returns the thread ID (0 = nothing waiting).
  */
-function run() {
-	$count = (int) get_comments(
+function run(): int {
+	$items = array();
+	foreach ( get_comments(
 		array(
-			'status' => 'hold',
-			'type'   => 'comment',
-			'count'  => true,
+			'status'  => 'hold',
+			'type'    => 'comment',
+			'number'  => 200,
+			'orderby' => 'comment_date_gmt',
+			'order'   => 'ASC',
 		)
-	);
-	$ref   = 'flurfunk-comments:' . wp_date( 'Y-m-d' );
-	$found = Store\thread_by_ref( $ref );
-	if ( $found ) {
-		global $wpdb;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table.
-		$card = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM %i WHERE thread_id = %d AND provider = %s ORDER BY id LIMIT 1', table( 'attachments' ), $found->id, PROVIDER ) );
-		if ( $card ) {
-			flurfunk_as( 0, static fn () => Store\refresh_card( $card ) );
-		}
-		return (int) $found->id;
+	) as $c ) {
+		/* translators: 1: comment author, 2: post title */
+		$items[ 'c' . $c->comment_ID ] = sprintf( __( '%1$s on "%2$s"', 'flurfunk' ), '' !== trim( (string) $c->comment_author ) ? (string) $c->comment_author : __( 'Anonymous', 'flurfunk' ), html_entity_decode( get_the_title( (int) $c->comment_post_ID ), ENT_QUOTES, 'UTF-8' ) );
 	}
-	if ( ! $count ) {
-		return 0;
-	}
+	Watch\adopt( STATE, 'flurfunk-comments:', array_keys( $items ) ); // One thread per day before 0.7.
 	$channel = channel();
-	if ( \Flurfunk\Modules\COMMENTS_CHANNEL === $channel ) {
+	if ( $items && \Flurfunk\Modules\COMMENTS_CHANNEL === $channel ) {
 		\Flurfunk\Modules\comments_channel(); // Also when the module was switched on in code.
 	}
-	return flurfunk_post(
+	return Watch\run(
+		STATE,
+		$items,
 		array(
-			'channel'     => $channel,
-			'title'       => __( 'Comments awaiting moderation', 'flurfunk' ),
+			'channel' => $channel,
+			'title'   => __( 'Comments awaiting moderation', 'flurfunk' ),
 			/* translators: %s: number */
-			'body'        => sprintf( _n( '%s comment is waiting for approval.', '%s comments are waiting for approval.', $count, 'flurfunk' ), number_format_i18n( $count ) ),
-			'attachments' => array(
-				array(
-					'provider' => PROVIDER,
-					'ref'      => array( 'id' => 'queue' ),
-				),
-			),
-			'ref_key'     => $ref,
+			'body'    => static fn ( array $all ) => sprintf( _n( '%s comment is waiting for approval.', '%s comments are waiting for approval.', count( $all ), 'flurfunk' ), number_format_i18n( count( $all ) ) ),
+			/* translators: 1: number, 2: who on which post */
+			'new'     => static fn ( array $new ) => sprintf( _n( '%1$s new comment is waiting: %2$s', '%1$s new comments are waiting: %2$s', count( $new ), 'flurfunk' ), number_format_i18n( count( $new ) ), implode( '; ', $new ) ),
+			/* translators: %s: number of days */
+			'remind'  => static fn ( int $days ) => sprintf( _n( 'These comments have been waiting for %s day.', 'These comments have been waiting for %s days.', $days, 'flurfunk' ), number_format_i18n( $days ) ),
+			'days'    => (int) flurfunk_module_setting( MODULE, 'remind' ),
+			'card'    => array( PROVIDER, array( 'id' => 'queue' ) ),
 		)
 	);
 }

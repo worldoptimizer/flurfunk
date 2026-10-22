@@ -49,7 +49,9 @@ interface is drawn in the browser from the REST API.
 | `inc/strings.php` | `Flurfunk\Strings` | Translatable strings of the JavaScript |
 | `inc/modules.php` | `Flurfunk\Modules` | Module register: optional parts, switched under *Settings → Flurfunk* |
 | `modules/comments.php` | `Flurfunk\Modules\Comments` | `/comment` cards with moderation buttons |
-| `modules/comments-daily.php` | `Flurfunk\Modules\CommentsDaily` | Daily thread about comments awaiting moderation |
+| `modules/comments-daily.php` | `Flurfunk\Modules\CommentsDaily` | One open thread about comments awaiting moderation |
+| `modules/updates.php` | `Flurfunk\Modules\Updates` | One open thread about updates of WordPress, plugins and themes |
+| `inc/watch.php` | `Flurfunk\Watch` | One open thread for something that waits: new items as replies, ticked off when empty, reminders |
 | `modules/review.php` | `Flurfunk\Modules\Review` | Review requests as tasks |
 | `assets/app.js` | `window.Flurfunk` | The interface |
 | `assets/editor.js` | | Block editor "Conversations" panel |
@@ -940,7 +942,8 @@ They only build on WordPress itself.
 | Module | Default | Does |
 | --- | --- | --- |
 | `flurfunk/comments` | on | `/comment` (German `/kommentar`) inserts a comment: the commenter's public name, the post, an excerpt as quote, the state as status pill, and the actions **Approve**, **Spam** and **Trash** (with confirmation), depending on the state. For the team (`flurfunk_team`) with `moderate_comments`; each action checks `edit_comment` for that comment. The card never contains the email or IP address, the user agent or the commenter's website. |
-| `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`), if comments are waiting, the assistant posts one thread "Comments awaiting moderation" with the number, the oldest date and a table of up to ten (name, post, date). Running again on the same day updates that card. No thread on days without waiting comments. Everyone who can read the channel sees the commenters' names and post titles. Setting **Channel** (default `comments`): switching the module on creates #comments ("Comments"), which requires `moderate_comments` and is closed to guests (an existing #comments is used as it is). The filter `flurfunk_comments_channel` overrides the setting. |
+| `flurfunk/comments-daily` | off | Once a day (9:00 site time, filter `flurfunk_comments_hour`) it looks at the comments waiting for approval. The first time the assistant posts one task "Comments awaiting moderation" with the number, the oldest date and a table of up to ten (name, post, date) on a card that is refreshed on every run; later only new comments come as a reply in that thread (the same comments never post again); when none waits, the task is ticked off. Setting **Remind after … days** (default 7, 0 = never) adds one reminder per period. Threads of the one-per-day runs before 0.7 are taken over once (the newest; older open ones are ticked off). Everyone who can read the channel sees the commenters' names and post titles. Setting **Channel** (default `comments`): switching the module on creates #comments ("Comments"), which requires `moderate_comments` and is closed to guests (an existing #comments is used as it is). The filter `flurfunk_comments_channel` overrides the setting. |
+| `flurfunk/updates` | off | Once a day (8:00 site time, filter `flurfunk_updates_hour`, and ten minutes after updates were installed) it reads the update lists WordPress keeps (`update_core`, `update_plugins`, `update_themes`; nothing is fetched): one task "Updates available" with a card of what is open and a link to *Dashboard → Updates*; new updates later come as a reply, a newer version of the same plugin counts as new; when everything is installed the task is ticked off. A missing list counts as unknown, not as "all installed". Settings: **Channel** (default `updates`, created on switching it on: requires `update_plugins`, closed to guests), **WordPress itself**, **Plugins**, **Themes**, **Translations**, **Leave out** (plugin or theme folders, comma-separated), **Responsible** (people who may update plugins, assigned to the task), **Remind after … days** (default 7, 0 = never). |
 | `flurfunk/ai` | off | Needs WordPress 7.0 or newer (the AI client) and an AI provider under *Settings → Connectors*. Assistants get an AI profile under *Settings → Flurfunk → AI assistants*: on/off, instructions, the channels they take part in, whether guests may ask, whether they may read the text of the post a thread is about, read-only tools (abilities), preferred model IDs and a monthly token budget; channels can carry instructions of their own; site-wide switches replace email addresses and phone numbers before sending (on), keep a log of runs without content (on) and offer private summaries (on). When a person with `flurfunk_use_ai` mentions such an assistant in one of its channels (also by editing a message) – or starts a new thread in a channel where the assistant answers every new thread (profile key `auto`) – a run is queued: the thread shows "… is thinking", the assistant reads that one thread (newest 60 messages, 40,000 characters) and answers in it; only the person who asked is notified. "Summarize" in the thread header gives a private summary that is never posted. Tools run with the rights of the person asking and, in Flurfunk, only in the assistant's channels. Only abilities annotated `readonly: true` can be tools; everything else (including abilities without annotations, e.g. those of the WordPress plugin "AI") counts as changing something and can only be offered as **proposals**: the assistant never runs them, each call becomes a card `flurfunk/ai-proposal` under its answer with **Run** and **Dismiss**, and a person runs it with their own rights (stored in the option `flurfunk_ai_proposals`, the newest 500). Assistants do not trigger each other; a mention is answered once; over budget it says so once a month. See [AI assistants](#ai-assistants). Since 0.3.0. |
 | `flurfunk/review` | off | When a post of one of the configured post types is submitted for review (`pending`), the assistant starts a task thread about it, assigned to everyone who may publish and edit it (not the author, no assistants), with the post as a card. Settings: **Channel** (default `general`) and **Assign everyone who may publish** (default on; off: nobody is assigned). The filters `flurfunk_review_channel` and `flurfunk_review_assignees` override them per post. Submitting again reopens the same thread; publishing (or scheduling) replies and ticks it off; back to draft replies and marks it as a question. |
 
@@ -1230,6 +1233,7 @@ locked in the database.
 | `flurfunk_thread_limit` | 0.1.0 | `int $limit` | int | Messages loaded per thread in the app. Default 300. |
 | `flurfunk_notification_days` | 0.1.0 | `array {read, unread}` | array | Days to keep notifications. Default 90 and 180. |
 | `flurfunk_comments_channel` | 0.2.0 | `string $slug` | string | Channel of the daily moderation thread (module `flurfunk/comments-daily`). Default: the module's setting (`comments`). |
+| `flurfunk_updates_hour` | 0.7.0 | `int $hour` | int | Hour (site time) of the daily look at the updates (module `flurfunk/updates`). Default 8. |
 | `flurfunk_comments_hour` | 0.2.0 | `int $hour` | int | Hour (site time) of the daily moderation thread. Default 9. |
 | `flurfunk_review_channel` | 0.2.0 | `string $slug`, `WP_Post $post` | string | Channel of review requests (module `flurfunk/review`). Default: the module's setting (`general`). |
 | `flurfunk_review_assignees` | 0.2.0 | `int[] $user_ids`, `WP_Post $post` | int[] | Who is responsible for a review request. Default: everyone who may publish it, or nobody when the module's setting is off. |
@@ -1276,6 +1280,15 @@ Editing a thread's own title or text (`threads/<id>/edit`) fires no action.
 `flurfunk_cleanup_files` (daily; also prunes notifications), `flurfunk_comments_daily` (daily, only
 with the module `flurfunk/comments-daily`). See
 [Cron](installation.md#cron-reminders-digests-cleanup).
+
+## Watching something that waits
+
+`Flurfunk\Watch\run( $option, $items, $args )` keeps one open thread for something that waits for
+people – the modules for comments and updates use it. Call it on a schedule with what waits now
+(`key => line`, or `null` when it cannot be known right now): the first time it posts a task
+(`channel`, `title`, `body` callback, optional `card` [provider, ref] and `assignees`), later it
+replies only with what is new (`new` callback), ticks the task off when nothing waits, and after
+`days` without anything new replies once with `remind`. The state lives in the option you name.
 
 ## WP-CLI
 

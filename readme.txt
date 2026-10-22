@@ -114,6 +114,11 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
+= 0.7.0 (in development) =
+* New: the module "Updates available" (off by default): once a day it looks at the updates WordPress has found – one thread as a task with a card of what is open, new updates as a reply in it, ticked off once everything is installed, a reminder after a week. Its settings say which channel (by default its own #updates for people who may update plugins), what to look at (WordPress, plugins, themes, translations), what to leave out and who is responsible. Nothing is fetched from outside; when WordPress has no current list, it waits.
+* Changed: the daily moderation thread keeps one open thread – the same comments are never posted again, new ones come as a reply, the thread is ticked off when none waits, and a reminder comes after a week (setting). The one-per-day threads of earlier versions are taken over once.
+* New for developers: Flurfunk\Watch\run() keeps one open thread for anything that waits for people.
+
 = 0.6.0 =
 * New: an assistant stays in a thread once it has answered (for two days, on by default): anyone there can write on without mentioning it, as with one shared assistant per thread. A quick check with a small, cheap model decides whether a message is for it – an answer, a 👍 for thanks, or nothing for talk between people; "is thinking" only shows once it answers. Follow-ups of the person who asked go through the same check, which makes them cheaper.
 * New: a 👎 on an assistant's answer mutes it in that thread until someone mentions it again. Guests reach an assistant by mentioning it (see below for threads). Channel notes reach the quick check, so "answer spelling questions without being mentioned" works. The line under an answer names the model that wrote it.

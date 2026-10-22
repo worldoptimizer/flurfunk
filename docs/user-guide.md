@@ -255,9 +255,15 @@ current state.
 Your administrator can switch on more under *Settings → Flurfunk → Modules*:
 
 - **Comment cards** (on by default): the `/comment` command above.
-- **Daily moderation thread**: once a day, if comments are waiting for approval, the assistant
-  posts a thread with the number and a list of them, by default in its own channel #comments,
-  which only people who may moderate comments see.
+- **Daily moderation thread**: once a day it looks whether comments wait for approval. The first
+  time the assistant posts a thread with a card that always shows the current queue, by default
+  in its own channel #comments, which only people who may moderate comments see. Later only new
+  comments come as a reply in that thread – the same ones are never posted again; when none waits,
+  the thread is ticked off. If comments wait for a week (a setting), it reminds once.
+- **Updates available**: the same for updates of WordPress, plugins and themes – one thread as a
+  task, new updates as a reply, ticked off once everything is installed. By default in its own
+  channel #updates for people who may update plugins. Its settings say what to look at, what to
+  leave out, who is responsible and after how many days to remind.
 - **Review requests**: when a post is submitted for review, a task appears for the people who
   may publish it. Publishing it ticks the task off; moving it back to draft marks it as a
   question.

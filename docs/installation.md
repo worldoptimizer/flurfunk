@@ -102,7 +102,7 @@ Flurfunk sidebar. See the [user guide](user-guide.md#notifications).
 | Posts | Show | both on | The "Conversations" panel in the block editor, the column in the posts list. |
 | Data | Keep conversations when the plugin is deleted | on | See [Deactivate and uninstall](#deactivate-and-uninstall). |
 | Permissions | Roles × capabilities | see below | Which roles are team or guest, moderate and manage. Saved with its own button. See [Permissions](#permissions). |
-| Modules | A switch per module, and its settings underneath | | Optional parts, e.g. the daily moderation thread (setting: its channel) and review requests (settings: channel, assign everyone who may publish). Saved with their own button. |
+| Modules | A switch per module, and its settings underneath | | Optional parts, e.g. the daily moderation thread (settings: its channel, reminder), updates available (settings: channel, what to look at, what to leave out, responsible, reminder) and review requests (settings: channel, assign everyone who may publish). Saved with their own button. |
 
 A new channel's short name (slug) is derived from its name and cannot be changed in the form
 later. To choose the slug yourself, create the channel with WP-CLI:

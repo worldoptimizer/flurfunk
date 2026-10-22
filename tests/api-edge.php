@@ -883,62 +883,120 @@ $fresh_rate();
 require_once FLURFUNK_DIR . 'modules/comments-daily.php';
 Flurfunk\Modules\CommentsDaily\register();
 add_filter( 'flurfunk_comments_channel', $to_test = fn () => 'ff-test' );
+$cw_state = get_option( Flurfunk\Modules\CommentsDaily\STATE, null );
+delete_option( Flurfunk\Modules\CommentsDaily\STATE );
 $waiting = get_comments( array( 'status' => 'hold', 'fields' => 'ids' ) );
 foreach ( $waiting as $w ) {
 	wp_set_comment_status( $w, 'approve' ); // Put back below.
 }
-$day_ref = 'flurfunk-comments:' . wp_date( 'Y-m-d' );
-$old_day = Store\thread_by_ref( $day_ref );
-if ( $old_day ) {
-	$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-moved' ), array( 'id' => $old_day->id ) );
-}
-$check( 'nothing waiting: no thread', 0 === Flurfunk\Modules\CommentsDaily\run() && ! Store\thread_by_ref( $day_ref ) );
-$q1 = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Fred', 'comment_author_email' => 'fred@secret.example', 'comment_content' => 'First', 'comment_approved' => 0 ) );
+$msgs = static fn ( int $t ) => count( Store\full_thread( $t, $team )['messages'] ?? array() );
+$check( 'nothing waiting: no thread', 0 === Flurfunk\Modules\CommentsDaily\run() && ! get_option( Flurfunk\Modules\CommentsDaily\STATE ) );
+$q1    = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Fred', 'comment_author_email' => 'fred@secret.example', 'comment_content' => 'First', 'comment_approved' => 0 ) );
 $daily = Flurfunk\Modules\CommentsDaily\run();
-if ( is_wp_error( $daily ) ) {
-	WP_CLI::log( '  (daily run: ' . $daily->get_error_code() . ' ' . $daily->get_error_message() . ')' );
-}
-$dt    = is_int( $daily ) ? Store\full_thread( $daily, $team ) : null;
+$dt    = $daily ? Store\full_thread( $daily, $team ) : null;
 $dcard = $dt['attachments'][0]['snapshot'] ?? array();
-$check( 'waiting comments: one thread by the assistant with a table', $dt && Flurfunk\Access\is_bot( $dt['author'] ) && 'ff-test' === $dt['channel'] && array( 'Fred' ) === array_column( $dcard['table']['rows'] ?? array(), 0 ) && ! str_contains( (string) wp_json_encode( $dcard ), 'secret' ), $dcard );
-$q2 = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Gina', 'comment_content' => 'Second', 'comment_approved' => 0 ) );
+$check( 'waiting comments: one thread by the assistant, a task with a table', $dt && Flurfunk\Access\is_bot( $dt['author'] ) && 'ff-test' === $dt['channel'] && 'open' === ( $dt['status'] ?? '' ) && array( 'Fred' ) === array_column( $dcard['table']['rows'] ?? array(), 0 ) && ! str_contains( (string) wp_json_encode( $dcard ), 'secret' ), $dcard );
+$before = $msgs( $daily );
+$check( 'the same comments the next day: no new thread and no new message', $daily === Flurfunk\Modules\CommentsDaily\run() && $before === $msgs( $daily ) );
+$q2    = wp_insert_comment( array( 'comment_post_ID' => $other_post, 'comment_author' => 'Gina', 'comment_content' => 'Second', 'comment_approved' => 0 ) );
 $again = Flurfunk\Modules\CommentsDaily\run();
-$dcard = Store\full_thread( $daily, $team )['attachments'][0]['snapshot'] ?? array();
-$check( 'the same day: the card is updated, no second thread', $again === $daily && 2 === count( $dcard['table']['rows'] ?? array() ) && '2' === ( $dcard['fields'][0]['value'] ?? '' ), $dcard );
+$dt    = Store\full_thread( $daily, $team );
+$dcard = $dt['attachments'][0]['snapshot'] ?? array();
+$last  = end( $dt['messages'] );
+$check( 'a new comment: a reply in the same thread naming it, the card shows both', $again === $daily && $before + 1 === count( $dt['messages'] ) && str_contains( (string) ( $last['text'] ?? '' ), 'Gina' ) && ! str_contains( (string) ( $last['text'] ?? '' ), 'Fred' ) && 2 === count( $dcard['table']['rows'] ?? array() ), array( $last['text'] ?? '', $dcard ) );
+$cw = (array) get_option( Flurfunk\Modules\CommentsDaily\STATE );
+update_option( Flurfunk\Modules\CommentsDaily\STATE, array( 'since' => time() - 8 * DAY_IN_SECONDS, 'reminded' => 0 ) + $cw );
+$n1 = $msgs( $daily );
+Flurfunk\Modules\CommentsDaily\run();
+$n2 = $msgs( $daily );
+Flurfunk\Modules\CommentsDaily\run();
+$check( 'waiting for 8 days (setting: 7): one reminder, not again the next run', $n1 + 1 === $n2 && $n2 === $msgs( $daily ), array( $n1, $n2, $msgs( $daily ) ) );
+wp_set_comment_status( $q1, 'approve' );
+wp_set_comment_status( $q2, 'approve' );
+$check( 'none waits any more: the thread is ticked off, the state forgotten', 0 === Flurfunk\Modules\CommentsDaily\run() && 'done' === (string) Store\thread_row( $daily )->status && ! get_option( Flurfunk\Modules\CommentsDaily\STATE ) );
+// From before 0.7: one thread per day. The newest open one is taken over, older ones ticked off.
+$old1 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'alt 1', 'ref_key' => 'flurfunk-comments:2026-01-01' ) );
+$old2 = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'alt 2', 'ref_key' => 'flurfunk-comments:2026-01-02' ) );
+wp_set_comment_status( $q1, 'hold' );
+$took = Flurfunk\Modules\CommentsDaily\run();
+$check( 'threads of the old daily runs: the newest is taken over (no new thread, no message), older ones ticked off', $old2 === $took && 'done' === (string) Store\thread_row( $old1 )->status && 0 === $msgs( $old2 ), array( $took, $old1, $old2 ) );
+$extra_threads = array( $old1, $old2 );
 remove_filter( 'flurfunk_comments_channel', $to_test );
 // Without the filter: the module's own channel #comments, only for people who may moderate comments.
-$extra_threads = array();
-$had_comments  = (bool) Store\channel_by_slug( 'comments' );
-$mod_opt       = get_option( 'flurfunk_modules', null );
+$had_comments = (bool) Store\channel_by_slug( 'comments' );
+$mod_opt      = get_option( 'flurfunk_modules', null );
 Flurfunk\Modules\set( array( 'flurfunk/comments-daily' => true ) );
 $cch = Store\channel_by_slug( 'comments' );
 if ( ! $had_comments ) {
 	$check( 'switching the module on creates #comments: moderate_comments only, no guests, translated name', $cch && 'moderate_comments' === $cch->capability && 'none' === $cch->access_guests && __( 'Comments', 'flurfunk' ) === $cch->name, $cch );
 }
 $check( 'its channel setting defaults to #comments', 'comments' === flurfunk_module_setting( 'flurfunk/comments-daily', 'channel' ) );
-$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily' ), array( 'id' => $daily ) );
-$gdaily = Flurfunk\Modules\CommentsDaily\run();
+delete_option( Flurfunk\Modules\CommentsDaily\STATE );
+$GLOBALS['wpdb']->query( "UPDATE {$GLOBALS['wpdb']->prefix}flurfunk_threads SET ref_key = CONCAT('ff-test-', ref_key) WHERE ref_key LIKE 'flurfunk-comments:%' AND channel_id = " . (int) Store\channel_by_slug( 'ff-test' )->id );
+$gdaily          = Flurfunk\Modules\CommentsDaily\run();
 $extra_threads[] = (int) $gdaily;
-$grow   = is_int( $gdaily ) ? Store\thread_row( $gdaily ) : null;
-$nomodu = wp_insert_user( array( 'user_login' => 'ff-test-nomod-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
+$grow            = $gdaily ? Store\thread_row( $gdaily ) : null;
+$nomodu          = wp_insert_user( array( 'user_login' => 'ff-test-nomod-' . wp_generate_password( 5, false ), 'user_pass' => wp_generate_password(), 'role' => 'subscriber' ) );
 ( new WP_User( $nomodu ) )->add_cap( 'flurfunk_team' );
-$check( 'the daily thread lands in #comments, posted by the assistant', $grow && 'comments' === Store\channel( (int) $grow->channel_id )->slug && Flurfunk\Access\is_bot( (int) $grow->author_id ), $gdaily );
+$check( 'the thread lands in #comments, posted by the assistant', $grow && 'comments' === Store\channel( (int) $grow->channel_id )->slug && Flurfunk\Access\is_bot( (int) $grow->author_id ), $gdaily );
 $check( '… readable for people who may moderate comments, not for team members who may not, nor guests', $grow && Flurfunk\Access\can_see( $grow, $team ) && Flurfunk\Access\can_see( $grow, $team2 ) && ! Flurfunk\Access\can_see( $grow, $nomodu ) && ! Flurfunk\Access\can_see( $grow, $guest ) );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $nomodu );
-$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily-gated' ), array( 'id' => $gdaily ) );
 null === $mod_opt ? delete_option( 'flurfunk_modules' ) : update_option( 'flurfunk_modules', $mod_opt );
+null === $cw_state ? delete_option( Flurfunk\Modules\CommentsDaily\STATE ) : update_option( Flurfunk\Modules\CommentsDaily\STATE, $cw_state );
 wp_delete_comment( $q1, true );
 wp_delete_comment( $q2, true );
 foreach ( $waiting as $w ) {
 	wp_set_comment_status( $w, 'hold' );
 }
-if ( $old_day ) {
-	$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => $day_ref ), array( 'id' => $old_day->id ) );
-}
-$GLOBALS['wpdb']->update( $GLOBALS['wpdb']->prefix . 'flurfunk_threads', array( 'ref_key' => 'ff-test-daily' ), array( 'ref_key' => $day_ref, 'id' => $daily ) );
-$check( 'the daily run is scheduled', (bool) wp_next_scheduled( 'flurfunk_comments_daily' ) );
+
+WP_CLI::log( 'Updates module' );
+require_once FLURFUNK_DIR . 'modules/updates.php';
+Flurfunk\Modules\Updates\register();
+$up_state = get_option( Flurfunk\Modules\Updates\STATE, null );
+delete_option( Flurfunk\Modules\Updates\STATE );
+$up_set   = array( 'channel' => 'ff-test', 'core' => false, 'plugins' => true, 'themes' => false, 'translations' => false, 'ignore' => '', 'assign' => array( $team ), 'remind' => 7 );
+add_filter( 'flurfunk_module_setting', $up_filter = static fn ( $v, $id, $key ) => 'flurfunk/updates' === $id && array_key_exists( $key, $GLOBALS['ff_up_set'] ) ? $GLOBALS['ff_up_set'][ $key ] : $v, 10, 3 );
+$GLOBALS['ff_up_set'] = $up_set;
+$up_list  = static function ( array $plugins ) {
+	$o           = new stdClass();
+	$o->response = array();
+	foreach ( $plugins as $file => $v ) {
+		$o->response[ $file ] = (object) array( 'slug' => dirname( $file ), 'new_version' => $v );
+	}
+	return $o;
+};
+$GLOBALS['ff_up_fake'] = false;
+add_filter( 'site_transient_update_plugins', $up_tr = static fn ( $v ) => $GLOBALS['ff_up_fake'], 99 );
+$check( 'updates: WordPress has no current list – nothing happens (not "all installed")', 0 === Flurfunk\Modules\Updates\run() && ! get_option( Flurfunk\Modules\Updates\STATE ) );
+$GLOBALS['ff_up_fake'] = $up_list( array( 'ff-alpha/ff-alpha.php' => '2.0', 'ff-beta/ff-beta.php' => '1.1' ) );
+$ut  = Flurfunk\Modules\Updates\run();
+$utt = $ut ? Store\full_thread( $ut, $team ) : null;
+$uc  = $utt['attachments'][0]['snapshot'] ?? array();
+$check( 'two updates: one task in the channel by the assistant, the responsible person assigned, a card listing both', $utt && 'ff-test' === $utt['channel'] && Flurfunk\Access\is_bot( $utt['author'] ) && in_array( $team, array_map( 'intval', (array) ( $utt['assignees'] ?? array() ) ), true ) && 2 === count( $uc['table']['rows'] ?? array() ) && str_contains( (string) $utt['body'], 'ff-alpha' ), array( $utt['body'] ?? '', $uc ) );
+$un = $msgs( $ut );
+$check( '… the same updates the next day: nothing new', $ut === Flurfunk\Modules\Updates\run() && $un === $msgs( $ut ) );
+$GLOBALS['ff_up_fake'] = $up_list( array( 'ff-alpha/ff-alpha.php' => '2.0', 'ff-beta/ff-beta.php' => '1.1', 'ff-gamma/ff-gamma.php' => '3.0' ) );
+Flurfunk\Modules\Updates\run();
+$ul = Store\full_thread( $ut, $team )['messages'];
+$ul = (string) ( end( $ul )['text'] ?? '' );
+$check( '… a new update: a reply naming only that one', $un + 1 === $msgs( $ut ) && str_contains( $ul, 'ff-gamma' ) && ! str_contains( $ul, 'ff-alpha' ), $ul );
+$GLOBALS['ff_up_set']['ignore'] = 'ff-gamma';
+$GLOBALS['ff_up_fake']          = $up_list( array( 'ff-alpha/ff-alpha.php' => '2.1', 'ff-gamma/ff-gamma.php' => '3.0' ) );
+Flurfunk\Modules\Updates\run();
+$ul = Store\full_thread( $ut, $team )['messages'];
+$ul = (string) ( end( $ul )['text'] ?? '' );
+$check( '… a newer version of one counts as new; a plugin left out in the settings is not named', str_contains( $ul, '2.1' ) && ! str_contains( $ul, 'ff-gamma' ), $ul );
+$GLOBALS['ff_up_fake'] = $up_list( array() );
+$check( '… everything installed: the task is ticked off, the state forgotten', 0 === Flurfunk\Modules\Updates\run() && 'done' === (string) Store\thread_row( $ut )->status && ! get_option( Flurfunk\Modules\Updates\STATE ) );
+$check( 'the module is registered with its rules (channel #updates, what to look at, leave out, responsible, reminder)', array( 'channel', 'core', 'plugins', 'themes', 'translations', 'ignore', 'assign', 'remind' ) === array_keys( Flurfunk\Modules\registry()['flurfunk/updates']['settings'] ?? array() ) && 'updates' === Flurfunk\Modules\registry()['flurfunk/updates']['settings']['channel']['default'] );
+$extra_threads[] = (int) $ut;
+remove_filter( 'site_transient_update_plugins', $up_tr, 99 );
+remove_filter( 'flurfunk_module_setting', $up_filter, 10 );
+null === $up_state ? delete_option( Flurfunk\Modules\Updates\STATE ) : update_option( Flurfunk\Modules\Updates\STATE, $up_state );
+$check( 'the daily runs are scheduled (comments, updates)', (bool) wp_next_scheduled( 'flurfunk_comments_daily' ) && (bool) wp_next_scheduled( 'flurfunk_updates_daily' ) );
 wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
+wp_clear_scheduled_hook( 'flurfunk_updates_daily' );
 
 WP_CLI::log( 'Review requests module' );
 $fresh_rate();
@@ -1101,7 +1159,7 @@ if ( function_exists( 'wp_get_ability' ) ) {
 $fu_keep = array( get_user_meta( $ai_bot, 'flurfunk_ai_usage', true ), get_option( 'flurfunk_ai_log', array() ), $ai_seen );
 $fresh_rate();
 $as( $team );
-$fu_last = static fn ( int $tid ) => (int) $ai_lastm( $tid )['author'];
+$fu_last = static fn ( int $tid ) => (int) ( $ai_lastm( $tid )['author'] ?? 0 );
 $fu_last_id = static function ( int $t ) use ( $ai_bot ): int {
 	$ms = array_values( array_filter( Store\full_thread( $t, $ai_bot )['messages'], static fn ( $m ) => $ai_bot === (int) $m['author'] && 'message' === $m['type'] ) );
 	return $ms ? (int) end( $ms )['id'] : 0;

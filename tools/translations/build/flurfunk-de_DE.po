@@ -46,6 +46,14 @@ msgstr "%1$s von %2$s"
 msgid "%1$s made %2$s responsible"
 msgstr "%1$s hat %2$s zuständig gemacht"
 
+msgid "%1$s new comment is waiting: %2$s"
+msgid_plural "%1$s new comments are waiting: %2$s"
+msgstr[0] "%1$s neuer Kommentar wartet: %2$s"
+msgstr[1] "%1$s neue Kommentare warten: %2$s"
+
+msgid "%1$s on \"%2$s\""
+msgstr "%1$s zu „%2$s“"
+
 msgid "%1$s on %2$s · %3$s"
 msgstr "%1$s zu %2$s · %3$s"
 
@@ -185,8 +193,18 @@ msgstr "%s hat das zur Prüfung eingereicht. Bitte einmal draufschauen."
 msgid "%s ticked off a task"
 msgstr "%s hat eine Aufgabe abgehakt"
 
+msgid "%s translation"
+msgid_plural "%s translations"
+msgstr[0] "%s Übersetzung"
+msgstr[1] "%s Übersetzungen"
+
 msgid "%s undid the changes"
 msgstr "%s hat die Änderungen rückgängig gemacht"
+
+msgid "%s update available"
+msgid_plural "%s updates available"
+msgstr[0] "%s Update verfügbar"
+msgstr[1] "%s Updates verfügbar"
 
 msgid "%s wrote"
 msgstr "%s schreibt"
@@ -382,6 +400,9 @@ msgstr "Alle Gespräche zu diesem Artikel, aus allen Kanälen"
 
 msgid "All done"
 msgstr "Alles erledigt"
+
+msgid "All installed"
+msgstr "Alles eingespielt"
 
 msgid "All threads"
 msgstr "Alle Threads"
@@ -940,6 +961,9 @@ msgstr "Gib die Zeit als JJJJ-MM-TT HH:MM an."
 msgid "Go to the dashboard"
 msgstr "Zum Dashboard"
 
+msgid "Go to the updates"
+msgstr "Zu den Updates"
+
 msgid "Guest"
 msgstr "Gast"
 
@@ -1033,6 +1057,9 @@ msgstr "Karte einfügen"
 msgid "Insert a post as a card"
 msgstr "Artikel als Karte einfügen"
 
+msgid "Installed"
+msgstr "Installiert"
+
 msgid "Instructions"
 msgstr "Anweisungen"
 
@@ -1068,6 +1095,9 @@ msgstr "Neueste Aktivität zuerst"
 
 msgid "Layout"
 msgstr "Layout"
+
+msgid "Leave out (plugin or theme folders, separated by commas)"
+msgstr "Weglassen (Plugin- oder Theme-Ordner, durch Kommas getrennt)"
 
 msgid "Light"
 msgstr "Hell"
@@ -1294,6 +1324,9 @@ msgstr "Neues Markup"
 msgid "New markup for the whole template"
 msgstr "Neues Markup für die ganze Vorlage"
 
+msgid "New since:"
+msgstr "Neu dazugekommen:"
+
 msgid "New thread in #%s … (@name, / for cards)"
 msgstr "Neuer Thread in #%s … (@Name, / für Karten)"
 
@@ -1438,6 +1471,9 @@ msgstr "An"
 msgid "On for this device"
 msgstr "Auf diesem Gerät an"
 
+msgid "Once a day it looks at the updates WordPress has found. One thread lists them as a task; new ones come as a reply in it, and once everything is installed the thread is ticked off. By default in its own channel #updates, which only people who may update plugins see."
+msgstr "Schaut einmal am Tag nach den Updates, die WordPress gefunden hat. Ein Thread listet sie als Aufgabe; neue kommen als Antwort hinein, und sobald alles eingespielt ist, wird der Thread abgehakt. Standardmäßig im eigenen Kanal #updates, den nur sieht, wer Plugins aktualisieren darf."
+
 msgid "Once a day, if comments are waiting for approval, a thread lists them. By default in its own channel #comments, which only people who may moderate comments see."
 msgstr "Einmal am Tag listet ein Thread die Kommentare auf, die auf Freigabe warten. Standardmäßig im eigenen Kanal #comments, den nur sieht, wer Kommentare moderieren darf."
 
@@ -1548,6 +1584,12 @@ msgstr "Bitte wähle eine Exportdatei."
 
 msgid "Please wait until the upload is finished."
 msgstr "Bitte warte, bis die Datei hochgeladen ist."
+
+msgid "Plugin"
+msgstr "Plugin"
+
+msgid "Plugins"
+msgstr "Plugins"
 
 msgid "Post"
 msgstr "Artikel"
@@ -1678,8 +1720,14 @@ msgstr "Gelesen: %s"
 msgid "Reads: %1$s · Suggests: %2$s · Changes by itself: %3$s"
 msgstr "Liest: %1$s · Schlägt vor: %2$s · Ändert selbst: %3$s"
 
+msgid "Ready to install:"
+msgstr "Bereit zum Einspielen:"
+
 msgid "Remember for a channel"
 msgstr "Für einen Kanal merken"
+
+msgid "Remind after … days of waiting (0 = never)"
+msgstr "Erinnern nach … Tagen Wartezeit (0 = nie)"
 
 msgid "Remind me about this thread"
 msgstr "An diesen Thread erinnern"
@@ -2167,6 +2215,12 @@ msgstr "Der Text: Absätze durch eine Leerzeile getrennt; „- “ für Listen, 
 msgid "The theme's styles could not be changed."
 msgstr "Die Stile des Themes konnten nicht geändert werden."
 
+msgid "Theme"
+msgstr "Theme"
+
+msgid "Themes"
+msgstr "Themes"
+
 msgid "There are already enough check-ins in this conversation."
 msgstr "In diesem Gespräch ist schon genug Nachhaken geplant."
 
@@ -2190,6 +2244,16 @@ msgstr "In diesem Kanal gibt es noch keinen Schnappschuss zum Vergleichen."
 
 msgid "There is no such routine here."
 msgstr "Diese Routine gibt es hier nicht."
+
+msgid "These comments have been waiting for %s day."
+msgid_plural "These comments have been waiting for %s days."
+msgstr[0] "Diese Kommentare warten seit %s Tag."
+msgstr[1] "Diese Kommentare warten seit %s Tagen."
+
+msgid "These updates have been waiting for %s day."
+msgid_plural "These updates have been waiting for %s days."
+msgstr[0] "Diese Updates warten seit %s Tag."
+msgstr[1] "Diese Updates warten seit %s Tagen."
 
 msgid "This CSS cannot be saved: no markup, no @import and no scripts."
 msgstr "Dieses CSS kann nicht gespeichert werden: kein Markup, kein @import und keine Skripte."
@@ -2305,6 +2369,9 @@ msgstr "Werkzeuge zum Nachschlagen (%s gewählt)"
 msgid "Topic"
 msgstr "Thema"
 
+msgid "Translations"
+msgstr "Übersetzungen"
+
 msgid "Trash"
 msgstr "Papierkorb"
 
@@ -2350,6 +2417,15 @@ msgstr "Unbekannter Befehl."
 msgid "Update"
 msgstr "Aktualisieren"
 
+msgid "Updates"
+msgstr "Updates"
+
+msgid "Updates available"
+msgstr "Updates verfügbar"
+
+msgid "Updates for WordPress, plugins and themes"
+msgstr "Updates für WordPress, Plugins und Themes"
+
 msgid "Used: %s"
 msgstr "Genutzt: %s"
 
@@ -2364,6 +2440,9 @@ msgstr "Mi"
 
 msgid "Welcome to Flurfunk"
 msgstr "Willkommen bei Flurfunk"
+
+msgid "What"
+msgstr "Was"
 
 msgid "What an assistant reads goes to the AI provider of this site."
 msgstr "Was ein Assistent liest, geht an den KI-Anbieter dieser Website."
@@ -2430,6 +2509,9 @@ msgstr "Ohne id oder name: die eigenen Muster der Website (ID, Titel, ob synchro
 
 msgid "WordPress"
 msgstr "WordPress"
+
+msgid "WordPress itself"
+msgstr "WordPress selbst"
 
 msgid "Words in the title or text; leave it out for the latest posts."
 msgstr "Wörter im Titel oder Text; weglassen für die neuesten Beiträge."

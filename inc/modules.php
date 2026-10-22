@@ -43,6 +43,7 @@ const SETTINGS = 'flurfunk_module_settings'; // module ID => key => value.
 const TYPES    = array( 'channel', 'checkbox', 'number', 'text', 'select', 'roles', 'users' );
 
 const COMMENTS_CHANNEL = 'comments'; // Own channel of the daily moderation thread.
+const UPDATES_CHANNEL  = 'updates'; // Own channel of the module "Updates available".
 
 /**
  * All registered modules.
@@ -420,6 +421,77 @@ add_action(
 						'label'   => __( 'Channel', 'flurfunk' ),
 						'default' => COMMENTS_CHANNEL,
 					),
+					array(
+						'key'     => 'remind',
+						'type'    => 'number',
+						'label'   => __( 'Remind after … days of waiting (0 = never)', 'flurfunk' ),
+						'default' => 7,
+						'min'     => 0,
+						'max'     => 90,
+					),
+				),
+			)
+		);
+		register(
+			'flurfunk/updates',
+			array(
+				'label'       => __( 'Updates available', 'flurfunk' ),
+				'description' => __( 'Once a day it looks at the updates WordPress has found. One thread lists them as a task; new ones come as a reply in it, and once everything is installed the thread is ticked off. By default in its own channel #updates, which only people who may update plugins see.', 'flurfunk' ),
+				'group'       => __( 'Core', 'flurfunk' ),
+				'default'     => false,
+				'load'        => static fn () => require_once FLURFUNK_DIR . 'modules/updates.php',
+				'settings'    => array(
+					array(
+						'key'     => 'channel',
+						'type'    => 'channel',
+						'label'   => __( 'Channel', 'flurfunk' ),
+						'default' => UPDATES_CHANNEL,
+					),
+					array(
+						'key'     => 'core',
+						'type'    => 'checkbox',
+						'label'   => __( 'WordPress itself', 'flurfunk' ),
+						'default' => true,
+					),
+					array(
+						'key'     => 'plugins',
+						'type'    => 'checkbox',
+						'label'   => __( 'Plugins', 'flurfunk' ),
+						'default' => true,
+					),
+					array(
+						'key'     => 'themes',
+						'type'    => 'checkbox',
+						'label'   => __( 'Themes', 'flurfunk' ),
+						'default' => true,
+					),
+					array(
+						'key'     => 'translations',
+						'type'    => 'checkbox',
+						'label'   => __( 'Translations', 'flurfunk' ),
+						'default' => false,
+					),
+					array(
+						'key'     => 'ignore',
+						'type'    => 'text',
+						'label'   => __( 'Leave out (plugin or theme folders, separated by commas)', 'flurfunk' ),
+						'default' => '',
+					),
+					array(
+						'key'        => 'assign',
+						'type'       => 'users',
+						'label'      => __( 'Responsible', 'flurfunk' ),
+						'capability' => 'update_plugins',
+						'default'    => array(),
+					),
+					array(
+						'key'     => 'remind',
+						'type'    => 'number',
+						'label'   => __( 'Remind after … days of waiting (0 = never)', 'flurfunk' ),
+						'default' => 7,
+						'min'     => 0,
+						'max'     => 90,
+					),
 				),
 			)
 		);
@@ -469,12 +541,15 @@ add_action(
 	5
 );
 
-// The daily moderation thread brings its own channel, created when the module is switched on.
+// The daily moderation thread and the updates bring their own channel, created when switched on.
 add_action(
 	'flurfunk_module_on',
 	static function ( string $id ): void {
 		if ( 'flurfunk/comments-daily' === $id ) {
 			comments_channel();
+		}
+		if ( 'flurfunk/updates' === $id ) {
+			updates_channel();
 		}
 	}
 );
@@ -493,6 +568,24 @@ function comments_channel(): int {
 			'topic'         => __( 'Comments awaiting moderation', 'flurfunk' ),
 			'access_guests' => 'none',
 			'capability'    => 'moderate_comments',
+		)
+	);
+}
+
+/**
+ * The channel #updates of the module "Updates available": only for people who may update plugins.
+ * Created once; afterwards the site decides (name, levels, capability).
+ *
+ * @return int Channel ID.
+ */
+function updates_channel(): int {
+	return \Flurfunk\Store\ensure_channel(
+		UPDATES_CHANNEL,
+		array(
+			'name'          => __( 'Updates', 'flurfunk' ),
+			'topic'         => __( 'Updates for WordPress, plugins and themes', 'flurfunk' ),
+			'access_guests' => 'none',
+			'capability'    => 'update_plugins',
 		)
 	);
 }
