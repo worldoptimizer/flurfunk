@@ -995,6 +995,13 @@ remove_filter( 'site_transient_update_plugins', $up_tr, 99 );
 remove_filter( 'flurfunk_module_setting', $up_filter, 10 );
 null === $up_state ? delete_option( Flurfunk\Modules\Updates\STATE ) : update_option( Flurfunk\Modules\Updates\STATE, $up_state );
 $check( 'the daily runs are scheduled (comments, updates)', (bool) wp_next_scheduled( 'flurfunk_comments_daily' ) && (bool) wp_next_scheduled( 'flurfunk_updates_daily' ) );
+$up_keep = get_option( Flurfunk\Modules\SETTINGS );
+$up_none = ! Store\channel_by_slug( 'updates' );
+Flurfunk\Modules\save_settings( 'flurfunk/updates', array( 'channel' => 'ff-test' ) );
+Flurfunk\Modules\set( array( 'flurfunk/updates' => true ) );
+$check( 'switched on with another channel set: no #updates of its own', $up_none && ! Store\channel_by_slug( 'updates' ) );
+Flurfunk\Modules\set( array( 'flurfunk/updates' => false ) );
+false === $up_keep ? delete_option( Flurfunk\Modules\SETTINGS ) : update_option( Flurfunk\Modules\SETTINGS, $up_keep, false );
 wp_clear_scheduled_hook( 'flurfunk_comments_daily' );
 wp_clear_scheduled_hook( 'flurfunk_updates_daily' );
 

@@ -545,10 +545,11 @@ add_action(
 add_action(
 	'flurfunk_module_on',
 	static function ( string $id ): void {
-		if ( 'flurfunk/comments-daily' === $id ) {
+		// Their own channel only when they post there (not when another channel is set).
+		if ( 'flurfunk/comments-daily' === $id && COMMENTS_CHANNEL === sanitize_key( (string) setting( $id, 'channel' ) ) ) {
 			comments_channel();
 		}
-		if ( 'flurfunk/updates' === $id ) {
+		if ( 'flurfunk/updates' === $id && UPDATES_CHANNEL === sanitize_key( (string) setting( $id, 'channel' ) ) ) {
 			updates_channel();
 		}
 	}
