@@ -4,7 +4,7 @@ Tags: team chat, editorial, collaboration, tasks, comments
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,7 +114,7 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 
 == Changelog ==
 
-= 0.7.0 (in development) =
+= 0.7.0 =
 * New: the module "Updates available" (off by default): once a day it looks at the updates WordPress has found – one thread as a task with a card of what is open, new updates as a reply in it, ticked off once everything is installed, a reminder after a week. Its settings say which channel (by default its own #updates for people who may update plugins), what to look at (WordPress, plugins, themes, translations), what to leave out and who is responsible. Nothing is fetched from outside; when WordPress has no current list, it waits.
 * Changed: the daily moderation thread keeps one open thread – the same comments are never posted again, new ones come as a reply, the thread is ticked off when none waits, and a reminder comes after a week (setting). The one-per-day threads of earlier versions are taken over once.
 * New for developers: Flurfunk\Watch\run() keeps one open thread for anything that waits for people.
@@ -212,6 +212,9 @@ Only if a site switches on the module "AI assistants" and sets up an AI provider
 * First version.
 
 == Upgrade Notice ==
+
+= 0.7.0 =
+New module "Updates available". Assistants change the look without CSS of their own, and Flurfunk no longer creates an assistant account by itself – create one under Settings → Flurfunk → Assistants.
 
 = 0.6.0 =
 AI assistants join a thread like a colleague, keep notes, check back and run routines. For administrators they help run the site – pages, look, templates, menus, patterns, SEO, numbers, code, comments – always as cards you apply and can undo.
