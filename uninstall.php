@@ -76,24 +76,10 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 		delete_option( (string) $flurfunk_option );
 	}
 
-	// Assistant accounts exist only for Flurfunk. Their conversations are gone with the tables and
-	// their Flurfunk files above; anything they put into the media library goes to an administrator.
-	require_once ABSPATH . 'wp-admin/includes/user.php';
-	$flurfunk_admins = get_users(
-		array(
-			'role'   => 'administrator',
-			'number' => 1,
-			'fields' => 'ID',
-		)
-	);
-	foreach ( get_users( array( 'meta_key' => 'flurfunk_bot', 'fields' => 'ID' ) ) as $flurfunk_bot ) { // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- a handful of accounts, once on uninstall.
-		$flurfunk_owns = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE post_author = %d', $wpdb->posts, $flurfunk_bot ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- runs once on uninstall.
-		wp_delete_user( (int) $flurfunk_bot, $flurfunk_owns && $flurfunk_admins ? (int) $flurfunk_admins[0] : null );
-	}
-
 	delete_option( 'flurfunk_settings' );
 	delete_option( 'flurfunk_rev' );
 	delete_option( 'flurfunk_bot_default' );
+	delete_option( 'flurfunk_needs_assistant' );
 	delete_option( 'flurfunk_welcome_thread' );
 	delete_metadata( 'user', 0, 'flurfunk_prefs', '', true );
 	foreach ( array( 'theme', 'avatar', 'mail', 'push', 'quiet', 'badge', 'hour', 'channels', 'pause' ) as $flurfunk_k ) {
@@ -102,6 +88,8 @@ if ( isset( $flurfunk_settings['keep_data'] ) && ! $flurfunk_settings['keep_data
 	delete_metadata( 'user', 0, 'flurfunk_rev', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_started', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_last_channel', '', true );
+	// Assistant accounts stay, only their mark goes: without Flurfunk they are plain subscribers whose
+	// password nobody knows, and an administrator removes them under Users if not needed.
 	delete_metadata( 'user', 0, 'flurfunk_bot', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_day', '', true );
 	delete_metadata( 'user', 0, 'flurfunk_digest_last', '', true );

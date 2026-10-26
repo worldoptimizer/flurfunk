@@ -165,26 +165,21 @@ function flurfunk_app_url( string $view = '' ): string {
  * Run code as another person (for posting from PHP), then switch back. As an assistant, the code
  * may also use channels that require a capability (it is the site acting, see inc/access.php).
  *
- * @param int      $user_id User; 0 = the default assistant (created if needed).
+ * @param int      $user_id User; 0 = the default assistant (an administrator creates it under
+ *                          Settings → Flurfunk → Assistants; without one, an error comes back).
  * @param callable $fn      Work.
- * @return mixed What $fn returns.
+ * @return mixed What $fn returns, or a WP_Error without an assistant.
  */
 function flurfunk_as( int $user_id, callable $fn ) {
 	if ( ! $user_id ) {
 		$user_id = (int) get_option( 'flurfunk_bot_default' );
 		if ( ! $user_id || ! get_userdata( $user_id ) ) {
-			$made    = Flurfunk\Access\create_bot();
-			$user_id = is_wp_error( $made ) ? 0 : (int) $made;
+			update_option( 'flurfunk_needs_assistant', time(), false ); // The settings say so.
+			return new WP_Error( 'flurfunk_no_assistant', __( 'There is no assistant account yet. An administrator creates one under Settings → Flurfunk → Assistants.', 'flurfunk' ) );
 		}
 	}
-	$before = get_current_user_id();
-	wp_set_current_user( $user_id );
-	try {
-		// An assistant acting for PHP code may post into channels that require a capability.
-		return Flurfunk\Access\is_bot( $user_id ) ? Flurfunk\Access\as_server( $user_id, $fn ) : $fn();
-	} finally {
-		wp_set_current_user( $before );
-	}
+	// An assistant acting for PHP code may post into channels that require a capability.
+	return Flurfunk\Access\act_as( $user_id, static fn () => Flurfunk\Access\is_bot( $user_id ) ? Flurfunk\Access\as_server( $user_id, $fn ) : $fn() );
 }
 
 /**

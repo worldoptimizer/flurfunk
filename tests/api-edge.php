@@ -1960,11 +1960,16 @@ foreach ( array( '', 'team', 'guest', 'none' ) as $mx_c ) {
 Flurfunk\People\set_choice( $pp_u, '' );
 Store\ensure_channel( 'ff-test', array( 'access_guests' => $mx_g ), true );
 $check( 'the matrix: a contributor by role is a guest (guest channel yes, internal no); as team both; as guest like the role; no access nothing', array( 'role' => 'guest all/none', 'team' => 'team all/all', 'guest' => 'guest all/none', 'none' => ' none/none' ) === $mx, $mx );
-// The first visit: what was said before starts as read.
+// The first visit: what was said before starts as read – for accounts newer than Flurfunk only.
 Store\first_visit( $pp_u );
 $pp_c = Store\counts( $pp_u );
 Store\first_visit( $team );
 $check( 'someone new starts with nothing unread; who has read before is left alone', 0 === (int) $pp_c['total'] && get_user_meta( $pp_u, 'flurfunk_started', true ), $pp_c );
+$fv_old = wp_insert_user( array( 'user_login' => 'ff-test-old-' . wp_generate_password( 5, false, false ), 'user_pass' => wp_generate_password(), 'user_email' => 'ff-old-' . wp_generate_password( 5, false, false ) . '@example.test', 'role' => 'editor', 'user_registered' => '2001-01-01 00:00:00' ) );
+$fv_n   = (int) Store\counts( $fv_old )['total'];
+Store\first_visit( $fv_old );
+$check( '… an account from before Flurfunk keeps its unread (it may have been asked something)', $fv_n > 0 && $fv_n === (int) Store\counts( $fv_old )['total'] && get_user_meta( $fv_old, 'flurfunk_started', true ), $fv_n );
+wp_delete_user( $fv_old );
 wp_delete_user( $pp_u );
 // Notes for all channels (house rules), never where guests read.
 $sn_opts = get_option( 'flurfunk_ai_settings', null );
@@ -2166,27 +2171,34 @@ if ( function_exists( 'wp_get_ability' ) && wp_get_ability( 'flurfunk/site-check
 	wp_delete_post( $in_p, true );
 	$extra_threads[] = $in_t;
 }
-// The site's look: read it, propose a change as a card an administrator applies – and undoes.
+// The site's look: read it, propose a change as a card an administrator applies – and undoes. No CSS of its own.
 if ( function_exists( 'wp_get_ability' ) && wp_get_ability( Flurfunk\Styles\NAME ) ) {
 	$as( $team );
-	$st_now = Flurfunk\Styles\get();
-	$st_ok  = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'css' => '.wp-block-button__link { border-radius: 0; }', 'why' => 'Eckige Buttons' ) ) );
-	$st_bad = Flurfunk\Styles\validate( array( 'css' => '@import url(https://evil.example/x.css);' ) );
-	$st_bc  = Flurfunk\Styles\validate( array( 'css' => 'a{}</style><script>x</script>' ) );
-	$as( $team2 );
-	$st_ed = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team2, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'css' => 'a{color:red}' ) ) );
-	$as( $team );
-	$check( 'a change of the look can be proposed for an administrator (not for an editor); CSS with markup or imports is refused', '' !== (string) ( $st_now['theme'] ?? '' ) && true === $st_ok && is_wp_error( $st_bad ) && is_wp_error( $st_bc ) && true !== $st_ed, array( $st_ok, $st_ed ) );
-	$st_t   = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Design' ) );
-	$st_pid = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Styles\NAME, array( 'css' => '.ff-test-look { color: #123456; }', 'why' => 'Test' ), $ai_bot, $st_t );
-	$st_snap = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
-	$st_run = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $st_pid ), array(), $team );
-	$st_css = $st_now['block_theme'] ? (string) ( Flurfunk\Styles\get()['css'] ?? '' ) : (string) wp_get_custom_css();
-	$st_after = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
-	$st_undo = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $st_pid ), array(), $team );
-	$st_back = $st_now['block_theme'] ? (string) ( Flurfunk\Styles\get()['css'] ?? '' ) : (string) wp_get_custom_css();
-	$check( '… the card says what changes; applied with the clicker\'s rights it adds the CSS, offers undo, and undo puts it back', str_contains( (string) $st_snap['data']['sub'], 'Test' ) && null === $st_run && str_contains( $st_css, '.ff-test-look' ) && in_array( 'undo', (array) $st_after['actions'], true ) && null === $st_undo && ! str_contains( $st_back, '.ff-test-look' ), array( $st_run, $st_undo, $st_snap['data']['sub'] ?? null ) );
-	$extra_threads[] = $st_t;
+	$st_now    = Flurfunk\Styles\get();
+	$st_schema = (array) ( wp_get_ability( Flurfunk\Styles\NAME )->get_input_schema()['properties'] ?? array() );
+	$st_css    = Flurfunk\Styles\validate( array( 'css' => '.wp-block-button__link { border-radius: 0; }' ) );
+	$check( 'the look takes no CSS: not in the ability, and a change of only CSS is refused', '' !== (string) ( $st_now['theme'] ?? '' ) && ! isset( $st_schema['css'] ) && ! isset( $st_schema['css_mode'] ) && is_wp_error( $st_css ), $st_css );
+	$st_val = Flurfunk\Styles\validate( array( 'styles' => array( 'css' => 'a{color:red}' ) ) );
+	$check( '… not inside styles either', is_wp_error( $st_val ) );
+	if ( wp_is_block_theme() ) {
+		$st_link = static fn () => (string) ( json_decode( (string) ( Flurfunk\Styles\user_post()->post_content ?? '' ), true )['styles']['elements']['link']['color']['text'] ?? '' );
+		$st_was  = $st_link();
+		$st_ok   = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'link' => '#123456', 'why' => 'Dunklere Links' ) ) );
+		$as( $team2 );
+		$st_ed = Flurfunk\Modules\Ai\with_limit( $ai_bot, $team2, static fn () => Flurfunk\Modules\Ai\may_propose( Flurfunk\Styles\NAME, array( 'link' => '#123456' ) ) );
+		$as( $team );
+		$check( 'a change of the look can be proposed for an administrator (not for an editor)', true === $st_ok && true !== $st_ed, array( $st_ok, $st_ed ) );
+		$st_t     = Store\create_thread( array( 'channel' => 'ff-test', 'body' => 'Design' ) );
+		$st_pid   = Flurfunk\Modules\Ai\add_proposal( Flurfunk\Styles\NAME, array( 'link' => '#123456', 'why' => 'Test' ), $ai_bot, $st_t );
+		$st_snap  = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
+		$st_run   = Flurfunk\Modules\Ai\run_proposal( array( 'id' => $st_pid ), array(), $team );
+		$st_set   = $st_link();
+		$st_after = Flurfunk\Modules\Ai\build_snapshot( Flurfunk\Modules\Ai\proposal( $st_pid ) );
+		$st_undo  = Flurfunk\Modules\Ai\undo_proposal( array( 'id' => $st_pid ), array(), $team );
+		$check( '… the card says what changes; applied with the clicker\'s rights it sets the color, offers undo, and undo puts it back', str_contains( (string) $st_snap['data']['sub'], '#123456' ) && null === $st_run && '#123456' === $st_set && in_array( 'undo', (array) $st_after['actions'], true ) && null === $st_undo && $st_was === $st_link(), array( $st_run, $st_undo, $st_set, $st_snap['data']['sub'] ?? null ) );
+		$check( '… and a card never gets unfiltered HTML', ! Flurfunk\Modules\Ai\with_limit( $ai_bot, $team, static fn () => current_user_can( 'unfiltered_html' ) ) );
+		$extra_threads[] = $st_t;
+	}
 	// A page as a draft, with a layout of blocks.
 	$pg = Flurfunk\Drafts\create( array( 'title' => 'Über uns (Test)', 'type' => 'page', 'text' => "<!-- wp:columns -->\n<div class=\"wp-block-columns\"><!-- wp:column -->\n<div class=\"wp-block-column\"><!-- wp:paragraph -->\n<p>Links</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:column --></div>\n<!-- /wp:columns -->" ) );
 	$pg_p = get_post( (int) ( $pg['id'] ?? 0 ) );
@@ -2663,6 +2675,16 @@ $check( 'flurfunk_channel_level runs after the capability and has the last word'
 remove_filter( 'flurfunk_channel_level', $open_gate, 10 );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $fresh );
+
+// Without an assistant account, posting as "the assistant" fails – nothing creates one by itself.
+$na_def = get_option( 'flurfunk_bot_default' );
+update_option( 'flurfunk_bot_default', 0, false );
+delete_option( 'flurfunk_needs_assistant' );
+$na_users = count_users()['total_users'];
+$na_r     = flurfunk_post( array( 'channel' => 'ff-test', 'body' => 'Ohne Assistent' ) );
+$check( 'without an assistant account the PHP API returns an error, creates no account and the settings say so', is_wp_error( $na_r ) && 'flurfunk_no_assistant' === $na_r->get_error_code() && count_users()['total_users'] === $na_users && get_option( 'flurfunk_needs_assistant' ), $na_r );
+update_option( 'flurfunk_bot_default', $na_def, false );
+delete_option( 'flurfunk_needs_assistant' );
 
 // Flurfunk's own team capability: guests are out whatever the guest level, assistants are in.
 $bot = (int) flurfunk_as( 0, 'get_current_user_id' );

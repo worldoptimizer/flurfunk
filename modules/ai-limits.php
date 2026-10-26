@@ -291,21 +291,6 @@ function admin_read( ?bool $set = null ): bool {
 }
 
 /**
- * Saving CSS the person applies as a card: WordPress asks for "unfiltered_html" for that (CSS of the
- * site's look), so it counts while such a card runs – the CSS was checked before (no markup, no
- * imports, no scripts). Markup an assistant wrote is always filtered.
- *
- * @param bool|null $set Switch on or off; null reads.
- */
-function admin_css( ?bool $set = null ): bool {
-	static $on = false;
-	if ( null !== $set ) {
-		$on = $set;
-	}
-	return $on;
-}
-
-/**
  * May this ability read with the asker's administrator rights (see admin_read())? WordPress's own
  * read-only abilities (core/…) and Flurfunk's reading of plugin and theme code; the filter
  * flurfunk_ai_admin_read decides for others.
@@ -355,7 +340,7 @@ function limit_meta_cap( $caps, $cap, $user_id ) {
 			}
 			// Administrator rights for reading or a person's card – never unfiltered markup or uploads:
 			// what an assistant wrote is always filtered.
-			$blocked = in_array( $c, BLOCKED, true ) && ( ! admin_read() || ( 'unfiltered_upload' === $c ) || ( 'unfiltered_html' === $c && ! admin_css() ) );
+			$blocked = in_array( $c, BLOCKED, true ) && ( ! admin_read() || in_array( $c, array( 'unfiltered_upload', 'unfiltered_html' ), true ) );
 			if ( $blocked || ( null !== $limit['caps'] && empty( $limit['caps'][ $c ] ) ) ) {
 				return array( 'do_not_allow' );
 			}

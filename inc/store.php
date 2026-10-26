@@ -773,23 +773,20 @@ function follows( int $thread_id ): array {
  */
 function mark_all_read( int $user_id, string $channel = '' ): int {
 	global $wpdb;
-	$where = Access\where( $user_id );
-	if ( '' !== $channel ) {
-		$c      = channel_by_slug( $channel );
-		$where .= $wpdb->prepare( ' AND t.channel_id = %d', $c ? (int) $c->id : 0 );
-	}
-	// One statement for all threads (thousands of threads stay fast).
-	$n = (int) $wpdb->query( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+	list( $channels, $threads ) = Access\visible( $user_id );
+	$c                          = '' !== $channel ? channel_by_slug( $channel ) : null;
+	// One statement for all threads (thousands of threads stay fast); a channel of 0 means all.
+	$n = (int) $wpdb->query(
 		$wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
-			"INSERT INTO %i (user_id, thread_id, last_message_id, seen) SELECT %d, t.id, COALESCE( MAX(m.id), 0 ), %s FROM %i t LEFT JOIN %i m ON m.thread_id = t.id WHERE {$where} GROUP BY t.id
-			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(%i.last_message_id, VALUES(last_message_id)), seen = VALUES(seen)",
-			table( 'reads' ),
-			$user_id,
-			now(),
-			table( 'threads' ),
-			table( 'messages' ),
-			table( 'reads' )
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+			'INSERT INTO %i (user_id, thread_id, last_message_id, seen) SELECT %d, t.id, COALESCE( MAX(m.id), 0 ), %s FROM %i t LEFT JOIN %i m ON m.thread_id = t.id WHERE t.private_to = 0 AND ( t.channel_id IN (' . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') ) AND ( %d = 0 OR t.channel_id = %d ) GROUP BY t.id
+			ON DUPLICATE KEY UPDATE last_message_id = GREATEST(%i.last_message_id, VALUES(last_message_id)), seen = VALUES(seen)',
+			array_merge(
+				array( table( 'reads' ), $user_id, now(), table( 'threads' ), table( 'messages' ) ),
+				$channels,
+				$threads,
+				array( '' !== $channel ? 1 : 0, $c ? (int) $c->id : 0, table( 'reads' ) )
+			)
 		)
 	);
 	update_user_meta( $user_id, 'flurfunk_rev', (int) get_user_meta( $user_id, 'flurfunk_rev', true ) + 1 );
@@ -797,9 +794,10 @@ function mark_all_read( int $user_id, string $channel = '' ): int {
 }
 
 /**
- * Someone opens Flurfunk for the first time: what was said before starts as read, as when someone
- * joins Slack – not hundreds of old threads as unread. Only once, and never for someone who has
- * read anything already (an update does not touch existing accounts).
+ * Someone new opens Flurfunk for the first time: what was said before they joined starts as read,
+ * as when someone joins Slack – not hundreds of old threads as unread. Only once, only for accounts
+ * made after Flurfunk's first thread, and never for someone who has read anything already: people
+ * who were on the site before (and may have been asked something while away) keep their unread.
  *
  * @param int $user_id User.
  */
@@ -809,7 +807,11 @@ function first_visit( int $user_id ): void {
 		return;
 	}
 	update_user_meta( $user_id, 'flurfunk_started', time() );
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Flurfunk's own table, once per person.
+	$user  = get_userdata( $user_id );
+	$since = (string) $wpdb->get_var( $wpdb->prepare( 'SELECT MIN(created) FROM %i', table( 'threads' ) ) );
+	if ( ! $user || '' === $since || (string) $user->user_registered <= $since ) {
+		return;
+	}
 	if ( ! $wpdb->get_var( $wpdb->prepare( 'SELECT 1 FROM %i WHERE user_id = %d LIMIT 1', table( 'reads' ), $user_id ) ) ) {
 		mark_all_read( $user_id );
 	}
@@ -1467,58 +1469,87 @@ function audience( object $t ): array {
  */
 function list_threads( int $user_id, array $args = array() ): array {
 	global $wpdb;
-	$where = array( Access\where( $user_id ) );
-	if ( ! empty( $args['private_with'] ) ) {
-		// One's own private conversations with an assistant, and nothing else.
-		$where = array( $wpdb->prepare( "t.private_to = %d AND t.target_type = 'assistant' AND t.target_id = %d", $user_id, (int) $args['private_with'] ) );
-	}
-	$view  = (string) ( $args['view'] ?? 'all' );
-	if ( ! empty( $args['channel'] ) ) {
-		$c       = channel_by_slug( (string) $args['channel'] );
-		$where[] = $wpdb->prepare( 't.channel_id = %d', $c ? (int) $c->id : 0 );
-	}
-	if ( ! empty( $args['target'] ) && preg_match( '/^([a-z0-9_-]+):(\d+)$/', (string) $args['target'], $m ) ) {
-		$where[] = $wpdb->prepare( 't.target_type = %s AND t.target_id = %d', $m[1], (int) $m[2] );
-	}
-	if ( ! empty( $args['ref_prefix'] ) ) {
-		$where[] = $wpdb->prepare( 't.ref_key LIKE %s', $wpdb->esc_like( (string) $args['ref_prefix'] ) . '%' );
-	}
-	if ( 'tasks' === $view ) {
-		$where[] = "t.status IN ( 'open', 'doing', 'waiting' )";
-	}
-	if ( 'mine' === $view ) {
-		$where[] = $wpdb->prepare( "t.status IN ( 'open', 'doing', 'waiting' ) AND t.id IN ( SELECT thread_id FROM %i WHERE user_id = %d )", table( 'assignees' ), $user_id );
-	}
-	$q = trim( (string) ( $args['q'] ?? '' ) );
-	if ( '' !== $q ) {
-		$like    = '%' . $wpdb->esc_like( $q ) . '%';
-		$where[] = $wpdb->prepare( "( t.title LIKE %s OR t.body LIKE %s OR t.id IN ( SELECT thread_id FROM %i WHERE type = 'message' AND body LIKE %s ) )", $like, $like, table( 'messages' ), $like );
-	}
-	if ( 'mentions' === $view ) {
-		$where[] = $wpdb->prepare( 't.id IN (SELECT thread_id FROM %i WHERE user_id = %d)', table( 'mentions' ), $user_id );
-	}
-	if ( 'board' === $view ) {
-		// Every task, ticked-off ones only from the last two weeks.
-		$where[] = $wpdb->prepare( "( t.status IN ( 'open', 'doing', 'waiting' ) OR ( t.status = 'done' AND t.resolved_at >= %s ) )", gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'flurfunk_board_done_days', 14 ) * DAY_IN_SECONDS ) );
-	}
-	if ( ! empty( $args['person'] ) ) {
-		$where[] = $wpdb->prepare( 't.id IN ( SELECT thread_id FROM %i WHERE user_id = %d )', table( 'assignees' ), (int) $args['person'] );
-	}
-	if ( ! empty( $args['after'] ) ) {
-		$where[] = $wpdb->prepare( 't.id > %d', (int) $args['after'] ); // Paging through order=ref lists.
-	}
-	if ( ! empty( $args['before_id'] ) ) {
-		$where[] = $wpdb->prepare( 't.id < %d', (int) $args['before_id'] ); // Paging through order=new lists (a channel read top to bottom).
-	}
-	if ( ! empty( $args['before'] ) && mysql( (string) $args['before'] ) ) {
-		$where[] = $wpdb->prepare( 't.last_activity < %s', mysql( (string) $args['before'] ) );
-	}
-	$limit = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
-	// One of three fixed sort orders.
-	$order = 'ref' === ( $args['order'] ?? '' ) ? 't.id ASC' : ( 'new' === ( $args['order'] ?? '' ) ? 't.id DESC' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 't.due_date IS NULL, t.due_date ASC, t.last_activity DESC' : 't.last_activity DESC' ) );
-	$where = implode( ' AND ', $where );
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces, $order is one of the fixed orders above.
-	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.* FROM %i t WHERE {$where} ORDER BY {$order} LIMIT %d", table( 'threads' ), $limit ) );
+	$view    = (string) ( $args['view'] ?? 'all' );
+	$private = (int) ( $args['private_with'] ?? 0 ); // One's own private conversations with an assistant, and nothing else.
+	$channel = ! empty( $args['channel'] ) ? channel_by_slug( (string) $args['channel'] ) : null;
+	$target  = ! empty( $args['target'] ) && preg_match( '/^([a-z0-9_-]+):(\d+)$/', (string) $args['target'], $m ) ? array( $m[1], (int) $m[2] ) : array( '', 0 );
+	$prefix  = ! empty( $args['ref_prefix'] ) ? $wpdb->esc_like( (string) $args['ref_prefix'] ) . '%' : '';
+	$q       = trim( (string) ( $args['q'] ?? '' ) );
+	$like    = '' !== $q ? '%' . $wpdb->esc_like( $q ) . '%' : '';
+	$before  = ( ! empty( $args['before'] ) ? (string) mysql( (string) $args['before'] ) : '' ) ?: '9999-12-31 23:59:59'; // A real date: MySQL refuses comparing a date with ''.
+	// Every task on the board, ticked-off ones only from the last two weeks.
+	$done    = gmdate( 'Y-m-d H:i:s', time() - (int) apply_filters( 'flurfunk_board_done_days', 14 ) * DAY_IN_SECONDS );
+	$limit   = max( 1, min( 200, (int) ( $args['limit'] ?? 40 ) ) );
+	// One of the fixed orders: oldest first (paging through order=ref), newest first (a channel read
+	// top to bottom), tasks by due date, or by last activity.
+	$order = 'ref' === ( $args['order'] ?? '' ) ? 'ref' : ( 'new' === ( $args['order'] ?? '' ) ? 'new' : ( in_array( $view, array( 'mine', 'tasks', 'board' ), true ) ? 'due' : '' ) );
+
+	list( $channels, $threads ) = Access\visible( $user_id );
+	// Every filter is part of the query; one that was not asked for is switched off by its first value (0 or '').
+	$rows = $wpdb->get_results(
+		$wpdb->prepare(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+			"SELECT t.* FROM %i t WHERE
+			( ( %d = 0 AND t.private_to = 0 AND ( t.channel_id IN (" . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ") ) )
+				OR ( %d > 0 AND t.private_to = %d AND t.target_type = 'assistant' AND t.target_id = %d ) )
+			AND ( %d = 0 OR t.channel_id = %d )
+			AND ( %s = '' OR ( t.target_type = %s AND t.target_id = %d ) )
+			AND ( %s = '' OR t.ref_key LIKE %s )
+			AND ( %d = 0 OR t.status IN ( 'open', 'doing', 'waiting' ) )
+			AND ( %d = 0 OR t.id IN ( SELECT thread_id FROM %i WHERE user_id = %d ) )
+			AND ( %s = '' OR t.title LIKE %s OR t.body LIKE %s OR t.id IN ( SELECT thread_id FROM %i WHERE type = 'message' AND body LIKE %s ) )
+			AND ( %d = 0 OR t.id IN ( SELECT thread_id FROM %i WHERE user_id = %d ) )
+			AND ( %d = 0 OR t.status IN ( 'open', 'doing', 'waiting' ) OR ( t.status = 'done' AND t.resolved_at >= %s ) )
+			AND ( %d = 0 OR t.id IN ( SELECT thread_id FROM %i WHERE user_id = %d ) )
+			AND ( %d = 0 OR t.id > %d ) AND ( %d = 0 OR t.id < %d ) AND t.last_activity < %s
+			ORDER BY CASE WHEN %s = 'ref' THEN t.id END ASC, CASE WHEN %s = 'new' THEN t.id END DESC, CASE WHEN %s = 'due' THEN t.due_date IS NULL END ASC, CASE WHEN %s = 'due' THEN t.due_date END ASC, t.last_activity DESC, t.id DESC
+			LIMIT %d",
+			array_merge(
+				array( table( 'threads' ), $private ),
+				$channels,
+				$threads,
+				array(
+					$private,
+					$user_id,
+					$private,
+					! empty( $args['channel'] ) ? 1 : 0, // An unknown channel finds nothing.
+					$channel ? (int) $channel->id : 0,
+					$target[0],
+					$target[0],
+					$target[1],
+					$prefix,
+					$prefix,
+					in_array( $view, array( 'tasks', 'mine' ), true ) ? 1 : 0,
+					'mine' === $view ? 1 : 0,
+					table( 'assignees' ),
+					$user_id,
+					$like,
+					$like,
+					$like,
+					table( 'messages' ),
+					$like,
+					'mentions' === $view ? 1 : 0,
+					table( 'mentions' ),
+					$user_id,
+					'board' === $view ? 1 : 0,
+					$done,
+					(int) ( $args['person'] ?? 0 ),
+					table( 'assignees' ),
+					(int) ( $args['person'] ?? 0 ),
+					(int) ( $args['after'] ?? 0 ),
+					(int) ( $args['after'] ?? 0 ),
+					(int) ( $args['before_id'] ?? 0 ),
+					(int) ( $args['before_id'] ?? 0 ),
+					$before,
+					$order,
+					$order,
+					$order,
+					$order,
+					$limit,
+				)
+			)
+		)
+	);
 	return summarize( $rows, $user_id );
 }
 
@@ -1599,21 +1630,12 @@ function counts( int $user_id ): array {
 	if ( is_array( $cached ) ) {
 		return $cached;
 	}
-	$where = Access\where( $user_id );
-	$rows  = $wpdb->get_results( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+	list( $channels, $threads ) = Access\visible( $user_id );
+	$rows                       = $wpdb->get_results(
 		$wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
-			"SELECT t.id, t.channel_id, t.target_type, t.target_id, t.status, ( SELECT COUNT(*) FROM %i m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) ) + ( r.user_id IS NULL AND t.author_id <> %d ) AS unread, EXISTS ( SELECT 1 FROM %i x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned, EXISTS ( SELECT 1 FROM %i a WHERE a.thread_id = t.id AND a.user_id = %d ) AS mine, t.due_date FROM %i t LEFT JOIN %i r ON r.thread_id = t.id AND r.user_id = %d WHERE {$where}",
-			table( 'messages' ),
-			$user_id,
-			$user_id,
-			table( 'mentions' ),
-			$user_id,
-			table( 'assignees' ),
-			$user_id,
-			table( 'threads' ),
-			table( 'reads' ),
-			$user_id
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+			"SELECT t.id, t.channel_id, t.target_type, t.target_id, t.status, ( SELECT COUNT(*) FROM %i m WHERE m.thread_id = t.id AND m.type = 'message' AND m.author_id <> %d AND m.id > COALESCE(r.last_message_id, 0) ) + ( r.user_id IS NULL AND t.author_id <> %d ) AS unread, EXISTS ( SELECT 1 FROM %i x WHERE x.thread_id = t.id AND x.user_id = %d ) AS mentioned, EXISTS ( SELECT 1 FROM %i a WHERE a.thread_id = t.id AND a.user_id = %d ) AS mine, t.due_date FROM %i t LEFT JOIN %i r ON r.thread_id = t.id AND r.user_id = %d WHERE t.private_to = 0 AND ( t.channel_id IN (" . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') )',
+			array_merge( array( table( 'messages' ), $user_id, $user_id, table( 'mentions' ), $user_id, table( 'assignees' ), $user_id, table( 'threads' ), table( 'reads' ), $user_id ), $channels, $threads )
 		)
 	);
 	$today = wp_date( 'Y-m-d' );
@@ -1667,9 +1689,9 @@ function counts( int $user_id ): array {
  */
 function recent_targets( int $user_id, int $limit = 15 ): array {
 	global $wpdb;
-	$where = Access\where( $user_id );
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
-	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_type, t.target_id, MAX(t.last_activity) a FROM %i t WHERE t.target_type <> '' AND {$where} GROUP BY t.target_type, t.target_id ORDER BY a DESC LIMIT %d", table( 'threads' ), $limit ) );
+	list( $channels, $threads ) = Access\visible( $user_id );
+	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+	$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_type, t.target_id, MAX(t.last_activity) a FROM %i t WHERE t.target_type <> '' AND t.private_to = 0 AND ( t.channel_id IN (" . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') ) GROUP BY t.target_type, t.target_id ORDER BY a DESC LIMIT %d', array_merge( array( table( 'threads' ) ), $channels, $threads, array( $limit ) ) ) );
 	return array_map(
 		static fn ( $r ) => array(
 			'type' => $r->target_type,

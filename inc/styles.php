@@ -1,13 +1,13 @@
 <?php
 /**
- * The site's look: colors, fonts, sizes, spacing and additional CSS of the active theme – read, and
- * changed by a person who may edit the theme's options (an AI assistant only proposes it, as a card,
- * which the person applies and can undo).
+ * The site's look: colors, fonts, sizes and spacing of the active theme – read (with its additional
+ * CSS), and changed by a person who may edit the theme's options (an AI assistant only proposes it,
+ * as a card, which the person applies and can undo).
  *
  * Block themes keep a site's own choices in its global styles (colors, the palette, typography,
- * spacing, borders, content widths, CSS) – only known properties with plain values are set; classic
- * themes have the "Additional CSS" of the Customizer. Both keep revisions, and "undo" puts back the
- * state before – unless someone changed the look again since.
+ * spacing, borders, content widths) – only known properties with plain values are set, never CSS of
+ * its own: that stays with the Site Editor and the Customizer. Global styles keep revisions, and
+ * "undo" puts back the state before – unless someone changed the look again since.
  *
  * @package Flurfunk
  */
@@ -301,30 +301,17 @@ function color( string $c ): bool {
 }
 
 /**
- * CSS that may be saved: no markup, no imports or scripts.
- *
- * @param string $css CSS.
- * @return true|\WP_Error
- */
-function css_ok( string $css ) {
-	if ( mb_strlen( $css ) > 20000 || preg_match( '/<|@import|expression\s*\(|javascript:|behavior\s*:|-moz-binding/i', $css ) ) {
-		return new \WP_Error( 'flurfunk_styles', __( 'This CSS cannot be saved: no markup, no @import and no scripts.', 'flurfunk' ), array( 'status' => 400 ) );
-	}
-	return true;
-}
-
-/**
  * Check a proposed change before it becomes a card.
  *
  * @param array $input Ability input.
  * @return true|\WP_Error
  */
 function validate( array $input ) {
-	if ( isset( $input['css'] ) ) {
-		$ok = css_ok( (string) $input['css'] );
-		if ( true !== $ok ) {
-			return $ok;
-		}
+	if ( ! wp_is_block_theme() ) {
+		return new \WP_Error( 'flurfunk_styles', __( 'This theme is not a block theme: its look is changed in the Customizer.', 'flurfunk' ), array( 'status' => 400 ) );
+	}
+	if ( ! array_filter( array_intersect_key( $input, array_flip( array( 'background', 'text', 'link', 'palette', 'styles', 'layout' ) ) ) ) ) {
+		return new \WP_Error( 'flurfunk_styles', __( 'Nothing to change: colors, the palette, styles or the content width.', 'flurfunk' ), array( 'status' => 400 ) );
 	}
 	foreach ( array( 'background', 'text', 'link' ) as $k ) {
 		if ( isset( $input[ $k ] ) && ! color( (string) $input[ $k ] ) ) {
@@ -349,16 +336,13 @@ function validate( array $input ) {
 			}
 		}
 	}
-	if ( ! wp_is_block_theme() && ( isset( $input['background'] ) || isset( $input['text'] ) || isset( $input['link'] ) || ! empty( $input['palette'] ) || ! empty( $input['styles'] ) || ! empty( $input['layout'] ) ) ) {
-		return new \WP_Error( 'flurfunk_styles', __( 'This theme is not a block theme: only additional CSS can be changed here.', 'flurfunk' ), array( 'status' => 400 ) );
-	}
 	return true;
 }
 
 /**
- * Apply a change as the current person.
+ * Apply a change as the current person (block themes: the site's global styles).
  *
- * @param array $input { css, css_mode, background, text, link, palette, why }.
+ * @param array $input { background, text, link, palette, styles, layout, why }.
  * @return array|\WP_Error What changed, and what undo needs.
  */
 function update( array $input ) {
@@ -366,102 +350,76 @@ function update( array $input ) {
 	if ( true !== $ok ) {
 		return $ok;
 	}
-	$append = 'replace' !== ( $input['css_mode'] ?? 'append' );
-	$did    = array();
-	if ( wp_is_block_theme() ) {
-		$post = user_post( true );
-		if ( ! $post ) {
-			return new \WP_Error( 'flurfunk_styles', __( 'The theme\'s styles could not be changed.', 'flurfunk' ) );
-		}
-		$before = (string) $post->post_content;
-		$data   = json_decode( $before, true ) ?: array(
-			'version'                     => 3,
-			'isGlobalStylesUserThemeJSON' => true,
-		);
-		if ( isset( $input['css'] ) ) {
-			$old = (string) ( $data['styles']['css'] ?? '' );
-
-			$data['styles']['css'] = $append && '' !== trim( $old ) ? rtrim( $old ) . "\n\n" . trim( (string) $input['css'] ) : trim( (string) $input['css'] );
-
-			$did[] = 'css';
-		}
-		foreach ( array( 'background', 'text' ) as $k ) {
-			if ( isset( $input[ $k ] ) ) {
-				$data['styles']['color'][ $k ] = trim( (string) $input[ $k ] );
-
-				$did[] = $k;
-			}
-		}
-		if ( isset( $input['link'] ) ) {
-			$data['styles']['elements']['link']['color']['text'] = trim( (string) $input['link'] );
-
-			$did[] = 'link';
-		}
-		if ( ! empty( $input['styles'] ) ) {
-			$data['styles'] = array_replace_recursive( (array) ( $data['styles'] ?? array() ), clean_styles( (array) $input['styles'] ) );
-
-			$did[] = 'styles';
-		}
-		if ( ! empty( $input['layout'] ) ) {
-			$data['settings']['layout'] = array_merge( (array) ( $data['settings']['layout'] ?? array() ), clean_layout( (array) $input['layout'] ) );
-
-			$did[] = 'layout';
-		}
-		if ( ! empty( $input['palette'] ) ) {
-			$custom = array();
-			foreach ( (array) ( $data['settings']['color']['palette']['custom'] ?? array() ) as $c ) {
-				$custom[ (string) $c['slug'] ] = $c;
-			}
-			foreach ( (array) $input['palette'] as $c ) {
-				$slug            = sanitize_title( (string) $c['slug'] );
-				$custom[ $slug ] = array(
-					'slug'  => $slug,
-					'name'  => sanitize_text_field( (string) ( $c['name'] ?? $slug ) ),
-					'color' => trim( (string) $c['color'] ),
-				);
-			}
-			$data['settings']['color']['palette']['custom'] = array_values( $custom );
-
-			$did[] = 'palette';
-		}
-		$after = (string) wp_json_encode( $data );
-		$res   = wp_update_post(
-			array(
-				'ID'           => $post->ID,
-				'post_content' => wp_slash( $after ),
-			),
-			true
-		);
-		if ( is_wp_error( $res ) ) {
-			return $res;
-		}
-		if ( class_exists( 'WP_Theme_JSON_Resolver' ) ) {
-			\WP_Theme_JSON_Resolver::clean_cached_data();
-		}
-		return array(
-			'theme'   => wp_get_theme()->get( 'Name' ),
-			'changed' => $did,
-			'undo'    => array(
-				'kind'   => 'global',
-				'post'   => (int) $post->ID,
-				'before' => $before,
-				'after'  => md5( (string) get_post( $post->ID )->post_content ),
-			),
-		);
+	$post = user_post( true );
+	if ( ! $post ) {
+		return new \WP_Error( 'flurfunk_styles', __( 'The theme\'s styles could not be changed.', 'flurfunk' ) );
 	}
-	$before = (string) wp_get_custom_css();
-	$css    = $append && '' !== trim( $before ) ? rtrim( $before ) . "\n\n" . trim( (string) ( $input['css'] ?? '' ) ) : trim( (string) ( $input['css'] ?? '' ) );
-	$res    = wp_update_custom_css_post( $css );
+	$did    = array();
+	$before = (string) $post->post_content;
+	$data   = json_decode( $before, true ) ?: array(
+		'version'                     => 3,
+		'isGlobalStylesUserThemeJSON' => true,
+	);
+	foreach ( array( 'background', 'text' ) as $k ) {
+		if ( isset( $input[ $k ] ) ) {
+			$data['styles']['color'][ $k ] = trim( (string) $input[ $k ] );
+
+			$did[] = $k;
+		}
+	}
+	if ( isset( $input['link'] ) ) {
+		$data['styles']['elements']['link']['color']['text'] = trim( (string) $input['link'] );
+
+		$did[] = 'link';
+	}
+	if ( ! empty( $input['styles'] ) ) {
+		$data['styles'] = array_replace_recursive( (array) ( $data['styles'] ?? array() ), clean_styles( (array) $input['styles'] ) );
+
+		$did[] = 'styles';
+	}
+	if ( ! empty( $input['layout'] ) ) {
+		$data['settings']['layout'] = array_merge( (array) ( $data['settings']['layout'] ?? array() ), clean_layout( (array) $input['layout'] ) );
+
+		$did[] = 'layout';
+	}
+	if ( ! empty( $input['palette'] ) ) {
+		$custom = array();
+		foreach ( (array) ( $data['settings']['color']['palette']['custom'] ?? array() ) as $c ) {
+			$custom[ (string) $c['slug'] ] = $c;
+		}
+		foreach ( (array) $input['palette'] as $c ) {
+			$slug            = sanitize_title( (string) $c['slug'] );
+			$custom[ $slug ] = array(
+				'slug'  => $slug,
+				'name'  => sanitize_text_field( (string) ( $c['name'] ?? $slug ) ),
+				'color' => trim( (string) $c['color'] ),
+			);
+		}
+		$data['settings']['color']['palette']['custom'] = array_values( $custom );
+
+		$did[] = 'palette';
+	}
+	$res = wp_update_post(
+		array(
+			'ID'           => $post->ID,
+			'post_content' => wp_slash( (string) wp_json_encode( $data ) ),
+		),
+		true
+	);
 	if ( is_wp_error( $res ) ) {
 		return $res;
 	}
+	if ( class_exists( 'WP_Theme_JSON_Resolver' ) ) {
+		\WP_Theme_JSON_Resolver::clean_cached_data();
+	}
 	return array(
 		'theme'   => wp_get_theme()->get( 'Name' ),
-		'changed' => array( 'css' ),
+		'changed' => $did,
 		'undo'    => array(
-			'kind'   => 'custom_css',
+			'kind'   => 'global',
+			'post'   => (int) $post->ID,
 			'before' => $before,
-			'after'  => md5( (string) wp_get_custom_css() ),
+			'after'  => md5( (string) get_post( $post->ID )->post_content ),
 		),
 	);
 }
@@ -476,27 +434,20 @@ function undo( array $undo ) {
 	if ( ! current_user_can( 'edit_theme_options' ) ) {
 		return new \WP_Error( 'flurfunk_forbidden', __( 'You cannot do this.', 'flurfunk' ), array( 'status' => 403 ) );
 	}
-	if ( 'global' === ( $undo['kind'] ?? '' ) ) {
-		$post = get_post( (int) $undo['post'] );
-		if ( ! $post || md5( (string) $post->post_content ) !== (string) $undo['after'] ) {
-			return new \WP_Error( 'flurfunk_styles', __( 'The look was changed again since; nothing was undone.', 'flurfunk' ), array( 'status' => 409 ) );
-		}
-		wp_update_post(
-			array(
-				'ID'           => $post->ID,
-				'post_content' => wp_slash( (string) $undo['before'] ),
-			)
-		);
-		if ( class_exists( 'WP_Theme_JSON_Resolver' ) ) {
-			\WP_Theme_JSON_Resolver::clean_cached_data();
-		}
-		return true;
-	}
-	if ( md5( (string) wp_get_custom_css() ) !== (string) ( $undo['after'] ?? '' ) ) {
+	$post = 'global' === ( $undo['kind'] ?? '' ) ? get_post( (int) $undo['post'] ) : null;
+	if ( ! $post || md5( (string) $post->post_content ) !== (string) $undo['after'] ) {
 		return new \WP_Error( 'flurfunk_styles', __( 'The look was changed again since; nothing was undone.', 'flurfunk' ), array( 'status' => 409 ) );
 	}
-	$res = wp_update_custom_css_post( (string) $undo['before'] );
-	return is_wp_error( $res ) ? $res : true;
+	wp_update_post(
+		array(
+			'ID'           => $post->ID,
+			'post_content' => wp_slash( (string) $undo['before'] ),
+		)
+	);
+	if ( class_exists( 'WP_Theme_JSON_Resolver' ) ) {
+		\WP_Theme_JSON_Resolver::clean_cached_data();
+	}
+	return true;
 }
 
 /**
@@ -551,21 +502,11 @@ function register(): void {
 		NAME,
 		array(
 			'label'               => __( 'Change the site\'s look', 'flurfunk' ),
-			'description'         => __( 'Changes the active theme\'s look for the whole site: additional CSS (added, or replacing all of it), for block themes also the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). Can be undone.', 'flurfunk' ),
+			'description'         => __( 'Changes the look of a block theme for the whole site: the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). No CSS of its own. Can be undone.', 'flurfunk' ),
 			'category'            => 'flurfunk',
 			'input_schema'        => array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'css'        => array(
-						'type'      => 'string',
-						'maxLength' => 20000,
-						'title'     => __( 'CSS', 'flurfunk' ),
-					),
-					'css_mode'   => array(
-						'type'    => 'string',
-						'enum'    => array( 'append', 'replace' ),
-						'default' => 'append',
-					),
 					'background' => $color + array( 'title' => __( 'Background', 'flurfunk' ) ),
 					'text'       => $color + array( 'title' => __( 'Text color', 'flurfunk' ) ),
 					'link'       => $color + array( 'title' => __( 'Link color', 'flurfunk' ) ),

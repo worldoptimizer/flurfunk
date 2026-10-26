@@ -323,10 +323,6 @@ function build_snapshot( array $p ): array {
 		$extra = trim( (string) ( $in['text'] ?? '' ) );
 	} elseif ( \Flurfunk\Styles\NAME === $p['ability'] ) {
 		$what = array();
-		if ( isset( $in['css'] ) ) {
-			/* translators: %d: number of lines */
-			$what[] = sprintf( 'replace' === ( $in['css_mode'] ?? '' ) ? __( 'replace the additional CSS (%d lines)', 'flurfunk' ) : __( 'add %d lines of CSS', 'flurfunk' ), count( array_filter( explode( "\n", trim( (string) $in['css'] ) ) ) ) );
-		}
 		if ( isset( $in['background'] ) ) {
 			/* translators: %s: color */
 			$what[] = sprintf( __( 'background %s', 'flurfunk' ), (string) $in['background'] );
@@ -348,7 +344,7 @@ function build_snapshot( array $p ): array {
 		$line  = __( 'Change the site\'s look', 'flurfunk' );
 		$sub   = implode( ' – ', array_filter( array( trim( (string) ( $in['why'] ?? '' ) ), implode( '; ', $what ) ) ) );
 		$run   = __( 'Apply', 'flurfunk' );
-		$extra = isset( $in['css'] ) ? (string) $in['css'] : '';
+		$extra = '';
 
 		$fields = array(); // The card says it in words; no raw fields.
 
@@ -548,30 +544,25 @@ function run_proposal( array $ref, array $card, int $user_id, array $choice = ar
 			return new \WP_Error( 'flurfunk_change_empty', __( 'Tick at least one post.', 'flurfunk' ), array( 'status' => 400 ) );
 		}
 	}
-	$me = get_current_user_id();
-	wp_set_current_user( $user_id );
-	try {
-		// With the clicker's rights, within the limit of the assistant that proposed it (for the
-		// site's look: the clicker's administrator rights count).
-		$admin  = runs_as_admin( (string) $p['ability'] );
-		$result = with_limit(
+	// With the clicker's rights (Access\act_as()), within the limit of the assistant that proposed it
+	// (for the site's look: the clicker's administrator rights count).
+	$admin  = runs_as_admin( (string) $p['ability'] );
+	$result = Access\act_as(
+		$user_id,
+		static fn () => with_limit(
 			(int) $p['agent'],
 			$user_id,
 			static function () use ( $ability, $input, $admin ) {
 				admin_read( $admin );
-				admin_css( \Flurfunk\Styles\NAME === $ability->get_name() );
 				try {
 					return $ability->execute( $input );
 				} finally {
 					admin_read( false );
-					admin_css( false );
 				}
 			},
 			proposal_channel( $p )
-		);
-	} finally {
-		wp_set_current_user( $me );
-	}
+		)
+	);
 	if ( is_wp_error( $result ) ) {
 		return $result;
 	}
@@ -603,34 +594,35 @@ function undo_proposal( array $ref, array $card, int $user_id ) {
 	if ( ! $p || 'done' !== $p['state'] || ! ( \Flurfunk\Changes\NAME === $p['ability'] || looks( (string) $p['ability'] ) ) || ! undoable( $p ) ) {
 		return new \WP_Error( 'flurfunk_action_gone', __( 'This is no longer possible. The card shows the current state.', 'flurfunk' ), array( 'status' => 409 ) );
 	}
-	$me = get_current_user_id();
-	wp_set_current_user( $user_id );
-	try {
-		if ( looks( (string) $p['ability'] ) ) {
-			$done = with_limit(
-				(int) $p['agent'],
-				$user_id,
-				static function () use ( $p ) {
-					admin_read( runs_as_admin( (string) $p['ability'] ) );
-					admin_css( \Flurfunk\Styles\NAME === $p['ability'] );
-					try {
-						return call_user_func( undoable_cards()[ $p['ability'] ][1], (array) ( $p['outcome']['undo'] ?? array() ) );
-					} finally {
-						admin_read( false );
-						admin_css( false );
-					}
-				},
-				proposal_channel( $p )
-			);
-			if ( is_wp_error( $done ) ) {
-				return $done;
+	$result = Access\act_as(
+		$user_id,
+		static function () use ( $p, $user_id ) {
+			if ( looks( (string) $p['ability'] ) ) {
+				$done = with_limit(
+					(int) $p['agent'],
+					$user_id,
+					static function () use ( $p ) {
+						admin_read( runs_as_admin( (string) $p['ability'] ) );
+						try {
+							return call_user_func( undoable_cards()[ $p['ability'] ][1], (array) ( $p['outcome']['undo'] ?? array() ) );
+						} finally {
+							admin_read( false );
+						}
+					},
+					proposal_channel( $p )
+				);
+				if ( is_wp_error( $done ) ) {
+					return $done;
+				}
+				$result = array( 'posts' => array() );
+			} else {
+				$result = with_limit( (int) $p['agent'], $user_id, static fn () => \Flurfunk\Changes\undo( (array) $p['outcome'] ), proposal_channel( $p ) );
 			}
-			$result = array( 'posts' => array() );
-		} else {
-			$result = with_limit( (int) $p['agent'], $user_id, static fn () => \Flurfunk\Changes\undo( (array) $p['outcome'] ), proposal_channel( $p ) );
+			return $result;
 		}
-	} finally {
-		wp_set_current_user( $me );
+	);
+	if ( is_wp_error( $result ) ) {
+		return $result;
 	}
 	update_proposal(
 		$id,

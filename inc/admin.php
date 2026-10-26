@@ -161,9 +161,9 @@ function column( string $col, int $post_id ): void {
 		$stats = array();
 		$ids   = array_map( 'intval', wp_list_pluck( (array) ( $wp_query->posts ?? array() ), 'ID' ) );
 		if ( $ids ) {
-			$where = Access\where( get_current_user_id() );
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- $where is made of $wpdb->prepare() pieces (Access\where()); our own table, once per list screen.
-			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_id, COUNT(*) n, SUM(t.status IN ( 'open', 'doing', 'waiting' )) open FROM %i t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ") AND {$where} GROUP BY t.target_id", array_merge( array( \Flurfunk\Schema\table( 'threads' ) ), $ids ) ) );
+			list( $channels, $threads ) = Access\visible( get_current_user_id() );
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- the IN lists are placeholders; our own table, once per list screen.
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT t.target_id, COUNT(*) n, SUM(t.status IN ( 'open', 'doing', 'waiting' )) open FROM %i t WHERE t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $ids ), '%d' ) ) . ') AND t.private_to = 0 AND ( t.channel_id IN (' . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') ) GROUP BY t.target_id', array_merge( array( \Flurfunk\Schema\table( 'threads' ) ), $ids, $channels, $threads ) ) );
 			foreach ( $rows as $r ) {
 				$stats[ (int) $r->target_id ] = $r;
 			}

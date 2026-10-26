@@ -270,6 +270,9 @@ function render(): void {
 		<?php if ( isset( $_GET['flurfunk-saved'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- own parameter: WordPress shows its own notice for "updated". ?>
 			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'flurfunk' ); ?></p></div>
 		<?php endif; ?>
+		<?php if ( get_option( 'flurfunk_needs_assistant' ) && ! get_userdata( (int) get_option( 'flurfunk_bot_default' ) ) ) : ?>
+			<div class="notice notice-warning"><p><?php esc_html_e( 'A module or the site\'s own code wanted to post as the assistant, but there is no assistant account yet. Create one under Assistants below.', 'flurfunk' ); ?></p></div>
+		<?php endif; ?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="flurfunk_settings">
 			<?php wp_nonce_field( 'flurfunk_settings' ); ?>
@@ -336,7 +339,7 @@ function render(): void {
 				<tbody>
 				<?php foreach ( get_users( array( 'meta_key' => 'flurfunk_bot' ) ) as $bot ) : // phpcs:ignore WordPress.DB.SlowDBQuery ?>
 					<tr>
-						<td><strong><?php echo esc_html( $bot->display_name ); ?></strong><br><code><?php echo esc_html( $bot->user_login ); ?></code> · ID <?php echo (int) $bot->ID; ?><?php echo (int) get_option( 'flurfunk_bot_default' ) === $bot->ID ? ' · ' . esc_html__( 'default for wp flurfunk post', 'flurfunk' ) : ''; ?></td>
+						<td><strong><?php echo esc_html( $bot->display_name ); ?></strong><br><code><?php echo esc_html( $bot->user_login ); ?></code> · ID <?php echo (int) $bot->ID; ?><?php echo (int) get_option( 'flurfunk_bot_default' ) === $bot->ID ? ' · ' . esc_html__( 'default assistant (modules, wp flurfunk post)', 'flurfunk' ) : ''; ?></td>
 						<td><?php if ( current_user_can( 'edit_user', $bot->ID ) ) : ?><a href="<?php echo esc_url( get_edit_user_link( $bot->ID ) . '#application-passwords-section' ); ?>"><?php esc_html_e( 'Application passwords', 'flurfunk' ); ?></a><?php endif; ?></td>
 					</tr>
 				<?php endforeach; ?>

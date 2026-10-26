@@ -534,7 +534,7 @@ group, module`). Check a declared capability like any other with `user_can()`.
 | `flurfunk_post( array $args )` | 0.2.0 | int thread ID or `WP_Error` | Start a thread from PHP. See [Posting from PHP](#posting-from-php). |
 | `flurfunk_reply( int\|string $thread, string $body, array $args = [] )` | 0.2.0 | int message ID or `WP_Error` | Reply to a thread (ID or `ref_key`). `$args`: `files`, `attachments`, `author`. |
 | `flurfunk_set_status( int\|string $thread, string $status, int $author = 0 )` | 0.2.0 | true or `WP_Error` | Set a thread's task state: `open`, `doing`, `waiting`, `done`, or `''` (no task). |
-| `flurfunk_as( int $user_id, callable $fn )` | 0.2.0 | what `$fn` returns | Run code as another person, then switch back. `0` = the default assistant (created if needed). As an assistant it passes channel capabilities. |
+| `flurfunk_as( int $user_id, callable $fn )` | 0.2.0 | what `$fn` returns | Run code as another person, then switch back. `0` = the default assistant; without one a `WP_Error` (`flurfunk_no_assistant`) comes back – Flurfunk never creates an account by itself. As an assistant it passes channel capabilities. |
 | `flurfunk_unread_count( int $user_id = 0 )` | 0.1.0 | int | Unread messages of a person (0 = current), for badges elsewhere. 0 for people without access. |
 | `flurfunk_url( string $view = '' )` | 0.1.0 | string | URL of the app in wp-admin, optionally opening a view. |
 | `flurfunk_app_url( string $view = '' )` | 0.1.0 | string | URL of the full-screen app outside wp-admin, same views. |
@@ -1022,7 +1022,7 @@ stored as code points without variation selectors, so 👍 and 👍️ are one r
 `POST threads` with `{ private_with: <assistant ID>, body }` starts a private conversation
 (`Flurfunk\Store\start_private()`). Private threads (`private: true`, target `assistant:<ID>`) live
 in a container channel that never opens as a channel; only their person and the assistant can see
-them, and lists, numbers and searches leave them out (`Access\where()` adds `t.private_to = 0`).
+them, and lists, numbers and searches leave them out (they ask for `t.private_to = 0`, see `Access\visible()`).
 `GET threads?private_with=<ID>` lists one's own; `counts.private` has their unread replies per
 assistant. Export and import keep them private.
 
@@ -1045,7 +1045,7 @@ current user with Flurfunk's own checks, so an agent only reaches what its accou
 | `flurfunk/follow-up` | no | An assistant at work (or an assistant account) sets itself a check-in in a conversation: `thread`, `when` (`YYYY-MM-DD HH:MM`, site time), `note`; or `cancel`. When due (cron hook `flurfunk_ai_check_in`), the assistant follows up in the thread; "@Name" in its text becomes a mention. Pending ones are in the option `flurfunk_ai_followups`. |
 | `flurfunk/routine` | no | An assistant at work (or an assistant account) manages the routines of a conversation's channel: `thread`, `action` (`add`, `list`, `pause`, `resume`, `remove`); for `add` a `name`, the `task`, `days` (`mon` … `sun`), `time` (`HH:MM`, site time) and `post` (`thread` or `channel`); `id` for the others. The person must be team and see the conversation. When due (cron hook `flurfunk_ai_routine`), the assistant does the task with that person's rights and posts the result, or nothing for an answer of `-`. Routines live in the option `flurfunk_ai_routines`, at most ten per channel. |
 | `flurfunk/get-styles` | yes | The active theme, whether it is a block theme, its base colors, palette, fonts and additional CSS. Needs `edit_theme_options`. |
-| `flurfunk/update-styles` | no | Changes the look: `css` (with `css_mode` `append` or `replace`), for block themes `background`, `text`, `link`, `palette` entries, `styles` (as theme.json `styles`: `typography`, `spacing`, `color`, `border` for the site, `elements` and `blocks`; only known properties with plain values – no URLs, nothing that ends a declaration) and `layout` (`contentSize`, `wideSize`); `why` for the card. Block themes: the site's global styles; classic themes: Additional CSS. Returns what undo needs. As a card of an assistant it runs with the clicker's administrator rights (filter `flurfunk_ai_admin_cards`) and can be undone. Needs `edit_theme_options`. |
+| `flurfunk/update-styles` | no | Changes the look of a block theme (the site's global styles): `background`, `text`, `link`, `palette` entries, `styles` (as theme.json `styles`: `typography`, `spacing`, `color`, `border` for the site, `elements` and `blocks`; only known properties with plain values – no URLs, nothing that ends a declaration) and `layout` (`contentSize`, `wideSize`); `why` for the card. No CSS of its own; classic themes are changed in the Customizer. Returns what undo needs. As a card of an assistant it runs with the clicker's administrator rights (filter `flurfunk_ai_admin_cards`) and can be undone. Needs `edit_theme_options`. |
 | `flurfunk/get-templates` | yes | Block themes: without `id` the templates and parts (ID, type, title, area, source) and the navigation menus (`wp_navigation`; the newest is the one a navigation block without `ref` shows), with `id` (and `type` `wp_template_part`, `wp_template` or `wp_navigation`) the block markup. Needs `edit_theme_options`. |
 | `flurfunk/update-template` | no | Block themes: an exact replacement in a template's, part's or menu's markup (`find`, `replace`) or new markup (`content`); `why` for the card. Saved through the REST API as the site's own copy; returns what undo needs (a theme original is reset). Inserted markup is filtered with `wp_kses_post()`. As a card of an assistant it runs with the clicker's administrator rights. |
 | `flurfunk/add-template` | no | Block themes: a new template (`type` `wp_template`, e.g. a page template) or template part (`wp_template_part`, with `area`): `slug`, `title`, `description`, `content` (filtered); `assign` gives a page template to pages. Saved through the REST API as the site's own; undo removes it and gives the pages their template back. As a card it runs with the clicker's administrator rights. |
@@ -1347,16 +1347,10 @@ wp flurfunk bot-create [--name=<name>] [--login=<login>] [--default]
 | --- | --- | --- |
 | `--name` | `Assistant` (translated) | Display name |
 | `--login` | `flurfunk-assistent` | Login name. An existing user with that login is marked as assistant. |
-| `--default` | | Use it for `wp flurfunk post` when no `--as` is given |
+| `--default` | | Make it the default assistant: modules and `wp flurfunk post` (without `--as` or `--user`) post as it |
 
-### `wp flurfunk bot-password`
-
-```
-wp flurfunk bot-password <user> [--name=<name>]
-```
-
-Creates an application password for an assistant (user ID) and prints login, password and API
-URL. The password is shown once. `--name` labels it (default `Agent`).
+An application password for the assistant comes from WP-CLI itself:
+`wp user application-password create <id> "GitHub Actions" --porcelain` (shown once).
 
 ### `wp flurfunk post`
 
@@ -1376,7 +1370,7 @@ wp flurfunk post [--channel=<slug>] [--thread=<id>] [--ref=<key>] [--title=<titl
 | `--target` | Attach a new thread, e.g. `post:12` |
 | `--file` | Files to attach, comma-separated paths. They become Flurfunk files. For a new thread they are added as a first reply. |
 | `--card` | One card, `provider:json`, e.g. `'flurfunk/post:{"id":12}'` |
-| `--as` | Author (user ID). Default: the default assistant. |
+| `--as` | Author (user ID). Default: the user WP-CLI runs as (`--user`), else the default assistant. |
 
 The command runs with the permissions of the author: the channel level, the target and the rate
 limit apply. Uploaded files are removed again if posting fails.
@@ -1394,7 +1388,7 @@ wp flurfunk post --thread=12 --body="<@7> please have a look" --card='flurfunk/p
 
    ```bash
    wp flurfunk bot-create --name="CI" --login=ci-bot
-   wp flurfunk bot-password <id> --name="GitHub Actions"
+   wp user application-password create <id> "GitHub Actions" --porcelain
    ```
 
 2. Call the REST API with HTTP Basic auth: the assistant's login and the application password.

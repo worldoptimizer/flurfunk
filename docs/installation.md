@@ -240,8 +240,10 @@ WP-CLI:
 wp flurfunk bot-create --name="Build bot" --login=build-bot --default
 ```
 
-`--default` makes it the author for `wp flurfunk post` when no `--as` is given. The first
-assistant ever created becomes the default automatically. Without options the account is called
+`--default` makes it the default assistant: modules and `wp flurfunk post` (without `--as`) post
+as it. The first assistant ever created becomes the default automatically. Flurfunk never creates
+an assistant by itself: until there is one, modules that post as the assistant wait, and the
+settings page says so. Without options the account is called
 "Assistant" (in the site's language) with the login `flurfunk-assistent`. Running the command again for an existing login
 only marks that user as an assistant.
 
@@ -251,10 +253,11 @@ Agents and scripts outside the server authenticate with an
 [application password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/):
 
 ```bash
-wp flurfunk bot-password 42 --name="GitHub Actions"
+wp user application-password create 42 "GitHub Actions" --porcelain
 ```
 
-This prints the login, the password (shown once) and the API address. You can also create the
+This prints the password (shown once); the login is the assistant's, the API address
+`/wp-json/flurfunk/v1/`. You can also create the
 password on the assistant's profile page (*Users → Edit → Application Passwords*); the settings
 page links there. WordPress only offers application passwords on HTTPS sites (or when the
 environment type is `local`).
@@ -357,9 +360,10 @@ but each one is sent to the AI provider for the check (a few hundred tokens), so
 questions are expected, e.g. in a proofreading or help channel.
 
 **Pages and design** (pack, off by default, for administrators): an assistant writes page drafts –
-with layouts of core blocks if asked – and proposes changes to the look (additional CSS; for block
-themes base colors, palette, fonts, font sizes, spacing, borders and content widths – for the whole
-site, for headings, buttons and the like, or for single blocks) as a card. The card runs with the rights of the administrator who
+with layouts of core blocks if asked – and proposes changes to the look of a block theme (base colors,
+palette, fonts, font sizes, spacing, borders and content widths – for the whole site, for headings,
+buttons and the like, or for single blocks) as a card. It writes no CSS of its own: where something
+needs CSS, it says where a person adds it (Site Editor or Customizer). The card runs with the rights of the administrator who
 clicks it, and "Undo" puts the look back as long as nobody changed it again since. For block themes the same
 goes for templates and parts like header and footer and for the navigation menus (saved as the site's
 own copy, as in the Site Editor; undo resets to the theme's own), for new templates and template

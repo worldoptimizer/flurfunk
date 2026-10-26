@@ -284,6 +284,9 @@ msgstr "Ein Kommentar, mit Knöpfen zum Moderieren"
 msgid "A content and SEO check of the published posts and pages: missing excerpts or meta descriptions (SEO plugins count), titles too long or short, no featured image, images without alt text, under 300 words, duplicate titles, no internal links, not updated for two years – with counts and examples."
 msgstr "Ein Inhalts- und SEO-Check der veröffentlichten Beiträge und Seiten: fehlende Auszüge oder Meta-Beschreibungen (SEO-Plugins zählen mit), zu lange oder kurze Titel, kein Beitragsbild, Bilder ohne Alt-Text, unter 300 Wörter, doppelte Titel, keine internen Links, seit zwei Jahren nicht aktualisiert – mit Anzahl und Beispielen."
 
+msgid "A module or the site's own code wanted to post as the assistant, but there is no assistant account yet. Create one under Assistants below."
+msgstr "Ein Modul oder der eigene Code der Website wollte als Assistent schreiben, aber es gibt noch kein Assistent-Konto. Leg unten unter Assistenten eins an."
+
 msgid "A new pattern needs a title and its block markup."
 msgstr "Ein neues Muster braucht einen Titel und sein Block-Markup."
 
@@ -628,8 +631,8 @@ msgstr "Ändert eine Vorlage, einen Vorlagenteil oder ein Navigationsmenü des a
 msgid "Changes existing posts and pages, several at once: corrections in the text (exact replacements, only in text), the layout (exact replacements in the block markup, blocks, or new blocks at the end, append), title, excerpt, categories, tags, featured image. A post changed since unchanged_since is skipped, as is one whose markup saving would lose."
 msgstr "Ändert bestehende Beiträge und Seiten, mehrere auf einmal: Korrekturen im Text (genaue Ersetzungen, nur im Text), das Layout (genaue Ersetzungen im Block-Markup, blocks, oder neue Blöcke am Ende, append), Titel, Auszug, Kategorien, Schlagwörter, Beitragsbild. Ein seit unchanged_since geänderter Beitrag wird übersprungen, ebenso einer, dessen Markup beim Speichern verloren ginge."
 
-msgid "Changes the active theme's look for the whole site: additional CSS (added, or replacing all of it), for block themes also the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). Can be undone."
-msgstr "Ändert das Aussehen des aktiven Themes für die ganze Website: zusätzliches CSS (ergänzt oder alles ersetzt), bei Block-Themes auch Hintergrund-, Text- und Linkfarbe, Farben der Palette, Schriften, Schriftgrößen, Abstände und Rahmen (styles, wie in der theme.json – für die Website, Elemente wie Überschriften und Buttons oder Blöcke) und die Inhaltsbreiten (layout). Lässt sich rückgängig machen."
+msgid "Changes the look of a block theme for the whole site: the background, text and link colors, colors of the palette, fonts, font sizes, spacing and borders (styles, as in theme.json – for the site, elements like headings and buttons, or blocks) and the content widths (layout). No CSS of its own. Can be undone."
+msgstr "Ändert das Aussehen eines Block-Themes für die ganze Website: Hintergrund-, Text- und Linkfarbe, Farben der Palette, Schriften, Schriftgrößen, Abstände und Rahmen (styles, wie in der theme.json – für die Website, Elemente wie Überschriften und Buttons oder Blöcke) und die Inhaltsbreiten (layout). Kein eigenes CSS. Lässt sich rückgängig machen."
 
 msgid "Changes to posts"
 msgstr "Änderungen an Beiträgen"
@@ -1419,6 +1422,9 @@ msgstr "Hier ist noch nichts. Fang unten einen Thread an."
 
 msgid "Nothing to change."
 msgstr "Nichts zu ändern."
+
+msgid "Nothing to change: colors, the palette, styles or the content width."
+msgstr "Nichts zu ändern: Farben, Palette, Stile oder Inhaltsbreite."
 
 msgid "Nothing would change in post %d."
 msgstr "In Beitrag %d würde sich nichts ändern."
@@ -2230,6 +2236,9 @@ msgstr "Hier gibt es schon genug Routinen. Entferne zuerst eine."
 msgid "There are already many different reactions here."
 msgstr "Hier gibt es schon sehr viele verschiedene Reaktionen."
 
+msgid "There is no assistant account yet. An administrator creates one under Settings → Flurfunk → Assistants."
+msgstr "Es gibt noch kein Assistent-Konto. Ein Administrator legt eins unter Einstellungen → Flurfunk → Assistenten an."
+
 msgid "There is no block \"%s\" (e.g. core/button)."
 msgstr "Einen Block „%s“ gibt es nicht (z. B. core/button)."
 
@@ -2254,9 +2263,6 @@ msgid "These updates have been waiting for %s day."
 msgid_plural "These updates have been waiting for %s days."
 msgstr[0] "Diese Updates warten seit %s Tag."
 msgstr[1] "Diese Updates warten seit %s Tagen."
-
-msgid "This CSS cannot be saved: no markup, no @import and no scripts."
-msgstr "Dieses CSS kann nicht gespeichert werden: kein Markup, kein @import und keine Skripte."
 
 msgid "This action is no longer available on the site."
 msgstr "Diese Aktion gibt es auf der Website nicht mehr."
@@ -2324,11 +2330,11 @@ msgstr "Diese Website hat keinen KI-Client (nötig ist WordPress 7.0 oder neuer)
 msgid "This template does not exist."
 msgstr "Diese Vorlage gibt es nicht."
 
+msgid "This theme is not a block theme: its look is changed in the Customizer."
+msgstr "Dieses Theme ist kein Block-Theme: Sein Aussehen änderst du im Customizer."
+
 msgid "This theme is not a block theme: its templates are files, which cannot be changed here."
 msgstr "Dieses Theme ist kein Block-Theme: Seine Vorlagen sind Dateien, die sich hier nicht ändern lassen."
-
-msgid "This theme is not a block theme: only additional CSS can be changed here."
-msgstr "Dieses Theme ist kein Block-Theme: Hier lässt sich nur zusätzliches CSS ändern."
 
 msgid "Thread"
 msgstr "Thread"
@@ -2599,9 +2605,6 @@ msgstr "ein Beitrag"
 msgid "about %s answers"
 msgstr "etwa %s Antworten"
 
-msgid "add %d lines of CSS"
-msgstr "%d Zeilen CSS ergänzen"
-
 msgid "answers every new thread here and your follow-ups"
 msgstr "antwortet hier auf jeden neuen Thread und auf deine Nachfragen"
 
@@ -2635,8 +2638,8 @@ msgstr "täglich"
 msgid "date: newest by publication date; modified: last edited first."
 msgstr "date: neueste nach Veröffentlichungsdatum; modified: zuletzt bearbeitete zuerst."
 
-msgid "default for wp flurfunk post"
-msgstr "Standard für wp flurfunk post"
+msgid "default assistant (modules, wp flurfunk post)"
+msgstr "Standard-Assistent (Module, wp flurfunk post)"
 
 msgid "deleted"
 msgstr "gelöscht"
@@ -2784,9 +2787,6 @@ msgstr "liest den Thread"
 
 msgid "reads the thread and finds and reads posts"
 msgstr "liest den Thread und findet und liest Beiträge"
-
-msgid "replace the additional CSS (%d lines)"
-msgstr "das zusätzliche CSS ersetzen (%d Zeilen)"
 
 msgid "rounded corners"
 msgstr "abgerundete Ecken"

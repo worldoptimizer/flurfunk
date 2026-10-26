@@ -93,7 +93,7 @@ app's scope, so phones show them with a small browser bar on top of the app.
 
 ```bash
 wp flurfunk bot-create --name="Assistant" --default   # account without editing rights
-wp flurfunk bot-password <id>                          # application password for the REST API
+wp user application-password create <id> Agent --porcelain   # application password for the REST API
 wp flurfunk post --channel=general --title="Report" --body="…" --file=report.csv
 wp flurfunk post --ref=checklist:billing --card='flurfunk/post:{"id":12}'
 ```

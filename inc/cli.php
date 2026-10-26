@@ -49,7 +49,8 @@ class Command {
 	}
 
 	/**
-	 * Import an export. Threads imported before are skipped.
+	 * Import an export. Threads imported before are skipped. Run it as an administrator (WP-CLI's
+	 * --user), in whose name the files are stored.
 	 *
 	 * ## OPTIONS
 	 *
@@ -63,8 +64,7 @@ class Command {
 		$path = (string) $args[0];
 		$temp = '';
 		if ( ! get_current_user_id() ) {
-			$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
-			wp_set_current_user( (int) ( $admins[0] ?? 0 ) ); // Files are stored in someone's name.
+			WP_CLI::error( 'Files are stored in someone\'s name: run it as an administrator, e.g. with --user=admin.' );
 		}
 		if ( is_dir( $path ) ) {
 			$dir  = rtrim( $path, '/' );
@@ -199,7 +199,7 @@ class Command {
 	 * : Login name. Default: flurfunk-assistent.
 	 *
 	 * [--default]
-	 * : Use it for `wp flurfunk post` when no --as is given.
+	 * : Make it the default assistant: modules and `wp flurfunk post` (without --as or --user) post as it.
 	 *
 	 * @subcommand bot-create
 	 * @param array $args       Arguments.
@@ -213,36 +213,7 @@ class Command {
 		if ( ! empty( $assoc_args['default'] ) ) {
 			update_option( 'flurfunk_bot_default', (int) $id, false );
 		}
-		WP_CLI::success( sprintf( 'Assistant %s (%d).', get_userdata( $id )->display_name, $id ) );
-	}
-
-	/**
-	 * Create an application password for an assistant (shown once). Agents use it with the REST API.
-	 *
-	 * ## OPTIONS
-	 *
-	 * <user>
-	 * : User ID of the assistant.
-	 *
-	 * [--name=<name>]
-	 * : Label of the password. Default: Agent.
-	 *
-	 * @subcommand bot-password
-	 * @param array $args       Arguments.
-	 * @param array $assoc_args Options.
-	 */
-	public function bot_password( array $args, array $assoc_args ): void {
-		$id = (int) $args[0];
-		if ( ! \Flurfunk\Access\is_bot( $id ) ) {
-			WP_CLI::error( 'Not an assistant account.' );
-		}
-		$r = \WP_Application_Passwords::create_new_application_password( $id, array( 'name' => $assoc_args['name'] ?? 'Agent' ) );
-		if ( is_wp_error( $r ) ) {
-			WP_CLI::error( $r );
-		}
-		WP_CLI::log( 'User:     ' . get_userdata( $id )->user_login );
-		WP_CLI::log( 'Password: ' . \WP_Application_Passwords::chunk_password( $r[0] ) );
-		WP_CLI::log( 'API:      ' . rest_url( 'flurfunk/v1/' ) );
+		WP_CLI::success( sprintf( 'Assistant %s (%d). An application password for agents: wp user application-password create %d Agent --porcelain', get_userdata( $id )->display_name, $id, $id ) );
 	}
 
 	/**
@@ -276,17 +247,28 @@ class Command {
 	 * : A card, e.g. 'flurfunk/post:{"id":12}'.
 	 *
 	 * [--as=<user>]
-	 * : Author. Default: the default assistant.
+	 * : Author (user ID). Default: the user WP-CLI runs as (--user), else the default assistant.
 	 *
 	 * @param array $args       Arguments.
 	 * @param array $assoc_args Options.
 	 */
 	public function post( array $args, array $assoc_args ): void {
-		$as = (int) ( $assoc_args['as'] ?? get_option( 'flurfunk_bot_default' ) );
-		if ( ! $as || ! get_userdata( $as ) ) {
-			WP_CLI::error( 'No author: pass --as or create one with `wp flurfunk bot-create`.' );
+		$as = (int) ( $assoc_args['as'] ?? get_current_user_id() );
+		if ( $as && ! get_userdata( $as ) ) {
+			WP_CLI::error( "There is no user $as." );
 		}
-		wp_set_current_user( $as );
+		$done = flurfunk_as( $as, fn () => $this->write( $assoc_args ) );
+		if ( is_wp_error( $done ) ) {
+			WP_CLI::error( $done->get_error_message() . ' On the command line: wp flurfunk bot-create --default' );
+		}
+	}
+
+	/**
+	 * Write the thread or reply of post() as the current person.
+	 *
+	 * @param array $assoc_args Options of post().
+	 */
+	private function write( array $assoc_args ): bool {
 		$body = (string) ( $assoc_args['body'] ?? '' );
 		if ( '-' === $body ) {
 			$body = (string) stream_get_contents( STDIN );
@@ -345,6 +327,7 @@ class Command {
 			WP_CLI::error( $r );
 		}
 		WP_CLI::success( $thread ? "Reply $r in thread $thread." : "Thread $r." );
+		return true;
 	}
 }
 

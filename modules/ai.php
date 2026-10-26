@@ -1785,69 +1785,73 @@ function answer_with_tools( array $context, int $agent, array $tools, array $mod
 		}
 		$history[] = $message;
 		set_busy( (int) $context['thread'], $agent, true, 'look' );
-		// The tools run as the person who asked, so they only find what that person may see – and
-		// in Flurfunk only in channels this assistant takes part in (a channel without AI stays out).
-		$me    = get_current_user_id();
+		// The tools run as the person who asked (Access\act_as()), so they only find what that person
+		// may see – and in Flurfunk only in channels this assistant takes part in (a channel without AI
+		// stays out).
 		$where = lookup_channels( $agent, (int) $context['thread'] );
 		$scope = static fn ( $ok, $slug ) => $ok && in_array( (string) $slug, $where, true );
 		add_filter( 'flurfunk_ability_channel', $scope, 10, 2 );
-		wp_set_current_user( (int) $context['asker'] );
 		working( $agent );
 		try {
-			$parts = array();
-			foreach ( $calls as $call ) {
-				$ability = \WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name( (string) $call->getName() );
-				$used[]  = $ability;
-				if ( in_array( $ability, $names, true ) ) {
-					// Never run: a card for a person to confirm – and only if the person asking (within
-					// this assistant's limit) may do it at all, so it never proposes what nobody here may run.
-					$allowed = may_propose( $ability, (array) $call->getArgs() );
-					if ( true === $allowed ) {
-						$ideas[] = add_proposal( $ability, (array) $call->getArgs(), $agent, (int) $context['thread'] );
-						$a_obj   = wp_get_ability( $ability );
-						/* translators: %s: what is proposed */
-						busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => sprintf( __( 'Prepared a suggestion: %s', 'flurfunk' ), \Flurfunk\Changes\NAME === $ability ? __( 'Change posts', 'flurfunk' ) : ( $a_obj ? $a_obj->get_label() : $ability ) ) ) );
-						$reply   = array( 'status' => 'proposed', 'note' => 'Not done yet: it appears as a card under your answer, and a person decides whether to run it.' );
-					} else {
-						$reply = array( 'status' => 'not_allowed', 'note' => sprintf( 'Not proposed: the person asking may not do this, or your limit (%s) does not allow it. Say so plainly, without a card; an administrator can change your limit under Settings → Flurfunk → AI assistants.', limit_label( $agent, (string) ( $context['channel'] ?? '' ) ) ) );
-					}
-					$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( new \WordPress\AiClient\Tools\DTO\FunctionResponse( $call->getId(), $call->getName(), $reply ) );
-				} else {
-					$arg = (int) ( ( (array) $call->getArgs() )['id'] ?? 0 );
-					if ( 'flurfunk/get-thread' === $ability && $arg ) {
-						$looked[] = $arg;
-					} elseif ( 'flurfunk/get-post' === $ability && $arg ) {
-						$posts[] = $arg;
-					} elseif ( ! in_array( $ability, DRAFT_TOOLS, true ) ) {
-						$ran[] = $ability;
-					}
-					admin_read( reads_as_admin( $ability ) ); // WordPress's own read-only abilities: with the asker's rights.
-					try {
-						$response = $resolver->execute_ability( $call );
-					} finally {
-						admin_read( false );
-					}
-					$done     = (array) $response->getResponse();
-					busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => step_label( $ability, (array) $call->getArgs(), $done ) ) );
-					if ( 'flurfunk/list-comments' === $ability ) {
-						foreach ( $done as $c ) {
-							if ( is_array( $c ) && 'hold' === ( $c['status'] ?? '' ) ) {
-								$notes[] = (int) $c['id'];
+			$parts = \Flurfunk\Access\act_as(
+				(int) $context['asker'],
+				function () use ( $calls, $names, $agent, $context, $resolver, &$used, &$ideas, &$looked, &$posts, &$ran, &$notes, &$drafts ) {
+					$parts = array();
+					foreach ( $calls as $call ) {
+						$ability = \WP_AI_Client_Ability_Function_Resolver::function_name_to_ability_name( (string) $call->getName() );
+						$used[]  = $ability;
+						if ( in_array( $ability, $names, true ) ) {
+							// Never run: a card for a person to confirm – and only if the person asking (within
+							// this assistant's limit) may do it at all, so it never proposes what nobody here may run.
+							$allowed = may_propose( $ability, (array) $call->getArgs() );
+							if ( true === $allowed ) {
+								$ideas[] = add_proposal( $ability, (array) $call->getArgs(), $agent, (int) $context['thread'] );
+								$a_obj   = wp_get_ability( $ability );
+								/* translators: %s: what is proposed */
+								busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => sprintf( __( 'Prepared a suggestion: %s', 'flurfunk' ), \Flurfunk\Changes\NAME === $ability ? __( 'Change posts', 'flurfunk' ) : ( $a_obj ? $a_obj->get_label() : $ability ) ) ) );
+								$reply   = array( 'status' => 'proposed', 'note' => 'Not done yet: it appears as a card under your answer, and a person decides whether to run it.' );
+							} else {
+								$reply = array( 'status' => 'not_allowed', 'note' => sprintf( 'Not proposed: the person asking may not do this, or your limit (%s) does not allow it. Say so plainly, without a card; an administrator can change your limit under Settings → Flurfunk → AI assistants.', limit_label( $agent, (string) ( $context['channel'] ?? '' ) ) ) );
 							}
+							$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( new \WordPress\AiClient\Tools\DTO\FunctionResponse( $call->getId(), $call->getName(), $reply ) );
+						} else {
+							$arg = (int) ( ( (array) $call->getArgs() )['id'] ?? 0 );
+							if ( 'flurfunk/get-thread' === $ability && $arg ) {
+								$looked[] = $arg;
+							} elseif ( 'flurfunk/get-post' === $ability && $arg ) {
+								$posts[] = $arg;
+							} elseif ( ! in_array( $ability, DRAFT_TOOLS, true ) ) {
+								$ran[] = $ability;
+							}
+							admin_read( reads_as_admin( $ability ) ); // WordPress's own read-only abilities: with the asker's rights.
+							try {
+								$response = $resolver->execute_ability( $call );
+							} finally {
+								admin_read( false );
+							}
+							$done     = (array) $response->getResponse();
+							busy_done( (int) $context['thread'], $agent, in_locale( language( $agent ), static fn () => step_label( $ability, (array) $call->getArgs(), $done ) ) );
+							if ( 'flurfunk/list-comments' === $ability ) {
+								foreach ( $done as $c ) {
+									if ( is_array( $c ) && 'hold' === ( $c['status'] ?? '' ) ) {
+										$notes[] = (int) $c['id'];
+									}
+								}
+							}
+							if ( in_array( $ability, DRAFT_TOOLS, true ) && ! empty( $done['id'] ) && empty( $done['error'] ) ) {
+								$drafts[] = (int) $done['id'];
+								update_post_meta( (int) $done['id'], \Flurfunk\Drafts\AGENT, $agent );
+								update_post_meta( (int) $done['id'], \Flurfunk\Drafts\THREAD, (int) $context['thread'] );
+							}
+							$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( $response );
 						}
 					}
-					if ( in_array( $ability, DRAFT_TOOLS, true ) && ! empty( $done['id'] ) && empty( $done['error'] ) ) {
-						$drafts[] = (int) $done['id'];
-						update_post_meta( (int) $done['id'], \Flurfunk\Drafts\AGENT, $agent );
-						update_post_meta( (int) $done['id'], \Flurfunk\Drafts\THREAD, (int) $context['thread'] );
-					}
-					$parts[] = new \WordPress\AiClient\Messages\DTO\MessagePart( $response );
+					return $parts;
 				}
-			}
+			);
 			$history[] = new \WordPress\AiClient\Messages\DTO\UserMessage( $parts );
 		} finally {
 			working( 0 );
-			wp_set_current_user( $me );
 			remove_filter( 'flurfunk_ability_channel', $scope, 10 );
 		}
 	}
@@ -2070,7 +2074,7 @@ function context( object $thread, int $message_id, int $agent, string $task = ''
 						: sprintf( 'You work with the rights of %1$s, the person asking, but at most with what the role %2$s may on this site (your limit here), and never administer the site (users, plugins, settings). What that limit may not see – e.g. other people\'s drafts or private posts – is invisible to you, even if %1$s could see it. So when you cannot find something the person expects (a draft, a post, a channel) or something is refused, do not say it does not exist or that %1$s may not see it: say that it may be outside your limit (%2$s), and that an administrator can change it under Settings → Flurfunk → AI assistants.', $asker_name, '"' . limit_label( $agent, channel_slug( $thread ) ) . '"' ) )
 					: '',
 				profile( $agent )['drafts'] && function_exists( 'wp_get_ability' ) && wp_get_ability( DRAFT_TOOLS[0] ) ? 'You can write drafts: flurfunk/create-draft makes one (never published; the person asking is its author), flurfunk/update-draft changes a draft made that way as long as nobody else has worked on it since. Use them when the person asks for a draft, an article, a text for the site or changes to the draft you wrote; do it, do not just announce it. Then say in one sentence what you wrote – a card with the draft appears under your answer. Write the text plainly: paragraphs separated by a blank line, "- " for lists, "## " for subheadings, no HTML. Files in the thread are shown as [File #ID: name]; when the person wants an image in the draft, pass its ID as featured_image (the main picture) or in images. If adding an image is refused, write the draft without it and say why. You can never publish; say so if asked.' : '',
-				in_array( 'flurfunk/get-styles', profile( $agent )['tools'], true ) ? 'For the site\'s look: read it with flurfunk/get-styles first. To change colors or add CSS, call flurfunk/update-styles with only what changes and a short why – it becomes a card the person applies and can undo. Fonts, font sizes, spacing, borders and the content width go the same way, without CSS: styles as in theme.json (for the whole site, for elements such as heading, h2 or button, or for blocks such as core/button) and layout (contentSize, wideSize) – use the presets get-styles lists (their value, e.g. var(--wp--preset--font-size--large)). Only installed fonts can be used; a new web font is added by a person in the Site Editor (Styles → Typography). Keep CSS small and scoped to the theme\'s blocks and classes; never hide content, never import anything. For a new page, write a draft of type page; for a layout use block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator) with the theme\'s palette colors. To change the header, footer or a page template of a block theme: list them with flurfunk/get-templates, read the one you need (id), then propose flurfunk/update-template with an exact find and replace in its block markup – small and precise. The menu is a navigation menu in the same list (type wp_navigation): a page list in it shows every published page by itself, so publishing a page adds it; to choose the links or their order, propose flurfunk/update-template on the menu (its id, type wp_navigation) with navigation-link blocks – look up the pages\' addresses with flurfunk/find-posts, type page, instead of guessing them. A new page template or template part (e.g. a landing page without sidebar): propose flurfunk/add-template with a slug, a title and its block markup – start from the theme\'s own page template (read it) – and assign to give it to pages right away. Patterns: flurfunk/get-patterns lists the site\'s own and the theme\'s; a theme pattern\'s markup is a good start for a section. To keep a section for reuse, propose flurfunk/save-pattern (synced if it should look the same everywhere, like a contact box; a change to a synced one shows wherever it is used). Classic themes keep templates in files: suggest a child theme instead.' : '',
+				in_array( 'flurfunk/get-styles', profile( $agent )['tools'], true ) ? 'For the site\'s look: read it with flurfunk/get-styles first. To change colors of a block theme, call flurfunk/update-styles with only what changes and a short why – it becomes a card the person applies and can undo. Fonts, font sizes, spacing, borders and the content width go the same way: styles as in theme.json (for the whole site, for elements such as heading, h2 or button, or for blocks such as core/button) and layout (contentSize, wideSize) – use the presets get-styles lists (their value, e.g. var(--wp--preset--font-size--large)). Only installed fonts can be used; a new web font is added by a person in the Site Editor (Styles → Typography). You cannot write CSS: when something needs it, say so and where a person adds it (Site Editor → Styles → Additional CSS, or the Customizer for a classic theme). For a new page, write a draft of type page; for a layout use block markup of core blocks (group, columns, cover, buttons, heading, paragraph, image, separator) with the theme\'s palette colors. To change the header, footer or a page template of a block theme: list them with flurfunk/get-templates, read the one you need (id), then propose flurfunk/update-template with an exact find and replace in its block markup – small and precise. The menu is a navigation menu in the same list (type wp_navigation): a page list in it shows every published page by itself, so publishing a page adds it; to choose the links or their order, propose flurfunk/update-template on the menu (its id, type wp_navigation) with navigation-link blocks – look up the pages\' addresses with flurfunk/find-posts, type page, instead of guessing them. A new page template or template part (e.g. a landing page without sidebar): propose flurfunk/add-template with a slug, a title and its block markup – start from the theme\'s own page template (read it) – and assign to give it to pages right away. Patterns: flurfunk/get-patterns lists the site\'s own and the theme\'s; a theme pattern\'s markup is a good start for a section. To keep a section for reuse, propose flurfunk/save-pattern (synced if it should look the same everywhere, like a contact box; a change to a synced one shows wherever it is used). Classic themes keep templates in files: suggest a child theme instead.' : '',
 				in_array( 'flurfunk/metrics', profile( $agent )['tools'], true ) ? sprintf( 'For the site\'s state and SEO: flurfunk/site-check finds gaps in the content, flurfunk/metrics gives the numbers (what a statistics plugin provides, if any – say so if visits are missing). Keep the numbers with flurfunk/snapshot (thread %d, action take, a note what was done or planned) when someone starts a measure or asks to, and compare later (action compare, since: the number from list) to say whether it helped – changes, not guesses; say when a change may have other causes.', (int) $thread->id ) : '',
 				in_array( 'flurfunk/search-code', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'To explain how a plugin or theme works or how to extend it: find it with flurfunk/list-code, search its code with flurfunk/search-code (hook names, functions, classes), read the relevant lines with flurfunk/read-code. Name file and line. To extend something, suggest a small separate plugin or a snippet using its hooks – never changes to its own files, which an update would overwrite. You cannot change files.' : '',
 				in_array( 'flurfunk/list-comments', array_map( static fn ( $a ) => $a->get_name(), tools( $agent ) ), true ) ? 'For comments: find them with flurfunk/list-comments. Those waiting for approval appear as cards with buttons to approve, mark as spam or trash under your answer, so do not list them all again – say briefly which look like spam and why (many links, off-topic, generic praise) and which deserve an answer. To answer one, call flurfunk/reply-comment; it becomes a card too.' : '',

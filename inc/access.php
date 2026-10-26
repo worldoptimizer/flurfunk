@@ -72,7 +72,9 @@ function is_bot( int $user_id ): bool {
 }
 
 /**
- * Create (or mark) an assistant account: a subscriber without editing rights.
+ * Create (or mark) an assistant account: a subscriber without editing rights, with a random password
+ * nobody knows and no real address. Only when someone who may create users asks for it (Settings →
+ * Flurfunk → Assistants, or `wp flurfunk bot-create`) – never by itself.
  *
  * @param string $name  Display name (empty: "Assistant", translated).
  * @param string $login Login name.
@@ -98,6 +100,7 @@ function create_bot( string $name = '', string $login = 'flurfunk-assistent' ) {
 	if ( ! get_option( 'flurfunk_bot_default' ) ) {
 		update_option( 'flurfunk_bot_default', (int) $id, false );
 	}
+	delete_option( 'flurfunk_needs_assistant' );
 	\Flurfunk\Store\bump();
 	return (int) $id;
 }
@@ -245,6 +248,28 @@ function as_server( int $user_id, callable $fn ) {
 }
 
 /**
+ * Run code with a person's rights, then switch back – the one place where Flurfunk changes the
+ * current user. Nobody gets logged in by it (no cookie, no session, no password). It is for work in
+ * the background (an assistant's answer runs as the person who asked, so its tools see and do only
+ * what that person may), for a card someone clicked (it runs with the clicker's rights) and for PHP
+ * code posting as an assistant (flurfunk_as()): WordPress's own capability checks then see that
+ * person. Switches back even when the work fails.
+ *
+ * @param int      $user_id User.
+ * @param callable $fn      Work.
+ * @return mixed What $fn returns.
+ */
+function act_as( int $user_id, callable $fn ) {
+	$before = get_current_user_id();
+	wp_set_current_user( $user_id );
+	try {
+		return $fn();
+	} finally {
+		wp_set_current_user( $before );
+	}
+}
+
+/**
  * Posts that belong to a person (for "own-posts").
  *
  * @param int $user_id User.
@@ -322,11 +347,15 @@ function can_target( string $type, int $id, int $user_id ): bool {
 }
 
 /**
- * SQL condition for the threads a person may see (table alias t).
+ * The threads a person may see: the channels they read completely, and the threads of channels
+ * where only their own posts count. Queries put both into their own prepare() as placeholder lists
+ * – t.private_to = 0 AND ( t.channel_id IN (…) OR t.id IN (…) ) – with the IDs as its values.
+ * Private conversations never show up in lists, numbers or searches; they have their own view.
  *
  * @param int $user_id User.
+ * @return array{0:int[],1:int[]} Channel IDs and thread IDs, never empty (0 matches nothing).
  */
-function where( int $user_id ): string {
+function visible( int $user_id ): array {
 	global $wpdb;
 	$all = array();
 	$own = array();
@@ -338,15 +367,11 @@ function where( int $user_id ): string {
 			$own[] = (int) $c->id;
 		}
 	}
-	$parts = array();
-	// Each piece is prepared on its own; callers put the result into their own prepared query.
-	if ( $all ) {
-		$parts[] = $wpdb->prepare( 't.channel_id IN (' . implode( ',', array_fill( 0, count( $all ), '%d' ) ) . ')', $all );
-	}
-	$posts = $own ? owned_post_ids( $user_id ) : array();
+	$threads = array();
+	$posts   = $own ? owned_post_ids( $user_id ) : array();
 	if ( $posts ) {
-		$parts[] = $wpdb->prepare( '(t.channel_id IN (' . implode( ',', array_fill( 0, count( $own ), '%d' ) ) . ") AND t.target_type = 'post' AND t.target_id IN (" . implode( ',', array_fill( 0, count( $posts ), '%d' ) ) . '))', array_merge( $own, $posts ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Flurfunk's own table; the IN lists are placeholders.
+		$threads = array_map( 'intval', (array) $wpdb->get_col( $wpdb->prepare( "SELECT id FROM %i WHERE target_type = 'post' AND channel_id IN (" . implode( ',', array_fill( 0, count( $own ), '%d' ) ) . ') AND target_id IN (' . implode( ',', array_fill( 0, count( $posts ), '%d' ) ) . ')', array_merge( array( \Flurfunk\Schema\table( 'threads' ) ), $own, $posts ) ) ) );
 	}
-	// Private conversations never show up in lists, numbers or searches; they have their own view.
-	return $parts ? '(' . implode( ' OR ', $parts ) . ') AND t.private_to = 0' : '0=1';
+	return array( $all ? $all : array( 0 ), $threads ? $threads : array( 0 ) );
 }

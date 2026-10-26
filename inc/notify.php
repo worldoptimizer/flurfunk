@@ -548,15 +548,12 @@ function send_digests( bool $force = false ): int {
 		update_user_meta( $uid, 'flurfunk_digest_day', wp_date( 'Y-m-d' ) );
 		$since = (string) get_user_meta( $uid, 'flurfunk_digest_last', true ) ?: gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS );
 		// Only threads they can still read (a channel may have gained a capability since).
-		$where = Access\where( $uid );
-		$rows  = $wpdb->get_results( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+		list( $channels, $threads ) = Access\visible( $uid );
+		$rows                       = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
-				"SELECT n.*, t.title, t.body, t.channel_id FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s AND {$where} ORDER BY n.id",
-				table( 'notifications' ),
-				table( 'threads' ),
-				$uid,
-				$since
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+				'SELECT n.*, t.title, t.body, t.channel_id FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND n.created > %s AND t.private_to = 0 AND ( t.channel_id IN (' . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') ) ORDER BY n.id',
+				array_merge( array( table( 'notifications' ), table( 'threads' ), $uid, $since ), $channels, $threads )
 			)
 		);
 		update_user_meta( $uid, 'flurfunk_digest_last', Store\now() );
@@ -678,14 +675,12 @@ function mark_read( int $user_id, ?array $ids = null, int $thread_id = 0 ): void
 function unread( int $user_id ): int {
 	global $wpdb;
 	// Like the list: only notifications about threads they can (still) read.
-	$where = Access\where( $user_id );
-	return (int) $wpdb->get_var( // phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is made of $wpdb->prepare() pieces (Access\where()).
+	list( $channels, $threads ) = Access\visible( $user_id );
+	return (int) $wpdb->get_var(
 		$wpdb->prepare(
-			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $where is made of $wpdb->prepare() pieces (Access\where()).
-			"SELECT COUNT(*) FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND {$where}",
-			table( 'notifications' ),
-			table( 'threads' ),
-			$user_id
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- the IN lists are placeholders (Access\visible()).
+			'SELECT COUNT(*) FROM %i n JOIN %i t ON t.id = n.thread_id WHERE n.user_id = %d AND n.read_at IS NULL AND t.private_to = 0 AND ( t.channel_id IN (' . implode( ',', array_fill( 0, count( $channels ), '%d' ) ) . ') OR t.id IN (' . implode( ',', array_fill( 0, count( $threads ), '%d' ) ) . ') )',
+			array_merge( array( table( 'notifications' ), table( 'threads' ), $user_id ), $channels, $threads )
 		)
 	);
 }
